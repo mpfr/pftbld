@@ -1,0 +1,7 @@
+#!/bin/ksh
+
+daemon="/usr/local/sbin/pftbld"
+
+. /etc/rc.d/rc.subr
+
+rc_cmd $1

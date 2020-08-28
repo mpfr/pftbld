@@ -1,0 +1,452 @@
+.\"
+.\" Copyright (c) 2020 Matthias Pressfreund
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: August 21 2020 $
+.Dt PFTBLD.CONF 5
+.Os
+.Sh NAME
+.Nm pftbld.conf
+.Nd configuration file for
+.Xr pftbld 8
+.Sh DESCRIPTION
+.Nm
+maintains the configuration for
+.Xr pftbld 8 .
+In this context, values of type
+.Pa time
+must be specified as a sequence of number/unit combinations, e.g.
+.Pa 7w3d
+for a period of 7 weeks and 3 days.
+Valid units are:
+.Pa w
+(weeks),
+.Pa d
+(days),
+.Pa h
+(hours),
+.Pa m
+(minutes) and
+.Pa s
+(seconds).
+.Sh GLOBAL CONFIGURATION
+Here are the settings that may be applied globally:
+.Bl -tag -width Ds
+.It Oo Ic no Oc Ic backlog Ar number
+The maximum allowed number of simultaneous connections on a
+.Ic socket .
+In case the
+.Ic no
+keyword is used instead of a
+.Ar number ,
+only one connection at a time will be permitted.
+If not specified, the default value of 5 connections will be used.
+The de facto upper limit of this parameter is the value of the
+.Pa kern.somaxconn
+kernel state which may be figured out by means of the
+.Xr sysctl 8
+utility.
+.It Oo Ic no Oc Ic datamax Ar bytes
+This will limit the number of
+.Ar bytes
+allowed to be transmitted per connection.
+In case a client exceeds this limit, the connection will be closed and all
+transmitted data will be discarded.
+If the
+.Ic no
+keyword is specified instead of the number of
+.Ar bytes ,
+no limit will be applied to the amount of data accepted by a connection.
+Defaults to 2048 bytes per connection.
+.It Oo Ic no Oc Ic drop Ar time
+The period of time (starting at the moment of reception) after which a managed
+IP address will be discarded/dropped from
+.Xr pftbld 8
+memory.
+In case the
+.Ic no
+keyword is used instead of a
+.Ar time
+value, IP addresses will be kept forever.
+.It Ic exclude Ar option | Brq ...
+Specifies exclusion criteria for incoming data.
+Multiple criterias may be either specified separately, one at a time, or
+collected by curly brackets.
+Valid options are:
+.Bl -tag -width Ds
+.It Ic localhosts
+Exclude all IP addresses found in the local host name lookup file
+.Pa /etc/hosts
+from being processed.
+.It Ic net Ar address/network
+Exclude the specified
+.Ar address/network
+(e.g.
+.Ar 192.168.100/24 )
+from being processed.
+.It Ic keyterms Ar path
+Skip processing of incoming data containing any of the strings from the file at
+.Ar path
+being read line by line, each line interpreted as a keyterm string.
+.El
+.It Oo Ic no Oc Ic log Ar path
+Make
+.Xr pftbld 8
+write its log to the file at
+.Pa path
+instead of the default log file
+.Pa /var/log/pftbld.log .
+Logging may be completely disabled by using the leading
+.Ic no
+keyword instead of specifying a
+.Ar path .
+.It Oo Ic no Oc Ic timeout Ar milliseconds
+Sets the maximum time for a client to transmit its data making a connection.
+If a client did not succeed sending data after the specified number of
+.Ar milliseconds ,
+the connection will be closed and all transmitted data will be discarded.
+In order to disable this timeout, the
+.Ic no
+keyword may be specified instead of a number of
+.Ar milliseconds .
+The default value is 10000 milliseconds.
+.El
+.Sh TARGETS
+Typically, targets are used to distinguish input data by service type and apply
+appropriate handling.
+.Bl -tag -width Ds
+.It Ic target Ar name Brq ...
+The
+.Pa name
+must be an explicit identifier, ideally reflecting the corresponding service
+name, followed by a block of options enclosed in curly brackets:
+.Bl -tag -width Ds
+.It Ic cascade Brq ...
+Specifies frame and first
+.Ic step
+of a
+.Xr pf 4
+.Ic table
+cascade every managed IP address will traverse during its
+.Xr pftbld 8
+life cycle, followed by a block of options enclosed in curly brackets:
+.Bl -tag -width Ds
+.It Oo Ic no Oc Ic drop Ar time
+Overrides any previously specified
+.Ic drop
+option.
+.It Ic expire Ar time
+Specifies the period of time an IP address will be held in the corresponding
+.Ic table .
+When that period has passed, the address will be deleted from the table.
+If omitted, addresses will be deleted only when dropped.
+.It Ic hits Ar number
+Maximum number of appearances for a specific IP address in the corresponding
+.Ic table .
+If
+.Ar number
+gets exceeded by an IP address, it will move on to the next
+.Ic step .
+In order to properly close a
+.Ic cascade ,
+this option needs to be omitted on the last
+.Ic step
+as this will make
+.Xr pftbld 8
+stop evaluating the appearance count of an IP address.
+.It Ic kill | keep Ar option | Brq ...
+Set/Unset kill options used when adding an address into a
+.Ic table .
+Multiple options may be either specified separately, one at a time, or
+collected by curly brackets.
+Valid options are:
+.Bl -tag -width Ds
+.It Ic nodes
+Refers to a reported address'
+.Pa source nodes .
+The default is
+.Ic keep .
+.It Ic states
+Refers to a reported address'
+.Pa state entries .
+The default is
+.Ic kill .
+.El
+Generally, an option's setting will be applied to the current
+.Ic step
+and all its successors, until revoked by its counterpart.
+.It Ic step Brq ...
+The next step in the
+.Ic cascade ,
+followed by a block of cascade options (except
+.Ic step
+itself) enclosed in curly brackets.
+Multiple occurrences are traversed in the order of their appearance.
+If
+.Ic table
+(inside the options) is omitted, its most recent definition will be used.
+.It Ic table Ar name
+The
+.Ar name
+of the corresponding
+.Xr pf 4
+table.
+This option is mandatory at
+.Ic cascade
+definition and optional for every enclosed
+.Ic step .
+.sp
+It shall further be noted that, even though sharing tables is discouraged,
+unmanaged entries added by other means will perfectly coexist and neither
+interfere with nor get affected by those created and managed by
+.Xr pftbld 8 .
+.El
+.It Oo Ic no Oc Ic drop Ar time
+Overrides the global
+.Ic drop
+option.
+.It Ic exclude Ar option | Brq ...
+Allows for
+.Ic target
+specific exclusion criteria additional (and evaluated prior) to the global
+.Ic exclude
+settings.
+.It Ic persist Ar path
+Specifies a file at
+.Ar path
+where managed IP addresses get saved to on service shutdown and loaded from on
+service startup.
+Each line of the file contains three space-separated fields: the address at
+first, followed by the number of hits and finally the UNIX timestamp of the
+last hit in the end.
+.sp
+This option may also be used to initialize the daemon's memory on startup by
+submitting a list of plain IP addresses (one per line) without any further
+information.
+In this case, the two other fields will be initialized to 1 for the number of
+hits and the current time for the last hit timestamp.
+.It Ic socket Ar path Oo Bro ... Brc Oc
+Specifies a UNIX-domain socket at
+.Ar path
+to be used for sending target specific
+.Pa data strings
+to
+.Xr pftbld 8 .
+At least one data socket must be specified per
+.Ic target ,
+followed by an optional block of parameters enclosed in curly brackets:
+.Bl -tag -width Ds
+.It Oo Ic no Oc Ic backlog Ar number
+Overrides the global
+.Ic backlog
+value.
+.It Oo Ic no Oc Ic datamax Ar bytes
+Overrides the global
+.Ic datamax
+value.
+.It Ic group Ar id | name
+The group of the
+.Ic socket ,
+either as a numeric group
+.Ar id
+or as a
+.Ar name
+to derive the
+.Ar id
+from.
+Defaults to the group of the parent directory.
+.It Ic id Ar name
+Appends the given
+.Ar name
+to the
+.Ar name
+of the enclosing
+.Ic target
+in all log entries and in the process list.
+This is useful in case more than one
+.Ic socket
+is defined for a target as it later allows for their identification.
+.It Ic mode Ar number
+The absolute mode of the
+.Ic socket ,
+as an octal
+.Ar number .
+Defaults to 0660.
+.It Ic owner Ar id | name
+The owner of the
+.Ic socket ,
+either as a numeric user
+.Ar id
+or as a
+.Ar name
+to derive the
+.Ar id
+from.
+Defaults to the owner of the parent directory.
+.It Oo Ic no Oc Ic timeout Ar milliseconds
+Overrides the global
+.Ic timeout
+value.
+.El
+.El
+.El
+.Sh FILES
+.Bl -tag -width "/etc/pftbld/pftbld.conf" -compact
+.It Pa /etc/hosts
+Local host name lookup file.
+.It Pa /etc/pftbld/pftbld.conf
+Default configuration file path.
+.It Pa /var/run/pftbld.sock
+Default control socket.
+.El
+.Sh EXAMPLES
+The following
+.Nm
+example specifies a
+.Pa www
+target with a
+.Pa data socket
+inside the default
+.Xr chroot 8
+directory of the
+.Xr httpd 8
+server, allowing for instant reporting of offending clients.
+.Bd -literal -offset indent
+exclude {
+	localhosts
+	net "10.0.0/24"
+}
+
+drop 3w
+
+target "www" {
+	persist "/etc/pftbld/clientaddr.list"
+	exclude keyterms "/etc/pftbld/keyterms.list"
+
+	socket "/var/www/run/pftbld-www.sock" {
+		owner "www"
+		group "www"
+	}
+
+	cascade {
+		table "attackers"
+		hits 4
+		expire 1h
+
+		step {
+			hits 12
+			expire 6h
+		}
+		step {
+			expire 5d
+			no drop
+			kill nodes
+		}
+	}
+}
+.Ed
+.Pp
+The first 4 times an address (outside the
+.Pa 10.0.0/24
+network and the hosts found in
+.Pa /etc/hosts )
+gets reported, it will be added to the
+.Pa attackers
+table for 1 hour.
+From the 5th until the 12th time, the address will remain in the same table
+for 6 hours.
+Until here, if an address has not been reported for 3 weeks, it will be
+dropped from memory.
+Related state entries will be killed while source nodes will be kept (the
+default).
+.Pp
+From the 13th appearance forth, an address will be held in the
+.Pa attackers
+table for 5 days, is not going to be dropped from memory anymore and source
+nodes will be killed along with state entries.
+.Pp
+The
+.Xr pftbld 8
+binary in pipe mode may be used for testing:
+.Bd -literal -offset indent
+$ echo -n "11.22.33.44" | pftbld -p /var/www/run/pftbld-www.sock
+.Ed
+.Pp
+Alternatively, the same result can be achieved by utilizing
+.Xr pftblctl 8 :
+.Bd -literal -offset indent
+$ pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44
+.Ed
+.Pp
+If everything went right, two entries were appended to the default log file
+.Pa /var/log/pftbld.log .
+The first telling that the address
+.Pa 11.22.33.44
+has hit the
+.Pa www
+target and the second that the address has been added to the
+.Pa attackers
+.Xr pf 4
+table and will be kept there for the next hour.
+.Pp
+Removing the address from
+.Xr pftbld 8
+memory (and the
+.Pa attackers
+table) can be achieved by sending a
+.Pa drop
+command to the
+.Pa control socket :
+.Bd -literal -offset indent
+$ pftblctl drop 11.22.33.44
+1 client entry dropped.
+.Ed
+.Pp
+In order to keep offending clients away from
+.Xr httpd 8 ,
+appropriate entries in
+.Xr pf.conf 5
+are required.
+Here's an example:
+.Bd -literal -offset indent
+table <attackers> persist
+block in quick log proto tcp from <attackers> to port { www https }
+.Ed
+.Pp
+On a FastCGI supported web server, the following PHP code snippet allows for
+automatic notifications:
+.Bd -literal -offset indent
+function pftbld_feed() {
+	$sock = socket_create(AF_UNIX, SOCK_STREAM, 0);
+	if ($sock === false)
+		return;
+	if (socket_connect($sock, '/run/pftbld-www.sock') !== false)
+		socket_write($sock,
+		    "{$_SERVER['REMOTE_ADDR']}\\n".
+		    "{$_SERVER['REQUEST_URI']}\\n".
+		    "{$_SERVER['HTTP_USER_AGENT']}");
+	socket_close($sock);
+}
+.Ed
+.Sh SEE ALSO
+.Xr pf 4 ,
+.Xr pf.conf 5 ,
+.Xr pftblctl 8 ,
+.Xr pftbld 8
+.Sh AUTHORS
+.An -nosplit
+The
+.Xr pftbld 8
+program was written by
+.An Matthias Pressfreund .

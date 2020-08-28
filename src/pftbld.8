@@ -1,0 +1,201 @@
+.\"
+.\" Copyright (c) 2020 Matthias Pressfreund
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: August 22 2020 $
+.Dt PFTBLD 8
+.Os
+.Sh NAME
+.Nm pftbld
+.Nd automate
+.Xr pf 4
+table content management
+.Sh SYNOPSIS
+.Nm
+.Op Fl dnuv
+.Op Fl f Ar file
+.Op Fl s Ar socket
+.Nm
+.Op Fl v
+.Fl p Ar socket
+.Sh DESCRIPTION
+The
+.Nm
+daemon listens on UNIX-domain sockets for incoming IP addresses, usually sent
+by programs such as network services and applications, and makes them traverse
+.Xr pf 4
+tables according to its configuration and the history of their occurrance.
+The daemon was originally designed to maintain service/application specific
+firewall blacklists, but may just as well serve any other kind of filtering or
+translation purposes.
+As
+.Nm
+can persist managed addresses and meta-data, it is capable of restoring its
+runtime status and corresponding
+.Xr pf 4
+tables through system reboots and migrations.
+.Pp
+.Nm
+obtains its configuration from
+.Xr pftbld.conf 5 .
+.Pp
+Sole prerequisite for client programs is the ability to directly or
+indirectly connect and write to UNIX-domain sockets.
+A FastCGI supported
+.Xr httpd 8
+server reporting offenders through such a socket is a typical example (see also
+.Xr pftbld.conf 5 Ns ).
+.Pp
+.Nm
+rereads the configuration file when it receives
+.Dv SIGHUP
+and reopens its log file when it receives
+.Dv SIGUSR1 .
+.Pp
+The options are as follows:
+.Bl -tag -width "-s socket"
+.It Fl d
+Debug mode.
+Don't detach or become a daemon.
+This allows for easy monitoring of
+.Nm .
+.It Fl f Ar file
+Specifies the configuration
+.Ar file .
+The default is
+.Pa /etc/pftbld/pftbld.conf .
+.It Fl n
+Verify the configuration, but don't start the service.
+.It Fl p Ar socket
+Makes
+.Nm
+act as a pipe forwarding
+.Ar stdin
+to the UNIX-domain
+.Ar socket
+specified and terminates silently right after.
+No other actions will be carried out and no other files will be accessed.
+.It Fl s Ar socket
+Specifies the control
+.Ar socket .
+Defaults to
+.Pa /var/run/pftbld.sock .
+.It Fl u
+By default, managed addresses will remain in
+.Xr pf 4
+tables after
+.Nm
+shutdown.
+With this option given, addresses will be unloaded from corresponding tables
+on shutdown.
+.It Fl v
+Verbose mode.
+If used with the server, multiple
+.Fl v
+options increase the verbosity.
+If used with pipe mode to write commands to the
+.Pa control socket ,
+this will enable printing server replies to
+.Ar stdout .
+.El
+.Sh MESSAGES
+Messages may be sent to any
+.Ic socket
+specified in the configuration.
+Each message must be formatted as
+.Pa one single plain text string ,
+and may consist of multiple
+.Pa newline-delimited
+parts.
+By default, the maximum length of a message is 2048 bytes, but this may be
+changed via the
+.Ic datamax
+parameter in
+.Xr pftbld.conf 5 .
+.Pp
+A message for a
+.Pa data socket
+must start with an
+.Pa IP address
+followed by an arbitrary number of
+.Pa optional text sections ,
+whose sole purpose is getting matched against the
+.Ic exclude keyterms
+specified in the configuration and finally get written into the log file.
+Here's an example:
+.Bd -literal -offset indent
+# msg="11.22.33.44\\nGET /test.php 404"
+.Ed
+.Pp
+Sending the above message to a
+.Pa data socket ,
+in this case located at
+.Pa /var/www/run/pftbld-www.sock ,
+.Bd -literal -offset indent
+# echo -n "${msg}" | pftbld -p /var/www/run/pftbld-www.sock
+.Ed
+.Pp
+which is connected to the
+.Pa www
+target, will cause two log entries:
+.Bd -literal -offset indent
+[...] Hit :: [www] <- [11.22.33.44][GET /test.php 404]
+[...] >>> Added [11.22.33.44]:[www]:(2x:3h16m25s) \\
+to { attackers } for 1h.
+.Ed
+.Pp
+The first entry documents the incoming message including all optional parts.
+The following entry lets us know that this is the second time the address
+.Pa 11.22.33.44
+was reported, while the last time was exaclty 3 hours, 16 minutes and 25
+seconds ago.
+Finally, we learn that the address was added into the
+.Pa attackers
+table where it will remain for 1 hour before, in turn, getting deleted causing
+another log entry:
+.Bd -literal -offset indent
+[...] >>> Deleted [11.22.33.44]:[www]:(2x:1h) from { attackers }.
+.Ed
+.Pp
+Even though sending messages to a
+.Pa control socket
+basically works the same way, it is recommended to use the
+.Xr pftblctl 8
+tool for the sake of simplicity.
+A list of accepted commands is available on its manpage.
+.Sh FILES
+.Bl -tag -width "/etc/pftbld/pftbld.conf" -compact
+.It Pa /etc/pftbld/pftbld.conf
+Default configuration file.
+.It Pa /var/log/pftbld.log
+Default log file.
+.It Pa /var/run/pftbld.sock
+Default control socket.
+.El
+.Sh SEE ALSO
+.Xr pf 4 ,
+.Xr pftbld.conf 5 ,
+.Xr pftblctl 8
+.Sh HISTORY
+The
+.Nm
+program first appeared on
+.Lk https://github.com/mpfr/pftbld/ GitHub
+in August, 2020.
+.Sh AUTHORS
+.An -nosplit
+The
+.Nm
+program was written by
+.An Matthias Pressfreund .

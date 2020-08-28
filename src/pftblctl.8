@@ -1,0 +1,198 @@
+.\"
+.\" Copyright (c) 2020 Matthias Pressfreund
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.Dd $Mdocdate: August 21 2020 $
+.Dt PFTBLCTL 8
+.Os
+.Sh NAME
+.Nm pftblctl
+.Nd control the
+.Xr pftbld 8
+daemon
+.Sh SYNOPSIS
+.Nm
+.Op Fl q
+.Op Fl s Ar socket
+.Ar command/address
+.Op Ar argument ...
+.Sh DESCRIPTION
+.Nm
+acually is a wrapper script facilitating the use of
+.Xr pftbld 8
+in verbose pipe mode.
+It is primarily intended to be used for sending commands to the
+.Ar control socket ,
+but may as well be utilized to simulate client input on a
+.Ar data socket .
+.Pp
+The options are as follows:
+.Bl -tag -width "-s socket"
+.It Fl q
+Quiet mode, suppressing output on
+.Ar stdout .
+.It Fl s Ar socket
+Specifies the
+.Ar socket
+used to send data to and defaults to
+.Pa /var/run/pftbld.sock .
+.El
+.Sh COMMANDS
+On the
+.Pa control socket ,
+the following commands will be accepted:
+.Bl -tag -width Ds -offset Ds
+.It Ic drop Oo Ic recap Oc Ar address/network Oo Ar target Oc
+Deletes the given
+.Ar address/network
+ahead of schedule from corresponding
+.Xr pf 4
+tables and from memory, optionally filtered for the given
+.Ar target .
+If
+.Ar target
+is omitted, removal will affect all targets.
+Since normally every single deletion will be logged, specifying large
+.Ar network
+ranges may lead to log files getting flooded with deletion entries.
+This can be avoided by passing the
+.Ic recap
+keyword which will make sure just a short summary (providing the number of
+deleted addresses per
+.Ar target
+and the overall number of dropped client entries) gets written into the log
+file instead.
+.It Ic dump Ar target
+Writes managed addresses and meta-data (number of hits and timestamp of last
+occurrence) of the specified
+.Ar target
+to
+.Ar stdout .
+.It Ic expire Oo Ic recap Oc Ar address/network Oo Ar target Oc
+Like the
+.Ic drop
+command, but just deletes
+.Ar address/network
+from
+.Xr pf 4
+tables while still keeping memorized.
+.It Ic list Oo Ic active Oc Oo Ar address/network Oc Oo Ar target Oc
+Prints a list of memorized client information to
+.Ar stdout .
+Output may be pre-filtered by the
+.Ic active
+keyword, matching only those clients currently present in a
+.Xr pf 4
+table, as well as by specifying an IP
+.Ar address/network
+and/or a
+.Ar target
+name.
+If no parameter is given, information for all clients will be printed.
+.It Ic reload
+Reinitializes the configuration by reloading the configuration file
+.Xr pftbld.conf 5 .
+The same effect may be accomplished by either using the
+.Xr rcctl 8
+utility:
+.Pp
+.Dl # rcctl reload pftbld
+.Pp
+or the
+.Xr pkill 1
+command:
+.Pp
+.Dl # pkill -HUP pftbld
+.It Ic save Ar target
+Writes managed addresses and meta-data (number of hits and timestamp of last
+occurrence) of the specified
+.Ar target
+to the corresponding
+.Ic persist
+.Ar path
+specified in the configuration file
+.Xr pftbld.conf 5 ,
+or (if not specified) no action will be performed.
+.It Ic self-exclude Oo Ar address/network | Ic remove Oc
+Writes
+.Ar address/network
+into the first location of the global
+.Ic exclude
+list and is intended to be used for the publicly visible
+.Ar address/network
+.Nm
+is running on.
+If the
+.Ic remove
+keyword is used instead of an
+.Ar address/network ,
+the current self-exclude will be deleted.
+If called without parameter, the current self-exclude will be printed to
+.Ar stdout .
+.It Ic status
+Prints a status report to
+.Ar stdout .
+.It Ic verbose Oo Ar level Oc
+Get/Set the verbosity
+.Ar level .
+If issued without parameter, the current level will be printed to
+.Ar stdout .
+.El
+.Pp
+Here's an example for a
+.Ic status
+report:
+.Bd -literal -offset indent
+# pftblctl status
+Self-exclude: [129.128.5/24]
+Verbosity level: 0
+Client count:
+	target [www]: 249
+Next scheduled event:
+	[11.22.33.44]:[www]:(2x:50m12s)
+		expires from { attackers } in 9m48s,
+		on [21/Jul/2020:11:22:56 +0200]
+.Ed
+.Pp
+The next example shows a
+.Pa control
+command deleting the address
+.Pa 11.22.33.44
+for the
+.Pa www
+target from memory:
+.Bd -literal -offset indent
+# pftblctl drop 11.22.33.44 www
+1 client entry dropped.
+.Ed
+.Pp
+The corresponding log entry might look like this:
+.Bd -literal -offset indent
+[...] [11.22.33.44]:[www]:(2x:1h3m17s) dropped.
+.Ed
+.Sh FILES
+.Bl -tag -width "/var/run/pftbld.sock" -compact
+.It Pa /var/run/pftbld.sock
+Default control socket.
+.El
+.Sh SEE ALSO
+.Xr pf 4 ,
+.Xr pftbld.conf 5 ,
+.Xr pftbld 8
+.Sh AUTHORS
+.An -nosplit
+The
+.Xr pftbld 8
+program was written by
+.An Matthias Pressfreund .

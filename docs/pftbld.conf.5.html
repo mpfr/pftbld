@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<!-- This is an automatically generated file.  Do not edit.
+   Copyright (c) 2020 Matthias Pressfreund
+  
+   Permission to use, copy, modify, and distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
+  
+   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   -->
+<head>
+  <meta charset="utf-8"/>
+  <link rel="stylesheet" href="mandoc.css" type="text/css" media="all"/>
+  <title>PFTBLD.CONF(5)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">PFTBLD.CONF(5)</td>
+    <td class="head-vol">File Formats Manual</td>
+    <td class="head-rtitle">PFTBLD.CONF(5)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp"><code class="Nm">pftbld.conf</code> &#x2014;
+    <span class="Nd">configuration file for
+    <a class="Xr" href="pftbld.8.html">pftbld(8)</a></span></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp"><code class="Nm">pftbld.conf</code> maintains the configuration
+    for <a class="Xr" href="pftbld.8.html">pftbld(8)</a>. In this context,
+    values of type <span class="Pa">time</span> must be specified as a sequence
+    of number/unit combinations, e.g. <span class="Pa">7w3d</span> for a period
+    of 7 weeks and 3 days. Valid units are: <span class="Pa">w</span> (weeks),
+    <span class="Pa">d</span> (days), <span class="Pa">h</span> (hours),
+    <span class="Pa">m</span> (minutes) and <span class="Pa">s</span>
+  (seconds).</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="GLOBAL_CONFIGURATION"><a class="permalink" href="#GLOBAL_CONFIGURATION">GLOBAL
+  CONFIGURATION</a></h1>
+<p class="Pp">Here are the settings that may be applied globally:</p>
+<dl class="Bl-tag">
+  <dt>[<code class="Ic">no</code>] <code class="Ic">backlog</code>
+    <var class="Ar">number</var></dt>
+  <dd>The maximum allowed number of simultaneous connections on a
+      <code class="Ic">socket</code>. In case the <code class="Ic">no</code>
+      keyword is used instead of a <var class="Ar">number</var>, only one
+      connection at a time will be permitted. If not specified, the default
+      value of 5 connections will be used. The de facto upper limit of this
+      parameter is the value of the <span class="Pa">kern.somaxconn</span>
+      kernel state which may be figured out by means of the
+      <a class="Xr" href="http://man.openbsd.org/sysctl.8">sysctl(8)</a>
+      utility.</dd>
+  <dt>[<code class="Ic">no</code>] <code class="Ic">datamax</code>
+    <var class="Ar">bytes</var></dt>
+  <dd>This will limit the number of <var class="Ar">bytes</var> allowed to be
+      transmitted per connection. In case a client exceeds this limit, the
+      connection will be closed and all transmitted data will be discarded. If
+      the <code class="Ic">no</code> keyword is specified instead of the number
+      of <var class="Ar">bytes</var>, no limit will be applied to the amount of
+      data accepted by a connection. Defaults to 2048 bytes per connection.</dd>
+  <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
+    <var class="Ar">time</var></dt>
+  <dd>The period of time (starting at the moment of reception) after which a
+      managed IP address will be discarded/dropped from
+      <a class="Xr" href="pftbld.8.html">pftbld(8)</a> memory. In case the
+      <code class="Ic">no</code> keyword is used instead of a
+      <var class="Ar">time</var> value, IP addresses will be kept forever.</dd>
+  <dt id="exclude"><a class="permalink" href="#exclude"><code class="Ic">exclude</code></a>
+    <var class="Ar">option</var> | {...}</dt>
+  <dd>Specifies exclusion criteria for incoming data. Multiple criterias may be
+      either specified separately, one at a time, or collected by curly
+      brackets. Valid options are:
+    <dl class="Bl-tag">
+      <dt id="localhosts"><a class="permalink" href="#localhosts"><code class="Ic">localhosts</code></a></dt>
+      <dd>Exclude all IP addresses found in the local host name lookup file
+          <span class="Pa">/etc/hosts</span> from being processed.</dd>
+      <dt id="net"><a class="permalink" href="#net"><code class="Ic">net</code></a>
+        <var class="Ar">address/network</var></dt>
+      <dd>Exclude the specified <var class="Ar">address/network</var> (e.g.
+          <var class="Ar">192.168.100/24</var>) from being processed.</dd>
+      <dt id="keyterms"><a class="permalink" href="#keyterms"><code class="Ic">keyterms</code></a>
+        <var class="Ar">path</var></dt>
+      <dd>Skip processing of incoming data containing any of the strings from
+          the file at <var class="Ar">path</var> being read line by line, each
+          line interpreted as a keyterm string.</dd>
+    </dl>
+  </dd>
+  <dt>[<code class="Ic">no</code>] <code class="Ic">log</code>
+    <var class="Ar">path</var></dt>
+  <dd>Make <a class="Xr" href="pftbld.8.html">pftbld(8)</a> write its log to the
+      file at <span class="Pa">path</span> instead of the default log file
+      <span class="Pa">/var/log/pftbld.log</span>. Logging may be completely
+      disabled by using the leading <code class="Ic">no</code> keyword instead
+      of specifying a <var class="Ar">path</var>.</dd>
+  <dt>[<code class="Ic">no</code>] <code class="Ic">timeout</code>
+    <var class="Ar">milliseconds</var></dt>
+  <dd>Sets the maximum time for a client to transmit its data making a
+      connection. If a client did not succeed sending data after the specified
+      number of <var class="Ar">milliseconds</var>, the connection will be
+      closed and all transmitted data will be discarded. In order to disable
+      this timeout, the <code class="Ic">no</code> keyword may be specified
+      instead of a number of <var class="Ar">milliseconds</var>. The default
+      value is 10000 milliseconds.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="TARGETS"><a class="permalink" href="#TARGETS">TARGETS</a></h1>
+<p class="Pp">Typically, targets are used to distinguish input data by service
+    type and apply appropriate handling.</p>
+<dl class="Bl-tag">
+  <dt id="target"><a class="permalink" href="#target"><code class="Ic">target</code></a>
+    <var class="Ar">name</var> {...}</dt>
+  <dd>The <span class="Pa">name</span> must be an explicit identifier, ideally
+      reflecting the corresponding service name, followed by a block of options
+      enclosed in curly brackets:
+    <dl class="Bl-tag">
+      <dt id="cascade"><a class="permalink" href="#cascade"><code class="Ic">cascade</code></a>
+        {...}</dt>
+      <dd>Specifies frame and first <code class="Ic">step</code> of a
+          <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>
+          <code class="Ic">table</code> cascade every managed IP address will
+          traverse during its <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
+          life cycle, followed by a block of options enclosed in curly brackets:
+        <dl class="Bl-tag">
+          <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
+            <var class="Ar">time</var></dt>
+          <dd>Overrides any previously specified <code class="Ic">drop</code>
+              option.</dd>
+          <dt id="expire"><a class="permalink" href="#expire"><code class="Ic">expire</code></a>
+            <var class="Ar">time</var></dt>
+          <dd>Specifies the period of time an IP address will be held in the
+              corresponding <code class="Ic">table</code>. When that period has
+              passed, the address will be deleted from the table. If omitted,
+              addresses will be deleted only when dropped.</dd>
+          <dt id="hits"><a class="permalink" href="#hits"><code class="Ic">hits</code></a>
+            <var class="Ar">number</var></dt>
+          <dd>Maximum number of appearances for a specific IP address in the
+              corresponding <code class="Ic">table</code>. If
+              <var class="Ar">number</var> gets exceeded by an IP address, it
+              will move on to the next <code class="Ic">step</code>. In order to
+              properly close a <code class="Ic">cascade</code>, this option
+              needs to be omitted on the last <code class="Ic">step</code> as
+              this will make <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
+              stop evaluating the appearance count of an IP address.</dd>
+          <dt id="kill"><a class="permalink" href="#kill"><code class="Ic">kill</code></a>
+            |
+            <a class="permalink" href="#keep"><code class="Ic" id="keep">keep</code></a>
+            <var class="Ar">option</var> | {...}</dt>
+          <dd>Set/Unset kill options used when adding an address into a
+              <code class="Ic">table</code>. Multiple options may be either
+              specified separately, one at a time, or collected by curly
+              brackets. Valid options are:
+            <dl class="Bl-tag">
+              <dt id="nodes"><a class="permalink" href="#nodes"><code class="Ic">nodes</code></a></dt>
+              <dd>Refers to a reported address' <span class="Pa">source
+                  nodes</span>. The default is
+                <code class="Ic">keep</code>.</dd>
+              <dt id="states"><a class="permalink" href="#states"><code class="Ic">states</code></a></dt>
+              <dd>Refers to a reported address' <span class="Pa">state
+                  entries</span>. The default is
+                <code class="Ic">kill</code>.</dd>
+            </dl>
+            Generally, an option's setting will be applied to the current
+              <code class="Ic">step</code> and all its successors, until revoked
+              by its counterpart.</dd>
+          <dt id="step"><a class="permalink" href="#step"><code class="Ic">step</code></a>
+            {...}</dt>
+          <dd>The next step in the <code class="Ic">cascade</code>, followed by
+              a block of cascade options (except <code class="Ic">step</code>
+              itself) enclosed in curly brackets. Multiple occurrences are
+              traversed in the order of their appearance. If
+              <code class="Ic">table</code> (inside the options) is omitted, its
+              most recent definition will be used.</dd>
+          <dt id="table"><a class="permalink" href="#table"><code class="Ic">table</code></a>
+            <var class="Ar">name</var></dt>
+          <dd>The <var class="Ar">name</var> of the corresponding
+              <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table.
+              This option is mandatory at <code class="Ic">cascade</code>
+              definition and optional for every enclosed
+              <code class="Ic">step</code>.
+            <p class="Pp">It shall further be noted that, even though sharing
+                tables is discouraged, unmanaged entries added by other means
+                will perfectly coexist and neither interfere with nor get
+                affected by those created and managed by
+                <a class="Xr" href="pftbld.8.html">pftbld(8)</a>.</p>
+          </dd>
+        </dl>
+      </dd>
+      <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
+        <var class="Ar">time</var></dt>
+      <dd>Overrides the global <code class="Ic">drop</code> option.</dd>
+      <dt id="exclude~2"><a class="permalink" href="#exclude~2"><code class="Ic">exclude</code></a>
+        <var class="Ar">option</var> | {...}</dt>
+      <dd>Allows for <code class="Ic">target</code> specific exclusion criteria
+          additional (and evaluated prior) to the global
+          <code class="Ic">exclude</code> settings.</dd>
+      <dt id="persist"><a class="permalink" href="#persist"><code class="Ic">persist</code></a>
+        <var class="Ar">path</var></dt>
+      <dd>Specifies a file at <var class="Ar">path</var> where managed IP
+          addresses get saved to on service shutdown and loaded from on service
+          startup. Each line of the file contains three space-separated fields:
+          the address at first, followed by the number of hits and finally the
+          UNIX timestamp of the last hit in the end.
+        <p class="Pp">This option may also be used to initialize the daemon's
+            memory on startup by submitting a list of plain IP addresses (one
+            per line) without any further information. In this case, the two
+            other fields will be initialized to 1 for the number of hits and the
+            current time for the last hit timestamp.</p>
+      </dd>
+      <dt id="socket"><a class="permalink" href="#socket"><code class="Ic">socket</code></a>
+        <var class="Ar">path</var> [{...}]</dt>
+      <dd>Specifies a UNIX-domain socket at <var class="Ar">path</var> to be
+          used for sending target specific <span class="Pa">data strings</span>
+          to <a class="Xr" href="pftbld.8.html">pftbld(8)</a>. At least one data
+          socket must be specified per <code class="Ic">target</code>, followed
+          by an optional block of parameters enclosed in curly brackets:
+        <dl class="Bl-tag">
+          <dt>[<code class="Ic">no</code>] <code class="Ic">backlog</code>
+            <var class="Ar">number</var></dt>
+          <dd>Overrides the global <code class="Ic">backlog</code> value.</dd>
+          <dt>[<code class="Ic">no</code>] <code class="Ic">datamax</code>
+            <var class="Ar">bytes</var></dt>
+          <dd>Overrides the global <code class="Ic">datamax</code> value.</dd>
+          <dt id="group"><a class="permalink" href="#group"><code class="Ic">group</code></a>
+            <var class="Ar">id</var> | <var class="Ar">name</var></dt>
+          <dd>The group of the <code class="Ic">socket</code>, either as a
+              numeric group <var class="Ar">id</var> or as a
+              <var class="Ar">name</var> to derive the <var class="Ar">id</var>
+              from. Defaults to the group of the parent directory.</dd>
+          <dt id="id"><a class="permalink" href="#id"><code class="Ic">id</code></a>
+            <var class="Ar">name</var></dt>
+          <dd>Appends the given <var class="Ar">name</var> to the
+              <var class="Ar">name</var> of the enclosing
+              <code class="Ic">target</code> in all log entries and in the
+              process list. This is useful in case more than one
+              <code class="Ic">socket</code> is defined for a target as it later
+              allows for their identification.</dd>
+          <dt id="mode"><a class="permalink" href="#mode"><code class="Ic">mode</code></a>
+            <var class="Ar">number</var></dt>
+          <dd>The absolute mode of the <code class="Ic">socket</code>, as an
+              octal <var class="Ar">number</var>. Defaults to 0660.</dd>
+          <dt id="owner"><a class="permalink" href="#owner"><code class="Ic">owner</code></a>
+            <var class="Ar">id</var> | <var class="Ar">name</var></dt>
+          <dd>The owner of the <code class="Ic">socket</code>, either as a
+              numeric user <var class="Ar">id</var> or as a
+              <var class="Ar">name</var> to derive the <var class="Ar">id</var>
+              from. Defaults to the owner of the parent directory.</dd>
+          <dt>[<code class="Ic">no</code>] <code class="Ic">timeout</code>
+            <var class="Ar">milliseconds</var></dt>
+          <dd>Overrides the global <code class="Ic">timeout</code> value.</dd>
+        </dl>
+      </dd>
+    </dl>
+  </dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h1>
+<dl class="Bl-tag Bl-compact">
+  <dt><span class="Pa">/etc/hosts</span></dt>
+  <dd>Local host name lookup file.</dd>
+  <dt><span class="Pa">/etc/pftbld/pftbld.conf</span></dt>
+  <dd>Default configuration file path.</dd>
+  <dt><span class="Pa">/var/run/pftbld.sock</span></dt>
+  <dd>Default control socket.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<p class="Pp">The following <code class="Nm">pftbld.conf</code> example
+    specifies a <span class="Pa">www</span> target with a <span class="Pa">data
+    socket</span> inside the default
+    <a class="Xr" href="http://man.openbsd.org/chroot.8">chroot(8)</a> directory
+    of the <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a>
+    server, allowing for instant reporting of offending clients.</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+exclude {
+	localhosts
+	net &quot;10.0.0/24&quot;
+}
+
+drop 3w
+
+target &quot;www&quot; {
+	persist &quot;/etc/pftbld/clientaddr.list&quot;
+	exclude keyterms &quot;/etc/pftbld/keyterms.list&quot;
+
+	socket &quot;/var/www/run/pftbld-www.sock&quot; {
+		owner &quot;www&quot;
+		group &quot;www&quot;
+	}
+
+	cascade {
+		table &quot;attackers&quot;
+		hits 4
+		expire 1h
+
+		step {
+			hits 12
+			expire 6h
+		}
+		step {
+			expire 5d
+			no drop
+			kill nodes
+		}
+	}
+}
+</pre>
+</div>
+<p class="Pp">The first 4 times an address (outside the
+    <span class="Pa">10.0.0/24</span> network and the hosts found in
+    <span class="Pa">/etc/hosts</span>) gets reported, it will be added to the
+    <span class="Pa">attackers</span> table for 1 hour. From the 5th until the
+    12th time, the address will remain in the same table for 6 hours. Until
+    here, if an address has not been reported for 3 weeks, it will be dropped
+    from memory. Related state entries will be killed while source nodes will be
+    kept (the default).</p>
+<p class="Pp">From the 13th appearance forth, an address will be held in the
+    <span class="Pa">attackers</span> table for 5 days, is not going to be
+    dropped from memory anymore and source nodes will be killed along with state
+    entries.</p>
+<p class="Pp">The <a class="Xr" href="pftbld.8.html">pftbld(8)</a> binary in
+    pipe mode may be used for testing:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+$ echo -n &quot;11.22.33.44&quot; | pftbld -p /var/www/run/pftbld-www.sock
+</pre>
+</div>
+<p class="Pp">Alternatively, the same result can be achieved by utilizing
+    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a>:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+$ pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44
+</pre>
+</div>
+<p class="Pp">If everything went right, two entries were appended to the default
+    log file <span class="Pa">/var/log/pftbld.log</span>. The first telling that
+    the address <span class="Pa">11.22.33.44</span> has hit the
+    <span class="Pa">www</span> target and the second that the address has been
+    added to the <span class="Pa">attackers</span>
+    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table and will be
+    kept there for the next hour.</p>
+<p class="Pp">Removing the address from
+    <a class="Xr" href="pftbld.8.html">pftbld(8)</a> memory (and the
+    <span class="Pa">attackers</span> table) can be achieved by sending a
+    <span class="Pa">drop</span> command to the <span class="Pa">control
+    socket</span>:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+$ pftblctl drop 11.22.33.44
+1 client entry dropped.
+</pre>
+</div>
+<p class="Pp">In order to keep offending clients away from
+    <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a>,
+    appropriate entries in
+    <a class="Xr" href="http://man.openbsd.org/pf.conf.5">pf.conf(5)</a> are
+    required. Here's an example:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+table &lt;attackers&gt; persist
+block in quick log proto tcp from &lt;attackers&gt; to port { www https }
+</pre>
+</div>
+<p class="Pp">On a FastCGI supported web server, the following PHP code snippet
+    allows for automatic notifications:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+function pftbld_feed() {
+	$sock = socket_create(AF_UNIX, SOCK_STREAM, 0);
+	if ($sock === false)
+		return;
+	if (socket_connect($sock, '/run/pftbld-www.sock') !== false)
+		socket_write($sock,
+		    &quot;{$_SERVER['REMOTE_ADDR']}\n&quot;.
+		    &quot;{$_SERVER['REQUEST_URI']}\n&quot;.
+		    &quot;{$_SERVER['HTTP_USER_AGENT']}&quot;);
+	socket_close($sock);
+}
+</pre>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp"><a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>,
+    <a class="Xr" href="http://man.openbsd.org/pf.conf.5">pf.conf(5)</a>,
+    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a>,
+    <a class="Xr" href="pftbld.8.html">pftbld(8)</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHORS"><a class="permalink" href="#AUTHORS">AUTHORS</a></h1>
+<p class="Pp">The <a class="Xr" href="pftbld.8.html">pftbld(8)</a> program was
+    written by <span class="An">Matthias Pressfreund</span>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">August 21, 2020</td>
+    <td class="foot-os">OpenBSD</td>
+  </tr>
+</table>
+</body>
+</html>

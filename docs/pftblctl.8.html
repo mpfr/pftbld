@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<!-- This is an automatically generated file.  Do not edit.
+   Copyright (c) 2020 Matthias Pressfreund
+  
+   Permission to use, copy, modify, and distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
+  
+   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+   -->
+<head>
+  <meta charset="utf-8"/>
+  <link rel="stylesheet" href="mandoc.css" type="text/css" media="all"/>
+  <title>PFTBLCTL(8)</title>
+</head>
+<body>
+<table class="head">
+  <tr>
+    <td class="head-ltitle">PFTBLCTL(8)</td>
+    <td class="head-vol">System Manager's Manual</td>
+    <td class="head-rtitle">PFTBLCTL(8)</td>
+  </tr>
+</table>
+<div class="manual-text">
+<section class="Sh">
+<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<p class="Pp"><code class="Nm">pftblctl</code> &#x2014; <span class="Nd">control
+    the <a class="Xr" href="pftbld.8.html">pftbld(8)</a> daemon</span></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<table class="Nm">
+  <tr>
+    <td><code class="Nm">pftblctl</code></td>
+    <td>[<code class="Fl">-q</code>] [<code class="Fl">-s</code>
+      <var class="Ar">socket</var>] <var class="Ar">command/address</var>
+      [<var class="Ar">argument ...</var>]</td>
+  </tr>
+</table>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<p class="Pp"><code class="Nm">pftblctl</code> acually is a wrapper script
+    facilitating the use of <a class="Xr" href="pftbld.8.html">pftbld(8)</a> in
+    verbose pipe mode. It is primarily intended to be used for sending commands
+    to the <var class="Ar">control socket</var>, but may as well be utilized to
+    simulate client input on a <var class="Ar">data socket</var>.</p>
+<p class="Pp">The options are as follows:</p>
+<dl class="Bl-tag">
+  <dt id="q"><a class="permalink" href="#q"><code class="Fl">-q</code></a></dt>
+  <dd>Quiet mode, suppressing output on <var class="Ar">stdout</var>.</dd>
+  <dt id="s"><a class="permalink" href="#s"><code class="Fl">-s</code></a>
+    <var class="Ar">socket</var></dt>
+  <dd>Specifies the <var class="Ar">socket</var> used to send data to and
+      defaults to <span class="Pa">/var/run/pftbld.sock</span>.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="COMMANDS"><a class="permalink" href="#COMMANDS">COMMANDS</a></h1>
+<p class="Pp">On the <span class="Pa">control socket</span>, the following
+    commands will be accepted:</p>
+<div class="Bd-indent">
+<dl class="Bl-tag">
+  <dt id="drop"><a class="permalink" href="#drop"><code class="Ic">drop</code></a>
+    [<code class="Ic">recap</code>] <var class="Ar">address/network</var>
+    [<var class="Ar">target</var>]</dt>
+  <dd>Deletes the given <var class="Ar">address/network</var> ahead of schedule
+      from corresponding
+      <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables and from
+      memory, optionally filtered for the given <var class="Ar">target</var>. If
+      <var class="Ar">target</var> is omitted, removal will affect all targets.
+      Since normally every single deletion will be logged, specifying large
+      <var class="Ar">network</var> ranges may lead to log files getting flooded
+      with deletion entries. This can be avoided by passing the
+      <code class="Ic">recap</code> keyword which will make sure just a short
+      summary (providing the number of deleted addresses per
+      <var class="Ar">target</var> and the overall number of dropped client
+      entries) gets written into the log file instead.</dd>
+  <dt id="dump"><a class="permalink" href="#dump"><code class="Ic">dump</code></a>
+    <var class="Ar">target</var></dt>
+  <dd>Writes managed addresses and meta-data (number of hits and timestamp of
+      last occurrence) of the specified <var class="Ar">target</var> to
+      <var class="Ar">stdout</var>.</dd>
+  <dt id="expire"><a class="permalink" href="#expire"><code class="Ic">expire</code></a>
+    [<code class="Ic">recap</code>] <var class="Ar">address/network</var>
+    [<var class="Ar">target</var>]</dt>
+  <dd>Like the <code class="Ic">drop</code> command, but just deletes
+      <var class="Ar">address/network</var> from
+      <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables while
+      still keeping memorized.</dd>
+  <dt id="list"><a class="permalink" href="#list"><code class="Ic">list</code></a>
+    [<code class="Ic">active</code>] [<var class="Ar">address/network</var>]
+    [<var class="Ar">target</var>]</dt>
+  <dd>Prints a list of memorized client information to
+      <var class="Ar">stdout</var>. Output may be pre-filtered by the
+      <code class="Ic">active</code> keyword, matching only those clients
+      currently present in a
+      <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table, as well
+      as by specifying an IP <var class="Ar">address/network</var> and/or a
+      <var class="Ar">target</var> name. If no parameter is given, information
+      for all clients will be printed.</dd>
+  <dt id="reload"><a class="permalink" href="#reload"><code class="Ic">reload</code></a></dt>
+  <dd>Reinitializes the configuration by reloading the configuration file
+      <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>. The same
+      effect may be accomplished by either using the
+      <a class="Xr" href="http://man.openbsd.org/rcctl.8">rcctl(8)</a> utility:
+    <p class="Pp"></p>
+    <div class="Bd Bd-indent"><code class="Li"># rcctl reload
+      pftbld</code></div>
+    <p class="Pp">or the
+        <a class="Xr" href="http://man.openbsd.org/pkill.1">pkill(1)</a>
+        command:</p>
+    <p class="Pp"></p>
+    <div class="Bd Bd-indent"><code class="Li"># pkill -HUP pftbld</code></div>
+  </dd>
+  <dt id="save"><a class="permalink" href="#save"><code class="Ic">save</code></a>
+    <var class="Ar">target</var></dt>
+  <dd>Writes managed addresses and meta-data (number of hits and timestamp of
+      last occurrence) of the specified <var class="Ar">target</var> to the
+      corresponding <code class="Ic">persist</code> <var class="Ar">path</var>
+      specified in the configuration file
+      <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>, or (if not
+      specified) no action will be performed.</dd>
+  <dt id="self-exclude"><a class="permalink" href="#self-exclude"><code class="Ic">self-exclude</code></a>
+    [<var class="Ar">address/network</var> |
+    <code class="Ic">remove</code>]</dt>
+  <dd>Writes <var class="Ar">address/network</var> into the first location of
+      the global <code class="Ic">exclude</code> list and is intended to be used
+      for the publicly visible <var class="Ar">address/network</var>
+      <code class="Nm">pftblctl</code> is running on. If the
+      <code class="Ic">remove</code> keyword is used instead of an
+      <var class="Ar">address/network</var>, the current self-exclude will be
+      deleted. If called without parameter, the current self-exclude will be
+      printed to <var class="Ar">stdout</var>.</dd>
+  <dt id="status"><a class="permalink" href="#status"><code class="Ic">status</code></a></dt>
+  <dd>Prints a status report to <var class="Ar">stdout</var>.</dd>
+  <dt id="verbose"><a class="permalink" href="#verbose"><code class="Ic">verbose</code></a>
+    [<var class="Ar">level</var>]</dt>
+  <dd>Get/Set the verbosity <var class="Ar">level</var>. If issued without
+      parameter, the current level will be printed to
+      <var class="Ar">stdout</var>.</dd>
+</dl>
+</div>
+<p class="Pp">Here's an example for a <code class="Ic">status</code> report:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+# pftblctl status
+Self-exclude: [129.128.5/24]
+Verbosity level: 0
+Client count:
+	target [www]: 249
+Next scheduled event:
+	[11.22.33.44]:[www]:(2x:50m12s)
+		expires from { attackers } in 9m48s,
+		on [21/Jul/2020:11:22:56 +0200]
+</pre>
+</div>
+<p class="Pp">The next example shows a <span class="Pa">control</span> command
+    deleting the address <span class="Pa">11.22.33.44</span> for the
+    <span class="Pa">www</span> target from memory:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+# pftblctl drop 11.22.33.44 www
+1 client entry dropped.
+</pre>
+</div>
+<p class="Pp">The corresponding log entry might look like this:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+[...] [11.22.33.44]:[www]:(2x:1h3m17s) dropped.
+</pre>
+</div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h1>
+<dl class="Bl-tag Bl-compact">
+  <dt><span class="Pa">/var/run/pftbld.sock</span></dt>
+  <dd>Default control socket.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h1>
+<p class="Pp"><a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>,
+    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>,
+    <a class="Xr" href="pftbld.8.html">pftbld(8)</a></p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="AUTHORS"><a class="permalink" href="#AUTHORS">AUTHORS</a></h1>
+<p class="Pp">The <a class="Xr" href="pftbld.8.html">pftbld(8)</a> program was
+    written by <span class="An">Matthias Pressfreund</span>.</p>
+</section>
+</div>
+<table class="foot">
+  <tr>
+    <td class="foot-date">August 21, 2020</td>
+    <td class="foot-os">OpenBSD</td>
+  </tr>
+</table>
+</body>
+</html>
