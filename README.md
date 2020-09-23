@@ -22,58 +22,58 @@ $
 Get the sources downloaded and extracted.
 
 ```
-$ ftp -o - https://codeload.github.com/mpfr/pftbld/tar.gz/master | tar xzvf -
-pftbld-master
-pftbld-master/README.md
-pftbld-master/docs
-pftbld-master/docs/mandoc.css
-pftbld-master/docs/pftblctl.8.html
-pftbld-master/docs/pftbld.8.html
-pftbld-master/docs/pftbld.conf.5.html
-pftbld-master/pkg
-pftbld-master/pkg/pftbld.conf
-pftbld-master/pkg/pftbld.rc
-pftbld-master/src
-pftbld-master/src/Makefile
-pftbld-master/src/config.c
-pftbld-master/src/listener.c
-pftbld-master/src/log.c
-pftbld-master/src/log.h
-pftbld-master/src/logger.c
-pftbld-master/src/parse.y
-pftbld-master/src/persist.c
-pftbld-master/src/pftblctl.8
-pftbld-master/src/pftblctl.sh
-pftbld-master/src/pftbld.8
-pftbld-master/src/pftbld.c
-pftbld-master/src/pftbld.conf.5
-pftbld-master/src/pftbld.h
-pftbld-master/src/scheduler.c
-pftbld-master/src/sockpipe.c
-pftbld-master/src/tinypfctl.c
-pftbld-master/src/util.c
+$ ftp -Vo - https://codeload.github.com/mpfr/pftbld/tar.gz/main | tar xzvf -
+pftbld-main
+pftbld-main/README.md
+pftbld-main/docs
+pftbld-main/docs/mandoc.css
+pftbld-main/docs/pftblctl.8.html
+pftbld-main/docs/pftbld.8.html
+pftbld-main/docs/pftbld.conf.5.html
+pftbld-main/pkg
+pftbld-main/pkg/pftbld.conf
+pftbld-main/pkg/pftbld.rc
+pftbld-main/src
+pftbld-main/src/Makefile
+pftbld-main/src/config.c
+pftbld-main/src/listener.c
+pftbld-main/src/log.c
+pftbld-main/src/log.h
+pftbld-main/src/logger.c
+pftbld-main/src/parse.y
+pftbld-main/src/persist.c
+pftbld-main/src/pftblctl.8
+pftbld-main/src/pftblctl.sh
+pftbld-main/src/pftbld.8
+pftbld-main/src/pftbld.c
+pftbld-main/src/pftbld.conf.5
+pftbld-main/src/pftbld.h
+pftbld-main/src/scheduler.c
+pftbld-main/src/sockpipe.c
+pftbld-main/src/tinypfctl.c
+pftbld-main/src/util.c
 $
 ```
 
 Compile the sources and install the `pftbld` binary, the `pftblctl` tool and the manpages.
 
 ```
-$ cd pftbld-master/src
+$ cd pftbld-main/src
 $ doas make obj
-making /home/mpfr/pftbld-master/src/obj
+making /home/mpfr/pftbld-main/src/obj
 $ doas make
-yacc  -o parse.c /home/mpfr/pftbld-master/src/parse.y
-cc -O2 -pipe  -Wall -I/home/mpfr/pftbld-master/src -Wstrict-prototypes ...
+yacc  -o parse.c /home/mpfr/pftbld-main/src/parse.y
+cc -O2 -pipe  -Wall -I/home/mpfr/pftbld-main/src -Wstrict-prototypes ...
 .
 .
 .
 cc   -o pftbld parse.o config.o listener.o log.o logger.o persist.o ...
 $ doas make install
 install -c -s  -o root -g bin  -m 555 pftbld /usr/local/sbin/pftbld
-install -c -o root -g bin -m 555  /home/mpfr/pftbld-master/src/pftblctl.sh ...
-install -c -o root -g bin -m 444  /home/mpfr/pftbld-master/src/pftblctl.8 ...
-install -c -o root -g bin -m 444  /home/mpfr/pftbld-master/src/pftbld.8 ...
-install -c -o root -g bin -m 444  /home/mpfr/pftbld-master/src/pftbld.conf.5 ...
+install -c -o root -g bin -m 555  /home/mpfr/pftbld-main/src/pftblctl.sh ...
+install -c -o root -g bin -m 444  /home/mpfr/pftbld-main/src/pftblctl.8 ...
+install -c -o root -g bin -m 444  /home/mpfr/pftbld-main/src/pftbld.8 ...
+install -c -o root -g bin -m 444  /home/mpfr/pftbld-main/src/pftbld.conf.5 ...
 $
 ```
 
