@@ -367,8 +367,6 @@ proc_data(struct inbuf *ibuf, int kqfd)
 				break;
 	}
 
-	GET_TIME(&now);
-
 	if (clt == NULL) {
 		CALLOC(clt, 1, sizeof(*clt));
 		if (addrstr(clt->astr, sizeof(clt->astr), &addr) == NULL)
@@ -379,6 +377,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	} else {
 		DPRINTF("found enqueued client (%s, %s, %d)", clt->astr,
 		    tgtname, clt->cnt);
+		GET_TIME(&now);
 		timespecsub(&now, &clt->ts, &tsdiff);
 		if (tsdiff.tv_sec <= 1) {
 			print_ts_log("Ignoring [%s]:[%s%s] duplicate hit.\n",
@@ -410,6 +409,8 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	print_ts_log("%s [%s]:[%s%s]:(%dx",
 	    pfres.nadd > 0 ? ">>> Added" : "Aquired",
 	    clt->astr, tgtname, sockid, clt->cnt);
+
+	GET_TIME(&now);
 
 	if (clt->cnt > 1) {
 		timespecsub(&now, &clt->ts, &tsdiff);
