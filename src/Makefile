@@ -5,7 +5,7 @@ SRCS+=		config.c listener.c log.c logger.c persist.c pftbld.c
 SRCS+=		scheduler.c sockpipe.c tinypfctl.c util.c
 MAN=		pftblctl.8 pftbld.8 pftbld.conf.5
 
-SCRIPT=		pftblctl.sh
+SCRIPT=		pftblctl
 
 LDADD+=		-lpthread
 DPADD+=		${LIBPTHREAD}
@@ -23,6 +23,6 @@ MANDIR?=	/usr/local/man/man
 
 afterinstall:
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
-		${.CURDIR}/${SCRIPT} ${DESTDIR}${BINDIR}/pftblctl
+		${.CURDIR}/${SCRIPT}.sh ${DESTDIR}${BINDIR}/${SCRIPT}
 
 .include <bsd.prog.mk>
