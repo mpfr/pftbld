@@ -295,8 +295,6 @@ print_ts_log(char *fmt, ...)
 	va_list		 args;
 
 	GET_TIME(&ts);
-	if (ts.tv_nsec >= 500000000L)
-		ts.tv_sec++;
 	if ((tm = localtime(&ts.tv_sec)) == NULL)
 		FATALX("localtime failed");
 	if (strftime(buf, sizeof(buf), TS_FMT, tm) == 0)
