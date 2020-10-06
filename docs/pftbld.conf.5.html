@@ -337,14 +337,14 @@ target &quot;www&quot; {
     pipe mode may be used for testing:</p>
 <div class="Bd Pp Bd-indent">
 <pre>
-$ echo -n &quot;11.22.33.44&quot; | pftbld -p /var/www/run/pftbld-www.sock
+# echo -n &quot;11.22.33.44&quot; | pftbld -p /var/www/run/pftbld-www.sock
 </pre>
 </div>
 <p class="Pp">Alternatively, the same result can be achieved by utilizing
     <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a>:</p>
 <div class="Bd Pp Bd-indent">
 <pre>
-$ pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44
+# pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44
 </pre>
 </div>
 <p class="Pp">If everything went right, two entries were appended to the default
@@ -361,7 +361,7 @@ $ pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44
     socket</span>:</p>
 <div class="Bd Pp Bd-indent">
 <pre>
-$ pftblctl drop 11.22.33.44
+# pftblctl drop 11.22.33.44
 1 client entry dropped.
 </pre>
 </div>
@@ -410,7 +410,7 @@ function pftbld_feed() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">August 21, 2020</td>
+    <td class="foot-date">October 4, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

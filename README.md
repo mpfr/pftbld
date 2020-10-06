@@ -16,14 +16,15 @@ permit nopass mpfr
 $ cd
 $ pwd
 /home/mpfr
-$
 ```
 
 Get the sources downloaded and extracted.
 
 ```
+$ rm -rf pftbld-main/
 $ ftp -Vo - https://codeload.github.com/mpfr/pftbld/tar.gz/main | tar xzvf -
 pftbld-main
+pftbld-main/LICENSE
 pftbld-main/README.md
 pftbld-main/docs
 pftbld-main/docs/mandoc.css
@@ -52,7 +53,6 @@ pftbld-main/src/scheduler.c
 pftbld-main/src/sockpipe.c
 pftbld-main/src/tinypfctl.c
 pftbld-main/src/util.c
-$
 ```
 
 Compile the sources and install the `pftbld` binary, the `pftblctl` tool and the manpages.
@@ -74,14 +74,12 @@ install -c -o root -g bin -m 555  /home/mpfr/pftbld-main/src/pftblctl.sh ...
 install -c -o root -g bin -m 444  /home/mpfr/pftbld-main/src/pftblctl.8 ...
 install -c -o root -g bin -m 444  /home/mpfr/pftbld-main/src/pftbld.8 ...
 install -c -o root -g bin -m 444  /home/mpfr/pftbld-main/src/pftbld.conf.5 ...
-$
 ```
 
 Create the `_pftbld` user.
 
 ```
 $ doas useradd -c "pftbld unprivileged user" -d /var/empty -g =uid -r 100..999 -s /sbin/nologin _pftbld
-$
 ```
 
 Install the service script.
@@ -89,7 +87,6 @@ Install the service script.
 ```
 $ doas install -c -o root -g bin -m 555 ../pkg/pftbld.rc /etc/rc.d/pftbld
 $ doas rcctl enable pftbld
-$
 ```
 
 Create a [configuration file](https://mpfr.github.io/pftbld/pftbld.conf.5.html) at the default location`/etc/pftbld/pftbld.conf`, e.g. by copying and adapting the [example](pkg/pftbld.conf) to your needs. When you're done, make sure to get the result verified.
@@ -101,7 +98,6 @@ $ doas vi /etc/pftbld/pftbld.conf
 ...
 $ doas pftbld -n
 configuration OK
-$
 ```
 
 Start the `pftbld` daemon.
@@ -109,7 +105,6 @@ Start the `pftbld` daemon.
 ```
 $ doas rcctl start pftbld
 pftbld(ok)
-$
 ```
 
 ## How to uninstall
@@ -124,5 +119,4 @@ $ doas rm /usr/local/sbin/pftbl*
 $ doas rmuser _pftbld
 ...
 $ doas rm -rf /etc/pftbld
-$
 ```
