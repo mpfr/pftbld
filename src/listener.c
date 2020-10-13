@@ -476,8 +476,6 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	do {								\
 		struct timespec	 _tp = *tp;				\
 		struct tm	*_tm;					\
-		if (_tp.tv_nsec >= 500000000L)				\
-			_tp.tv_sec++;					\
 		if ((_tm = localtime(&_tp.tv_sec)) == NULL)		\
 			FATALX("localtime failed");			\
 		if (strftime(str, sizeof(str), TS_FMT, _tm) == 0)	\
