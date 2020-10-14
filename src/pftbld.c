@@ -77,6 +77,7 @@ handle_signal(struct kevent *kev)
 		} else
 			log_info("reload aborted with errors");
 		break;
+	case SIGINT:
 	case SIGTERM:
 		kill(sched_pid, SIGTERM);
 		break;
@@ -259,6 +260,7 @@ pftbld(int argc, char *argv[])
 	signal(SIGTERM, SIG_IGN);
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGUSR1, SIG_IGN);
+	signal(SIGUSR2, SIG_IGN);
 
 	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
 	    pfd) == -1)
@@ -292,6 +294,8 @@ pftbld(int argc, char *argv[])
 
 	signal_handler = (struct kevcb){ &handle_signal, NULL };
 	EV_MOD(kqfd, &kev, SIGHUP, EVFILT_SIGNAL, EV_ADD, 0, 0,
+	    &signal_handler);
+	EV_MOD(kqfd, &kev, SIGINT, EVFILT_SIGNAL, EV_ADD, 0, 0,
 	    &signal_handler);
 	EV_MOD(kqfd, &kev, SIGTERM, EVFILT_SIGNAL, EV_ADD, 0, 0,
 	    &signal_handler);
@@ -490,13 +494,13 @@ shutdown_main(void)
 	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
 		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets)
 			if (sock->pid)
-				kill(sock->pid, SIGINT);
+				kill(sock->pid, SIGUSR2);
 
 	sock = &conf->ctrlsock;
 	if (!sock->pid)
 		goto end;
 
-	kill(sock->pid, SIGINT);
+	kill(sock->pid, SIGUSR2);
 	if (unlink(sock->path) == -1)
 		log_warn("failed deleting control socket %s", sock->path);
 
@@ -512,7 +516,7 @@ end:
 
 	if (logger_pid) {
 		NANONAP;
-		kill(logger_pid, SIGINT);
+		kill(logger_pid, SIGUSR2);
 	}
 
 	exit(0);

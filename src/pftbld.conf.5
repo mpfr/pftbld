@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: October 4 2020 $
+.Dd $Mdocdate: October 14 2020 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -112,7 +112,8 @@ Logging may be completely disabled by using the leading
 keyword instead of specifying a
 .Ar path .
 .It Oo Ic no Oc Ic timeout Ar milliseconds
-Sets the maximum time for a client to transmit its data making a connection.
+Sets the maximum time for a client to transmit its data after making a
+connection.
 If a client did not succeed sending data after the specified number of
 .Ar milliseconds ,
 the connection will be closed and all transmitted data will be discarded.
@@ -125,6 +126,10 @@ The default value is 10000 milliseconds.
 .Sh TARGETS
 Typically, targets are used to distinguish input data by service type and apply
 appropriate handling.
+At least one
+.Ic target
+entry needs to be defined to start
+.Xr pftbld 8 .
 .Bl -tag -width Ds
 .It Ic target Ar name Brq ...
 The

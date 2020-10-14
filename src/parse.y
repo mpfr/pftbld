@@ -30,8 +30,8 @@
 
 #define HOSTS_FILE	"/etc/hosts"
 
-static void yyerror(const char *, ...);
-static int yylex(void);
+static void	yyerror(const char *, ...);
+static int	yylex(void);
 
 static struct socket
 		*create_socket(const char *);

@@ -106,7 +106,7 @@
       of specifying a <var class="Ar">path</var>.</dd>
   <dt>[<code class="Ic">no</code>] <code class="Ic">timeout</code>
     <var class="Ar">milliseconds</var></dt>
-  <dd>Sets the maximum time for a client to transmit its data making a
+  <dd>Sets the maximum time for a client to transmit its data after making a
       connection. If a client did not succeed sending data after the specified
       number of <var class="Ar">milliseconds</var>, the connection will be
       closed and all transmitted data will be discarded. In order to disable
@@ -118,7 +118,9 @@
 <section class="Sh">
 <h1 class="Sh" id="TARGETS"><a class="permalink" href="#TARGETS">TARGETS</a></h1>
 <p class="Pp">Typically, targets are used to distinguish input data by service
-    type and apply appropriate handling.</p>
+    type and apply appropriate handling. At least one
+    <code class="Ic">target</code> entry needs to be defined to start
+    <a class="Xr" href="pftbld.8.html">pftbld(8)</a>.</p>
 <dl class="Bl-tag">
   <dt id="target"><a class="permalink" href="#target"><code class="Ic">target</code></a>
     <var class="Ar">name</var> {...}</dt>
@@ -410,7 +412,7 @@ function pftbld_feed() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">October 4, 2020</td>
+    <td class="foot-date">October 14, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

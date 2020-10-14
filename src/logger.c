@@ -48,7 +48,7 @@ handle_signal(struct kevent *kev)
 	int sig = kev->ident;
 
 	switch (sig) {
-	case SIGINT:
+	case SIGUSR2:
 		if (fsync(logfd) == -1)
 			log_warn("log flush failed");
 		exit(0);
@@ -116,6 +116,7 @@ logger(int argc, char *argv[])
 	signal(SIGINT, SIG_IGN);
 	signal(SIGTERM, SIG_IGN);
 	signal(SIGUSR1, SIG_IGN);
+	signal(SIGUSR2, SIG_IGN);
 
 	ETOI(debug, ENV_DEBUG);
 	ETOI(verbose, ENV_VERBOSE);
@@ -135,7 +136,7 @@ logger(int argc, char *argv[])
 		FATAL("kqueue");
 
 	signal_handler = (struct kevcb){ &handle_signal, NULL };
-	EV_MOD(kqfd, &kev, SIGINT, EVFILT_SIGNAL, EV_ADD, 0, 0,
+	EV_MOD(kqfd, &kev, SIGUSR2, EVFILT_SIGNAL, EV_ADD, 0, 0,
 	    &signal_handler);
 	ctrl_handler = (struct kevcb){ &handle_ctrl, NULL };
 	EV_MOD(kqfd, &kev, logger_cfd, EVFILT_READ, EV_ADD, 0, 0,

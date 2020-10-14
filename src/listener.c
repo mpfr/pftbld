@@ -150,10 +150,11 @@ listener(int argc, char *argv[])
 	struct kevcb		 ctrl_handler, srvsock_handler;
 
 	signal(SIGHUP, SIG_IGN);
-	signal(SIGINT, SIG_DFL);
+	signal(SIGINT, SIG_IGN);
 	signal(SIGTERM, SIG_IGN);
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGUSR1, SIG_IGN);
+	signal(SIGUSR2, SIG_DFL);
 
 	ETOI(debug, ENV_DEBUG);
 	ETOI(verbose, ENV_VERBOSE);

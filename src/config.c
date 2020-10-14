@@ -109,6 +109,12 @@ parse_conf(void)
 	if (fclose(yyfp) == EOF)
 		log_warn("configuration file %s close", conffile);
 
+	if (SIMPLEQ_EMPTY(&conf->ctargets)) {
+		log_warnx("no targets defined in configuration file %s",
+			conffile);
+		errors++;
+	}
+
 	if (errors)
 		return (errors);
 
