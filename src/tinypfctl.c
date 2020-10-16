@@ -36,6 +36,10 @@ static struct pfioc_table
 static int	 pf_add_table(int, const char *);
 static struct pfioc_table
 		*pf_addresses_prepare(const char *, struct pfr_addr *, size_t);
+#if DEBUG
+static void	 log_mod_table(const char *, struct pfr_addr *, int,
+		    const char *);
+#endif
 static int	 pf_add_addresses(int, const char *, struct pfr_addr *,
 		    size_t);
 static int	 pf_delete_addresses(int, const char *, struct pfr_addr *,
@@ -122,14 +126,35 @@ pf_addresses_prepare(const char *tname, struct pfr_addr *addrs, size_t n)
 	return (io);
 }
 
+#if DEBUG
+static void
+log_mod_table(const char *tname, struct pfr_addr *addr, int n, const char *mod)
+{
+	char	*add;
+
+	if (--n) {
+		if (asprintf(&add, "(+%d more address%s) ", n,
+		    n != 1 ? "es" : "") == -1)
+			FATAL("asprintf");
+	} else
+		CALLOC(add, 1, 1);
+	if (addr->pfra_af == AF_INET)
+		DPRINTF("%08X %s%s table <%s>",
+		    be32toh(addr->pfra_ip4addr.s_addr), add, mod, tname);
+	else
+		DPRINTF("%016llX%016llX %s%s table <%s>",
+		    be64toh(*(uint64_t *)addr->pfra_ip6addr.s6_addr),
+		    be64toh(*(uint64_t *)&addr->pfra_ip6addr.s6_addr[8]),
+		    add, mod, tname);
+	free(add);
+}
+#endif
+
 static int
 pf_add_addresses(int pffd, const char *tname, struct pfr_addr *addrs, size_t n)
 {
 	struct pfioc_table	*io = NULL;
 	int			 nadd;
-#if DEBUG
-	char			*buf;
-#endif
 
 	if (pf_add_table(pffd, tname) == -1)
 		goto fail;
@@ -144,27 +169,8 @@ pf_add_addresses(int pffd, const char *tname, struct pfr_addr *addrs, size_t n)
 
 	free(io);
 #if DEBUG
-	if (nadd > 0) {
-		if (nadd > 1) {
-			n = nadd - 1;
-			if (asprintf(&buf, "(+%zu more address%s) ", n,
-			    n != 1 ? "es" : "") == -1)
-				FATAL("asprintf");
-		} else
-			CALLOC(buf, 1, 1);
-		if (addrs->pfra_af == AF_INET)
-			DPRINTF("%08X %sadded to table <%s>",
-			    be32toh(addrs->pfra_ip4addr.s_addr),
-			    buf, tname);
-		else
-			DPRINTF("%016llX%016llX %sadded to table <%s>",
-			    be64toh(*(uint64_t *)
-			    addrs->pfra_ip6addr.s6_addr),
-			    be64toh(*(uint64_t *)
-			    &addrs->pfra_ip6addr.s6_addr[8]),
-			    buf, tname);
-		free(buf);
-	}
+	if (nadd > 0)
+		log_mod_table(tname, addrs, nadd, "added to");
 #endif
 	return (nadd);
 
@@ -179,9 +185,6 @@ pf_delete_addresses(int pffd, const char *tname, struct pfr_addr *addrs,
 {
 	struct pfioc_table	*io = NULL;
 	int			 ndel;
-#if DEBUG
-	char			*buf;
-#endif
 
 	if (pf_add_table(pffd, tname) == -1)
 		goto fail;
@@ -196,27 +199,8 @@ pf_delete_addresses(int pffd, const char *tname, struct pfr_addr *addrs,
 
 	free(io);
 #if DEBUG
-	if (ndel > 0) {
-		if (ndel > 1) {
-			n = ndel - 1;
-			if (asprintf(&buf, "(+%zu more address%s) ", n,
-			    n != 1 ? "es" : "") == -1)
-				FATAL("asprintf");
-		} else
-			CALLOC(buf, 1, 1);
-		if (addrs->pfra_af == AF_INET)
-			DPRINTF("%08X %sdeleted from table <%s>",
-			    be32toh(addrs->pfra_ip4addr.s_addr),
-			    buf, tname);
-		else
-			DPRINTF("%016llX%016llX %sdeleted from table <%s>",
-			    be64toh(*(uint64_t *)
-			    addrs->pfra_ip6addr.s6_addr),
-			    be64toh(*(uint64_t *)
-			    &addrs->pfra_ip6addr.s6_addr[8]),
-			    buf, tname);
-		free(buf);
-	}
+	if (ndel > 0)
+		log_mod_table(tname, addrs, ndel, "deleted from");
 #endif
 	return (ndel);
 
