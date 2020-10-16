@@ -66,7 +66,7 @@ handle_signal(struct kevent *kev)
 	extern int	 sched_cfd;
 	extern pid_t	 sched_pid, logger_pid;
 
-	int sig = kev->ident;
+	int	 sig = kev->ident;
 
 	switch (sig) {
 	case SIGHUP:
@@ -260,7 +260,6 @@ pftbld(int argc, char *argv[])
 	signal(SIGTERM, SIG_IGN);
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGUSR1, SIG_IGN);
-	signal(SIGUSR2, SIG_IGN);
 
 	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
 	    pfd) == -1)

@@ -45,7 +45,7 @@ pid_t	 logger_pid = 0;
 static void
 handle_signal(struct kevent *kev)
 {
-	int sig = kev->ident;
+	int	 sig = kev->ident;
 
 	switch (sig) {
 	case SIGUSR2:
