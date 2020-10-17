@@ -8,6 +8,9 @@ For further information, please have a look at the manpages of [pftbld(8)](https
 
 As there is no [package](https://www.openbsd.org/faq/faq15.html) available yet, `pftbld` needs to be built from source and installed manually. Luckily, this is easy and straightforward. Just follow the steps below.
 
+Make sure you're running `OpenBSD-current`. Otherwise, one of the following branches might be more appropriate:
+* [6.7-stable](https://github.com/mpfr/pftbld/tree/6.7-stable)
+
 Make sure your user has sufficient `doas` permissions. To start, `cd` into the user's home directory, here `/home/mpfr`.
 
 ```
