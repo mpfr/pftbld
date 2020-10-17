@@ -6,6 +6,9 @@
 
 As there is no [package](https://www.openbsd.org/faq/faq15.html) available, `pftbld` needs to be built from source and installed manually. Luckily, this is easy and straightforward. Just follow the steps below.
 
+Make sure you're running `OpenBSD 6.7-stable`. Otherwise, one of the following branches might be more appropriate:
+* [current](https://github.com/mpfr/pftbld)
+
 Make sure your user has sufficient `doas` permissions. To start, `cd` into the user's home directory, here `/home/mpfr`.
 
 ```
