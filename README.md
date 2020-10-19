@@ -8,6 +8,7 @@ As there is no [package](https://www.openbsd.org/faq/faq15.html) available, `pft
 
 Make sure you're running `OpenBSD 6.7-stable`. Otherwise, one of the following branches might be more appropriate:
 * [current](https://github.com/mpfr/pftbld)
+* [6.8-stable](https://github.com/mpfr/pftbld/tree/6.8-stable)
 
 Make sure your user has sufficient `doas` permissions. To start, `cd` into the user's home directory, here `/home/mpfr`.
 
