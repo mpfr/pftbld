@@ -28,7 +28,8 @@
 
 #define HAS_TIMEOUT(ibuf)	(ibuf->timeout < LLONG_MAX)
 
-static int	 evtimer_client(struct client **, struct clientq *);
+static struct client
+		*evtimer_client(void);
 static void	 evtimer_start(int, struct kevent *, struct client *,
 		    struct kevcb *);
 static void	 update_conf(struct config *);
@@ -53,11 +54,13 @@ struct kevcb	 expire_handler;
 static struct inbufq	 inbq;
 static int		 kqfd;
 
-static int
-evtimer_client(struct client **clt, struct clientq *cq)
+static struct client *
+evtimer_client(void)
 {
-	return ((*clt = TAILQ_FIRST(cq)) != NULL &&
-	    !timespec_isinfinite(&(*clt)->to));
+	struct client	*first = TAILQ_FIRST(&cltq);
+
+	return (first == NULL || timespec_isinfinite(&first->to) ?
+	    NULL : first);
 }
 
 static void
@@ -85,7 +88,7 @@ update_conf(struct config *nc)
 	struct crange		*self;
 	struct socket		*sock;
 
-	if (evtimer_client(&clt, &cltq))
+	if ((clt = evtimer_client()) != NULL)
 		EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER, EV_DELETE,
 		    0, 0, NULL);
 
@@ -112,7 +115,7 @@ update_conf(struct config *nc)
 		free(clt);
 	}
 
-	if (evtimer_client(&clt, &cltq))
+	if ((clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
 
 	close(conf->ctrlsock.ctrlfd);
@@ -176,9 +179,7 @@ drop_clients(const char *net, struct target *tgt)
 	SIMPLEQ_INIT(&caq);
 	cnt = 0;
 
-	if ((first = TAILQ_FIRST(&cltq)) != NULL &&
-	    timespec_isinfinite(&first->to))
-		first = NULL;
+	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if ((tgt != NULL && clt->tgt != tgt) ||
@@ -211,7 +212,7 @@ drop_clients(const char *net, struct target *tgt)
 		cnt++;
 	}
 
-	if (first == NULL && evtimer_client(&clt, &cltq))
+	if (first == NULL && (clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
 
 	return (cnt);
@@ -234,9 +235,7 @@ drop_clients_r(const char *net, struct target *tgt)
 	TAILQ_INIT(&dcq);
 	cnt = 0;
 
-	if ((first = TAILQ_FIRST(&cltq)) != NULL &&
-	    timespec_isinfinite(&first->to))
-		first = NULL;
+	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if ((tgt != NULL && clt->tgt != tgt) ||
@@ -266,7 +265,7 @@ drop_clients_r(const char *net, struct target *tgt)
 		print_ts_log("%d client entr%s dropped.\n", cnt,
 		    cnt != 1 ? "ies" : "y");
 
-	if (first == NULL && evtimer_client(&clt, &cltq))
+	if (first == NULL && (clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
 
 	return (cnt);
@@ -292,9 +291,7 @@ expire_clients(const char *net, struct target *tgt)
 	TAILQ_INIT(&dcq);
 	cnt = 0;
 
-	if ((first = TAILQ_FIRST(&cltq)) != NULL &&
-	    timespec_isinfinite(&first->to))
-		first = NULL;
+	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if (clt->exp || (tgt != NULL && clt->tgt != tgt) ||
@@ -337,7 +334,7 @@ expire_clients(const char *net, struct target *tgt)
 		sort_client_desc(clt);
 	}
 
-	if (first == NULL && evtimer_client(&clt, &cltq))
+	if (first == NULL && (clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
 
 	return (cnt);
@@ -360,9 +357,7 @@ expire_clients_r(const char *net, struct target *tgt)
 	TAILQ_INIT(&dcq);
 	cnt = 0;
 
-	if ((first = TAILQ_FIRST(&cltq)) != NULL &&
-	    timespec_isinfinite(&first->to))
-		first = NULL;
+	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if (clt->exp || (tgt != NULL && clt->tgt != tgt) ||
@@ -402,7 +397,7 @@ expire_clients_r(const char *net, struct target *tgt)
 		print_ts_log("%d client entr%s expired.\n", cnt,
 		    cnt != 1 ? "ies" : "y");
 
-	if (first == NULL && evtimer_client(&clt, &cltq))
+	if (first == NULL && (clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
 
 	return (cnt);
@@ -783,7 +778,7 @@ handle_expire(struct kevent *kev)
 	else
 		sort_client_desc(clt);
 
-	if (evtimer_client(&clt, &cltq))
+	if ((clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, kev, clt, &expire_handler);
 }
 
@@ -847,7 +842,7 @@ scheduler(int argc, char *argv[])
 		FATAL("kqueue");
 
 	expire_handler = (struct kevcb){ &handle_expire, NULL };
-	if (evtimer_client(&clt, &cltq))
+	if ((clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
 	signal_handler = (struct kevcb){ &handle_signal, NULL };
 	EV_MOD(kqfd, &kev, SIGTERM, EVFILT_SIGNAL, EV_ADD, 0, 0,
