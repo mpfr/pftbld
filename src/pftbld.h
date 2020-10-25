@@ -55,6 +55,16 @@
 
 #define timespec_isinfinite(t)	timespeccmp(t, &TIMESPEC_INFINITE, ==)
 
+#define EV_DPRINTF(e, s)					\
+	DPRINTF("KEVENT%s(id:%lu, EVFILT_%s%s, data:%lld)",	\
+	    s ? "->" : "<-", (e)->ident,			\
+	    (e)->filter == EVFILT_READ ? "READ" :		\
+	    (e)->filter == EVFILT_TIMER ? "TIMER" :		\
+	    (e)->filter == EVFILT_SIGNAL ? "SIGNAL" : "???",	\
+	    s ? (e)->flags & EV_ADD ? "/ADD" :			\
+	    (e)->flags & EV_DELETE ? "/DELETE" : "/???" : "",	\
+	    (e)->data)
+
 #define READ(d, b, n)				\
 	do {					\
 		if (read(d, b, n) == -1)	\
@@ -76,7 +86,7 @@
 #define WRITE2(d, b1, n1, b2, n2)					\
 	do {								\
 		if (write(d, b1, n1) == -1 || write(d, b2, n2) == -1)	\
-				FATAL("write");				\
+			FATAL("write");					\
 	} while (0)
 
 #define GETENV(s, e)							\
@@ -160,6 +170,7 @@
 #define EV_MOD(q, e, i, fi, fl, ff, d, u)			\
 	do {							\
 		EV_SET(e, i, fi, fl, ff, d, u);			\
+		EV_DPRINTF(e, 1);				\
 		if (kevent(q, e, 1, NULL, 0, NULL) == -1)	\
 			FATAL("kevent");			\
 	} while (0)
@@ -184,6 +195,7 @@
 
 #define KEVENT_HANDLE(e)						\
 	do {								\
+		EV_DPRINTF(e, 0);					\
 		if ((e)->flags & EV_ERROR)				\
 			FATALX("event error (%llu)", (e)->data);	\
 		if ((e)->udata != NULL) {				\
