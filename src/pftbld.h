@@ -197,7 +197,7 @@
 	do {								\
 		EV_DPRINTF(e, 0);					\
 		if ((e)->flags & EV_ERROR)				\
-			FATALX("event error (%llu)", (e)->data);	\
+			FATALX("event error (%lld)", (e)->data);	\
 		if ((e)->udata != NULL) {				\
 			struct kevcb *_h = (struct kevcb *)(e)->udata;	\
 			(e)->udata = _h->args;				\
