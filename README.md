@@ -4,26 +4,26 @@
 
 ## How to install
 
-As there is no [package](https://www.openbsd.org/faq/faq15.html) available yet, `pftbld` needs to be built from source and installed manually. Luckily, this is easy and straightforward. Just follow the steps below.
+`pftbld` needs to be built from sources and installed manually. Luckily, this is easy and straightforward. Just follow the steps below.
 
 Make sure you're running `OpenBSD 6.8-stable`. Otherwise, one of the following branches might be more appropriate:
 * [current](https://github.com/mpfr/pftbld)
 * [6.7-stable](https://github.com/mpfr/pftbld/tree/6.7-stable)
 
-Make sure your user has sufficient `doas` permissions. To start, `cd` into the user's home directory, here `/home/mpfr`.
+Then, make sure your user (e.g. `mpfr`) has sufficient `doas` permissions.
 
 ```
 $ cat /etc/doas.conf
 permit nopass mpfr
+```
+
+Download and extract the source files into the user's home directory, here `/home/mpfr`.
+
+```
 $ cd
 $ pwd
 /home/mpfr
-```
-
-Get the sources downloaded and extracted.
-
-```
-$ rm -rf pftbld-6.8-stable/
+$ doas rm -rf pftbld-6.8-stable/
 $ ftp -Vo - https://codeload.github.com/mpfr/pftbld/tar.gz/6.8-stable | tar xzvf -
 pftbld-6.8-stable
 pftbld-6.8-stable/LICENSE
@@ -57,7 +57,7 @@ pftbld-6.8-stable/src/tinypfctl.c
 pftbld-6.8-stable/src/util.c
 ```
 
-Compile the sources and install the `pftbld` binary, the `pftblctl` tool and the manpages.
+Compile the source files.
 
 ```
 $ cd pftbld-6.8-stable/src
@@ -70,32 +70,31 @@ cc -O2 -pipe  -Wall -I/home/mpfr/pftbld-6.8-stable/src -Wstrict-prototypes ...
 .
 .
 cc   -o pftbld parse.o config.o listener.o log.o logger.o persist.o ...
-$ doas make install
+```
+
+Install the daemon, related files, manpages and the daemon's user/group.
+
+```
+$ doas make fullinstall
 install -c -s  -o root -g bin  -m 555 pftbld /usr/local/sbin/pftbld
 install -c -o root -g bin -m 555  /home/mpfr/pftbld-6.8-stable/src/pftblctl.sh ...
 install -c -o root -g bin -m 444  /home/mpfr/pftbld-6.8-stable/src/pftblctl.8 ...
 install -c -o root -g bin -m 444  /home/mpfr/pftbld-6.8-stable/src/pftbld.8 ...
 install -c -o root -g bin -m 444  /home/mpfr/pftbld-6.8-stable/src/pftbld.conf.5 ...
+install -c -o root -g bin -m 555  /home/mpfr/pftbld-6.8-stable/src/../pkg/pftbld.rc ...
+useradd -c "pftbld unprivileged user" -d /var/empty -g =uid -r 100..999 -s /sbin/nologin _pftbld
+cp /home/mpfr/pftbld-6.8-stable/src/../pkg/pftbld.conf /etc/pftbld
 ```
 
-Create the `_pftbld` user.
+Activate the service script.
 
 ```
-$ doas useradd -c "pftbld unprivileged user" -d /var/empty -g =uid -r 100..999 -s /sbin/nologin _pftbld
-```
-
-Install the service script.
-
-```
-$ doas install -c -o root -g bin -m 555 ../pkg/pftbld.rc /etc/rc.d/pftbld
 $ doas rcctl enable pftbld
 ```
 
-Create a [configuration file](https://mpfr.github.io/pftbld/pftbld.conf.5.html) at the default location `/etc/pftbld/pftbld.conf`, e.g. by copying and adapting the [example](pkg/pftbld.conf) to your needs. When you're done, make sure to get the result verified.
+Adapt the sample configuration file at `/etc/pftbld/pftbld.conf` to your needs. When you're done, make sure to get the result verified.
 
 ```
-$ doas mkdir /etc/pftbld
-$ doas install -c -m 644 ../pkg/pftbld.conf /etc/pftbld
 $ doas vi /etc/pftbld/pftbld.conf
 ...
 $ doas pftbld -n
@@ -113,14 +112,26 @@ The manpages of `pftbld(8)`, its configuration file `pftbld.conf(5)`, and its co
 
 ## How to uninstall
 
+Stop the `pftbld` daemon.
+
 ```
 $ doas rcctl stop pftbld
 pftbld(ok)
+```
+
+Deactivate the service script.
+
+```
 $ doas rcctl disable pftbld
-$ doas rm /etc/rc.d/pftbld
-$ doas rm /usr/local/man/man{5,8}/pftbl*
-$ doas rm /usr/local/sbin/pftbl*
-$ doas rmuser _pftbld
-...
-$ doas rm -rf /etc/pftbld
+```
+
+Uninstall the daemon, related files, manpages and the daemon's user/group.
+
+```
+$ cd ~/pftbld-6.8-stable/src
+$ doas make uninstall
+rm -f /etc/rc.d/pftbld /usr/local/man/man{5,8}/pftbl* /usr/local/sbin/pftbl*
+userdel _pftbld
+groupdel _pftbld
+configuration has changes, not touching /etc/pftbld
 ```
