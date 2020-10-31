@@ -81,8 +81,8 @@ install -c -o root -g bin -m 555  /home/mpfr/pftbld-6.8-stable/src/pftblctl.sh .
 install -c -o root -g bin -m 444  /home/mpfr/pftbld-6.8-stable/src/pftblctl.8 ...
 install -c -o root -g bin -m 444  /home/mpfr/pftbld-6.8-stable/src/pftbld.8 ...
 install -c -o root -g bin -m 444  /home/mpfr/pftbld-6.8-stable/src/pftbld.conf.5 ...
-install -c -o root -g bin -m 555  /home/mpfr/pftbld-6.8-stable/src/../pkg/pftbld.rc ...
-useradd -c "pftbld unprivileged user" -d /var/empty -g =uid -r 100..999 -s /sbin/nologin _pftbld
+install -c -o root -g bin -m 555  /home/mpfr/pftbld-6.8-stable/src/../pkg/pftbld...
+useradd -c "pftbld unprivileged user" -d /var/empty -g =uid -r 100..999 -s ...
 cp /home/mpfr/pftbld-6.8-stable/src/../pkg/pftbld.conf /etc/pftbld
 ```
 
@@ -92,7 +92,7 @@ Activate the service script.
 $ doas rcctl enable pftbld
 ```
 
-Adapt the sample configuration file at `/etc/pftbld/pftbld.conf` to your needs. When you're done, make sure to get the result verified.
+Adapt the [sample](pkg/pftbld.conf) configuration file at `/etc/pftbld/pftbld.conf` to your needs. When you're done, make sure to get the result verified.
 
 ```
 $ doas vi /etc/pftbld/pftbld.conf
@@ -108,7 +108,7 @@ $ doas rcctl start pftbld
 pftbld(ok)
 ```
 
-The manpages of `pftbld(8)`, its configuration file `pftbld.conf(5)`, and its control tool `pftblctl(8)` are available either on the console or by pointing your browser to the corresponding `html` files under `pftbld-6.8-stable/docs/`.
+> The manpages of `pftbld(8)`, its configuration file `pftbld.conf(5)`, and its control tool `pftblctl(8)` are available either on the console or by pointing your browser to the corresponding `html` files under `pftbld-6.8-stable/docs/`.
 
 ## How to uninstall
 
