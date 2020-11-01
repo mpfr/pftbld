@@ -21,28 +21,30 @@ YFLAGS=
 BINDIR?=	/usr/local/sbin
 MANDIR?=	/usr/local/man/man
 
-CONFDIR=	/etc/pftbld
-CONFFILE=	pftbld.conf
-USER=		_pftbld
-
 afterinstall:
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		${.CURDIR}/${SCRIPT}.sh ${DESTDIR}${BINDIR}/${SCRIPT}
 
+.if exists(${.CURDIR}/../pkg/pftbld.rc) && exists(${.CURDIR}/../pkg/${CONFFILE})
+
+CONFDIR=	/etc/pftbld
+CONFFILE=	pftbld.conf
+USER=		_pftbld
+
 fullinstall: install
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		${.CURDIR}/../pkg/pftbld.rc /etc/rc.d/pftbld
-	@if test "$$(userinfo -e ${USER}; echo $$?)" = "0"; then userdel ${USER}; fi
-	@if test "$$(groupinfo -e ${USER}; echo $$?)" = "0"; then groupdel ${USER}; fi
+	@if test "$$(userinfo -e ${USER}; echo $$?)" = "0"; then echo "userdel ${USER}" && userdel ${USER}; fi
+	@if test "$$(groupinfo -e ${USER}; echo $$?)" = "0"; then echo "groupdel ${USER}" && groupdel ${USER}; fi
 	useradd -c "pftbld unprivileged user" -d /var/empty -g =uid -r 100..999 -s /sbin/nologin ${USER}
-	@if test -f ${CONFDIR}/${CONFFILE}; then echo "configuration exists, not touching ${CONFDIR}/${CONFFILE}"; else mkdir -p ${CONFDIR} && echo "cp ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}" && cp ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}; fi
+	@-if test -f ${CONFDIR}/${CONFFILE}; then echo "--> configuration exists, not touching ${CONFDIR}/${CONFFILE}"; else mkdir -p ${CONFDIR} && echo "cp ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}" && cp ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}; fi
 
 uninstall:
-	rm -f /etc/rc.d/pftbld ${MANDIR}{5,8}/pftbl* ${BINDIR}/pftbl*
-	@echo "userdel ${USER}"
-	@if test "$$(userinfo -e ${USER}; echo $$?)" = "0"; then userdel ${USER}; fi
-	@echo "groupdel ${USER}"
-	@if test "$$(groupinfo -e ${USER}; echo $$?)" = "0"; then groupdel ${USER}; fi
-	@if test -f ${CONFDIR}/${CONFFILE} -a $$(ls ${CONFDIR} | wc -l) -eq 1 -a "$$(cmp -s ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}/${CONFFILE}); echo $$?" = "0"; then echo "rm -rf ${CONFDIR}" && rm -rf ${CONFDIR}; else echo "configuration has changes, not touching ${CONFDIR}"; fi
+	-rm /etc/rc.d/pftbld ${MANDIR}{5,8}/pftbl* ${BINDIR}/pftbl*
+	-userdel ${USER}
+	-groupdel ${USER}
+	@-if test -f ${CONFDIR}/${CONFFILE} -a $$(ls ${CONFDIR} | wc -l) -eq 1 -a "$$(cmp -s ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}/${CONFFILE}; echo $$?)" = "0"; then echo "rm -r ${CONFDIR}" && rm -r ${CONFDIR}; else echo "--> configuration has changes, not touching ${CONFDIR}"; fi
+
+.endif
 
 .include <bsd.prog.mk>
