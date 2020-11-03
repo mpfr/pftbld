@@ -40,6 +40,7 @@ static void	 handle_signal(struct kevent *);
 static void	 handle_ctrl(struct kevent *);
 static void	 handle_inbfd(struct kevent *);
 static void	 handle_inbuf(struct kevent *);
+static void	 handle_expire(struct kevent *);
 static __dead void
 		 shutdown_scheduler(void);
 
@@ -721,7 +722,7 @@ remove:
 	free(ibuf);
 }
 
-void
+static void
 handle_expire(struct kevent *kev)
 {
 	struct client	*clt = (struct client *)kev->ident;

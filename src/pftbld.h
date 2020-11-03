@@ -404,7 +404,6 @@ int		 drop_clients(const char *, struct target *);
 int		 drop_clients_r(const char *, struct target *);
 int		 expire_clients(const char *, struct target *);
 int		 expire_clients_r(const char *, struct target *);
-void		 handle_expire(struct kevent *);
 __dead void	 scheduler(int, char **);
 void		 fork_scheduler(void);
 int		 bind_table(struct client *, struct pfaddrlistq *,
