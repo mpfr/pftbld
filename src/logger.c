@@ -211,7 +211,7 @@ term_logger(void)
 	if (!logger_pid)
 		return;
 
-	kill(logger_pid, SIGINT);
+	kill(logger_pid, SIGUSR2);
 	waitpid(logger_pid, NULL, 0);
 	logger_pid = 0;
 	close(logfd);
