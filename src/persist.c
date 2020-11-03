@@ -22,9 +22,6 @@
 #include "log.h"
 #include "pftbld.h"
 
-extern struct clientq	 cltq;
-extern struct kevcb	 expire_handler;
-
 int
 load(struct target *tgt)
 {
@@ -128,7 +125,9 @@ end:
 int
 save(struct target *tgt)
 {
-	extern int	 privfd;
+	extern int		 privfd;
+	extern struct clientq	 cltq;
+
 
 	char		*file = tgt->persist;
 	size_t		 len;
