@@ -45,6 +45,10 @@ uninstall:
 	-groupdel ${USER}
 	@-if test -f ${CONFDIR}/${CONFFILE} -a $$(ls ${CONFDIR} | wc -l) -eq 1 -a "$$(cmp -s ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}/${CONFFILE}; echo $$?)" = "0"; then echo "rm -r ${CONFDIR}" && rm -r ${CONFDIR}; else echo "--> configuration has changes, not touching ${CONFDIR}"; fi
 
+reinstall: uninstall fullinstall
+
+update: install
+
 .endif
 
 .include <bsd.prog.mk>

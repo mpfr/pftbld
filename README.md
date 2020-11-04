@@ -72,7 +72,7 @@ cc -O2 -pipe  -Wall -I/home/mpfr/pftbld-6.8-stable/src -Wstrict-prototypes ...
 cc   -o pftbld parse.o config.o listener.o log.o logger.o persist.o ...
 ```
 
-Install the daemon, related files, manpages and the daemon's user/group.
+Install the daemon, related binaries, manpages, service script, the daemon's user/group and a sample configuration file.
 
 ```
 $ doas make fullinstall
@@ -85,6 +85,15 @@ install -c -o root -g bin -m 555  /home/mpfr/pftbld-6.8-stable/src/../pkg/pftbld
 useradd -c "pftbld unprivileged user" -d /var/empty -g =uid -r 100..999 -s ...
 cp /home/mpfr/pftbld-6.8-stable/src/../pkg/pftbld.conf /etc/pftbld
 ```
+
+> For further usage, the following list of available installation targets might be helpful:
+> target name | description
+> ----------- | -----------
+> `fullinstall` | installs/updates the daemon's binaries, manpages, service script, user/group and a sample configuration file if not yet present
+> `install` | installs/updates the daemon's binaries and manpages only
+> `reinstall` | synonym for `uninstall fullinstall`
+> `uninstall` | removes everything installed by `fullinstall`, except leaving the configuation file untouched if it has changes
+> `update` | synonym for `install`, intended to be used for updating an existing installation
 
 Activate the service script.
 
@@ -125,7 +134,7 @@ Deactivate the service script.
 $ doas rcctl disable pftbld
 ```
 
-Uninstall the daemon, related files, manpages and the daemon's user/group.
+Uninstall the daemon, related binaries, manpages, service script, the daemon's user/group.
 
 ```
 $ cd ~/pftbld-6.8-stable/src
@@ -134,4 +143,10 @@ rm /etc/rc.d/pftbld /usr/local/man/man{5,8}/pftbl* /usr/local/sbin/pftbl*
 userdel _pftbld
 groupdel _pftbld
 --> configuration has changes, not touching /etc/pftbld
+```
+
+The configuration directory needs to be removed manually, if no longer needed.
+
+```
+$ doas rm -rf /etc/pftbld
 ```
