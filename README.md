@@ -91,11 +91,11 @@ cp /home/mpfr/pftbld-current/src/../pkg/pftbld.conf /etc/pftbld
 > For further usage, the following list of available installation targets might be helpful:
 > target name | description
 > ----------- | -----------
-> `fullinstall` | installs/updates the daemon's binaries, manpages, service script, user/group and a sample configuration file if not yet present
-> `install` | installs/updates the daemon's binaries and manpages only
-> `reinstall` | synonym for `uninstall fullinstall`
+> `fullinstall` | installs the daemon's binaries, manpages, service script, user/group and a sample configuration file if not yet present
+> `install` | installs the daemon's binaries and manpages only
+> `reinstall` | runs `uninstall`, then `fullinstall`
 > `uninstall` | removes everything installed by `fullinstall`, except leaving the configuation file untouched if it has changes
-> `update` | synonym for `install`, intended to be used for updating an existing installation
+> `update` | compiles the sources and installs binaries and manpages, intended to be used when updating an existing installation
 
 Activate the service script.
 

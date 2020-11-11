@@ -156,7 +156,8 @@ logger(int argc, char *argv[])
 void
 fork_logger(void)
 {
-	extern char	*__progname;
+	extern const struct procfunc	 process[];
+	extern char			*__progname;
 
 	int	 ctrlfd[2], ppfd[2];
 	char	*argv[4];
@@ -187,7 +188,7 @@ fork_logger(void)
 	ITOE(ENV_CTRLFD, ctrlfd[1]);
 	ITOE(ENV_LOGFD, ppfd[0]);
 
-	argv[0] = "logger";
+	argv[0] = process[PROC_LOGGER].name;
 	argv[1] = __progname;
 	argv[2] = conf->log;
 	argv[3] = NULL;

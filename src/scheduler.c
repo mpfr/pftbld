@@ -876,8 +876,9 @@ scheduler(int argc, char *argv[])
 void
 fork_scheduler(void)
 {
-	extern int	 logfd, privfd;
-	extern char	*__progname;
+	extern int			 logfd, privfd;
+	extern const struct procfunc	 process[];
+	extern char			*__progname;
 
 	int	 ctrlfd[2], inbfd[2];
 	char	*argv[3];
@@ -904,7 +905,7 @@ fork_scheduler(void)
 	FDTOE(ENV_CTRLFD, ctrlfd[1]);
 	FDTOE(ENV_INBFD, inbfd[0]);
 
-	argv[0] = "scheduler";
+	argv[0] = process[PROC_SCHEDULER].name;
 	argv[1] = __progname;
 	argv[2] = NULL;
 

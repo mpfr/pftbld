@@ -359,7 +359,8 @@ void
 fork_tinypfctl(struct pfresult *pfres, char *cmd, struct caddrq *caq,
     size_t acnt)
 {
-	extern char	*__progname;
+	extern const struct procfunc	 process[];
+	extern char			*__progname;
 
 	int		 ctrlfd[2], pid;
 	char		*argv[4];
@@ -375,7 +376,7 @@ fork_tinypfctl(struct pfresult *pfres, char *cmd, struct caddrq *caq,
 		close(ctrlfd[0]);
 		ITOE(ENV_CTRLFD, ctrlfd[1]);
 
-		argv[0] = "tinypfctl";
+		argv[0] = process[PROC_TINYPFCTL].name;
 		argv[1] = __progname;
 		argv[2] = cmd;
 		argv[3] = NULL;
