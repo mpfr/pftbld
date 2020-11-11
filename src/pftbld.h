@@ -365,6 +365,20 @@ enum pathres {
 	PATH_FILENAME
 };
 
+struct procfunc {
+	char		 *name;
+	__dead void	(*call)(int, char **);
+};
+
+enum procid {
+	PROC_PFTBLD = 0,
+	PROC_LOGGER,
+	PROC_SCHEDULER,
+	PROC_LISTENER,
+	PROC_TINYPFCTL,
+	NUM_PROCS /* must be last */
+};
+
 /* pftbld.c */
 void		 pfexec(struct caddrq *, struct pfresult *, const char *, ...)
 		    __attribute__((__format__ (printf, 3, 4)));

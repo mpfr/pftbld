@@ -50,6 +50,14 @@ extern struct config	*conf;
 char	*conffile = CONF_FILE;
 int	 privfd;
 
+const struct procfunc	 process[] = {
+	[PROC_PFTBLD] = { "pftbld", pftbld },
+	[PROC_LOGGER] = { "logger", logger },
+	[PROC_SCHEDULER] = { "scheduler", scheduler },
+	[PROC_LISTENER] = { "listener", listener },
+	[PROC_TINYPFCTL] = { "tinypfctl", tinypfctl }
+};
+
 static __dead void
 usage(void)
 {
@@ -198,6 +206,7 @@ pftbld(int argc, char *argv[])
 				}
 			}
 			sockpipe(sockfile, verbose);
+			/* NOTREACHED */
 		case 's':
 			sockfile = optarg;
 			break;
@@ -587,20 +596,12 @@ main(int argc, char *argv[])
 {
 	extern char	*__progname;
 
-	if (!strcmp("listener", __progname))
-		listener(argc, argv);
+	int	 i = NUM_PROCS;
 
-	if (!strcmp("logger", __progname))
-		logger(argc, argv);
-
-	if (!strcmp("pftbld", __progname))
-		pftbld(argc, argv);
-
-	if (!strcmp("scheduler", __progname))
-		scheduler(argc, argv);
-
-	if (!strcmp("tinypfctl", __progname))
-		tinypfctl(argc, argv);
-
+	while (--i >= 0)
+		if (!strcmp(process[i].name, __progname)) {
+			process[i].call(argc, argv);
+			/* NOTREACHED */
+		}
 	FATALX("invalid process '%s'", __progname);
 }
