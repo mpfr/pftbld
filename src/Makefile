@@ -47,7 +47,7 @@ uninstall:
 
 reinstall: uninstall fullinstall
 
-update: install
+update: all install
 
 .endif
 

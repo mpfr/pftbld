@@ -239,7 +239,8 @@ listener(int argc, char *argv[])
 void
 fork_listener(struct socket *sockcfg, char *tgtname)
 {
-	extern char	*__progname;
+	extern const struct procfunc	 process[];
+	extern char			*__progname;
 
 	int	 cfd[2];
 	pid_t	 pid;
@@ -263,7 +264,7 @@ fork_listener(struct socket *sockcfg, char *tgtname)
 	FDTOE(ENV_CTRLFD, cfd[1]);
 	FDTOE(ENV_INBFD, sched_ifd);
 
-	argv[0] = "listener";
+	argv[0] = process[PROC_LISTENER].name;
 	argv[1] = __progname;
 	argv[2] = tgtname;
 	argv[3] = sockcfg->id;
