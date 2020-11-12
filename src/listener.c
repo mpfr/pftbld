@@ -382,7 +382,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		GET_TIME(&now);
 		timespecsub(&now, &clt->ts, &tsdiff);
 		if (tsdiff.tv_sec <= 1) {
-			print_ts_log("Ignoring [%s]:[%s%s] duplicate hit.\n",
+			print_ts_log("Ignored [%s]:[%s%s] duplicate hit.\n",
 			    clt->astr, tgtname, sockid);
 			return;
 		}
