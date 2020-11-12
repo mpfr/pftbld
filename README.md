@@ -77,7 +77,7 @@ Install the daemon, related binaries, manpages, service script, the daemon's use
 ```
 $ doas make fullinstall
 install -c -s  -o root -g bin  -m 555 pftbld /usr/local/sbin/pftbld
-install -c -o root -g bin -m 555  /home/mpfr/pftbld-current/src/pftblctl.sh
+install -c -o root -g bin -m 555  /home/mpfr/pftbld-current/src/pftblctl.sh ...
 install -c -o root -g bin -m 444  pftblctl.8 /usr/local/man/man8/pftblctl.8
 install -c -o root -g bin -m 444  pftbld.8 /usr/local/man/man8/pftbld.8
 install -c -o root -g bin -m 444  pftbld.conf.5 /usr/local/man/man5/pftbld.conf.5
