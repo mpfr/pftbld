@@ -22,6 +22,15 @@ usage()
 	exit 1
 }
 
+err()
+{
+	echo "${0##*/}: $1" >&2
+	exit 1
+}
+
+PFTBLD=$(which pftbld 2>/dev/null)
+[[ $? -eq 0 ]] || err 'pftbld binary missing'
+
 CTRLSOCK='/var/run/pftbld.sock'
 VERBOSE='v'
 while getopts qs: arg; do
@@ -31,6 +40,7 @@ while getopts qs: arg; do
 	*)	usage;;
 	esac
 done
+[[ -S ${CTRLSOCK} ]] || err "no socket found at '${CTRLSOCK}'"
 shift $((OPTIND-1))
 
 while [[ -n "$1" ]]; do
@@ -40,4 +50,4 @@ done
 
 [[ -n "${cmd}" ]] || usage
 
-echo -n "${cmd}" | /usr/local/sbin/pftbld -${VERBOSE}p ${CTRLSOCK}
+echo -n "${cmd}" | ${PFTBLD} -${VERBOSE}p ${CTRLSOCK}
