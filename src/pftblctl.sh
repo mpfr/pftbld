@@ -28,8 +28,8 @@ err()
 	exit 1
 }
 
-PFTBLD=$(which pftbld 2>/dev/null)
-[[ $? -eq 0 ]] || err 'pftbld binary missing'
+PFTBLD='/usr/local/sbin/pftbld'
+[[ -x ${PFTBLD} ]] || err 'pftbld binary missing or not executable'
 
 CTRLSOCK='/var/run/pftbld.sock'
 VERBOSE='v'
