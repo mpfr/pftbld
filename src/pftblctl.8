@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: November 12 2020 $
+.Dd $Mdocdate: November 22 2020 $
 .Dt PFTBLCTL 8
 .Os
 .Sh NAME
@@ -87,19 +87,29 @@ command, but just deletes
 from
 .Xr pf 4
 tables while still keeping memorized.
-.It Ic list Oo Ic active Oc Oo Ar address/network Oc Oo Ar target Oc
+.It Ic list Oo Ar address/network Oc Oo Ar target Oc Oo Ic filter
+.Ar option ... Oc
 Prints a list of memorized client information to
 .Ar stdout .
-Output may be pre-filtered by the
-.Ic active
-keyword, matching only those clients currently present in a
-.Xr pf 4
-table, as well as by specifying an IP
+The list will be reversely ordered by expiration/drop date with the next event
+printed last.
+Output may be filtered by specifying an IP
 .Ar address/network
 and/or a
 .Ar target
-name.
-If no parameter is given, information for all clients will be printed.
+name and may be further narrowed down by specifying the
+.Ic filter
+keyword followed by at least one
+.Ar option .
+Valid options are:
+.Bl -tag -width Ds
+.It Ic active
+Matches only clients currently present in a
+.Xr pf 4
+table.
+.It Ic addresses
+Reduces client information to the IP address and omits any further output.
+.El
 .It Ic reload
 Reinitializes the configuration by reloading the configuration file
 .Xr pftbld.conf 5 .
@@ -149,7 +159,12 @@ Get/Set the verbosity
 If issued without parameter, the current level will be printed to
 .Ar stdout .
 .El
-.Pp
+.Sh FILES
+.Bl -tag -width "/var/run/pftbld.sock" -compact
+.It Pa /var/run/pftbld.sock
+Default control socket.
+.El
+.Sh EXAMPLES
 Here's an example for a
 .Ic status
 report:
@@ -163,6 +178,14 @@ Next scheduled event:
 	[11.22.33.44]:[www]:(2x:50m12s)
 		expires from { attackers } in 9m48s,
 		on [21/Jul/2020:11:22:56 +0200]
+.Ed
+.Pp
+Figuring out how many managed clients are currently present in a
+.Xr pf 4
+table may be accomplished like this:
+.Bd -literal -offset indent
+# pftblctl list filter active addresses | wc -l
+       7
 .Ed
 .Pp
 The next example shows a
@@ -181,11 +204,6 @@ The corresponding log entry might look like this:
 .Bd -literal -offset indent
 [...] [11.22.33.44]:[www]:(2x:1h3m17s) dropped.
 .Ed
-.Sh FILES
-.Bl -tag -width "/var/run/pftbld.sock" -compact
-.It Pa /var/run/pftbld.sock
-Default control socket.
-.El
 .Sh SEE ALSO
 .Xr pf 4 ,
 .Xr pftbld.conf 5 ,
