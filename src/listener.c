@@ -606,45 +606,67 @@ perform_ctrl_dump(int fd, char *arg, char *data, size_t datalen)
 static int
 perform_ctrl_list(int fd, char *arg, char *data, size_t datalen)
 {
-	int		 act, cnt;
+	int		 act = 0, addrs = 0, cnt;
 	struct target	*tgt = NULL;
 	struct crange	*r = NULL;
 	struct timespec	 now, tsdiff;
 	struct client	*clt;
 	char		*age, tstr[TS_SIZE];
 
-	if (arg != NULL && !strcmp("active", arg)) {
-		act = 1;
-		arg = shift(arg, data, datalen);
-	} else
-		act = 0;
+	if (arg == NULL)
+		goto start;
 
-	if (arg != NULL) {
-		if ((r = parse_crange(arg)) != NULL)
-			arg = shift(arg, data, datalen);
-		if (arg != NULL) {
-			if ((tgt = find_target(&conf->ctargets,
-			    arg)) == NULL) {
-				MSG_SEND(fd, "Unknown target");
-				if (r == NULL)
-					MSG_SEND(fd, " or invalid "
-					    "address/network");
-				MSG_SEND(fd, ".\n");
-				return (0);
-			}
-			if (shift(arg, data, datalen) != NULL)
-				return (1);
-		}
+	if ((r = parse_crange(arg)) != NULL &&
+	    (arg = shift(arg, data, datalen)) == NULL)
+		goto start;
+
+	if ((tgt = find_target(&conf->ctargets, arg)) != NULL &&
+	    (arg = shift(arg, data, datalen)) == NULL)
+		goto start;
+
+	if (strcmp("filter", arg)) {
+		if (tgt != NULL)
+			return (1);
+
+		MSG_SEND(fd, "Unknown target");
+		if (r == NULL)
+			MSG_SEND(fd, " or invalid address/network");
+		MSG_SEND(fd, ".\n");
+		return (0);
 	}
 
-	cnt = 0;
-	GET_TIME(&now);
+	if ((arg = shift(arg, data, datalen)) == NULL) {
+		MSG_SEND(fd, "Missing filter option.\n");
+		return (0);
+	}
+
+	do {
+		if (!strcmp("active", arg)) {
+			if (act++)
+				goto ferr;
+		} else if (!strcmp("addresses", arg)) {
+			if (addrs++)
+				goto ferr;
+		} else
+			goto ferr;
+	} while ((arg = shift(arg, data, datalen)) != NULL);
+
+start:
+	if (!addrs) {
+		cnt = 0;
+		GET_TIME(&now);
+	}
 
 	TAILQ_FOREACH_REVERSE(clt, &cltq, clientq, clients) {
 		if ((act && clt->exp) ||
 		    (r != NULL && !addr_inrange(r, &clt->addr)) ||
 		    (tgt != NULL && clt->tgt != tgt))
 			continue;
+
+		if (addrs) {
+			MSG_SEND(fd, "%s\n", clt->astr);
+			continue;
+		}
 
 		timespecsub(&now, &clt->ts, &tsdiff);
 		age = hrage(&tsdiff);
@@ -673,12 +695,19 @@ perform_ctrl_list(int fd, char *arg, char *data, size_t datalen)
 		cnt++;
 	}
 
-	if (cnt == 0)
-		MSG_SEND(fd, "No client entries found.\n");
-	else
-		MSG_SEND(fd, "%d client entr%s found.\n", cnt,
-		    cnt != 1 ? "ies" : "y");
+	if (!addrs) {
+		if (cnt == 0)
+			MSG_SEND(fd, "No client entries found.\n");
+		else
+			MSG_SEND(fd, "%d client entr%s found.\n", cnt,
+			    cnt != 1 ? "ies" : "y");
+	}
 
+	return (0);
+
+ferr:
+	MSG_SEND(fd, "Filter option '%s' %s.\n", arg,
+	    act > 1 || addrs > 1 ? "defined twice" : "is invalid");
 	return (0);
 }
 

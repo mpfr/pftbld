@@ -96,16 +96,24 @@
       <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables while
       still keeping memorized.</dd>
   <dt id="list"><a class="permalink" href="#list"><code class="Ic">list</code></a>
-    [<code class="Ic">active</code>] [<var class="Ar">address/network</var>]
-    [<var class="Ar">target</var>]</dt>
+    [<var class="Ar">address/network</var>] [<var class="Ar">target</var>]
+    [<code class="Ic">filter</code> <var class="Ar">option ...</var>]</dt>
   <dd>Prints a list of memorized client information to
-      <var class="Ar">stdout</var>. Output may be pre-filtered by the
-      <code class="Ic">active</code> keyword, matching only those clients
-      currently present in a
-      <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table, as well
-      as by specifying an IP <var class="Ar">address/network</var> and/or a
-      <var class="Ar">target</var> name. If no parameter is given, information
-      for all clients will be printed.</dd>
+      <var class="Ar">stdout</var>. The list will be reversely ordered by
+      expiration/drop date with the next event printed last. Output may be
+      filtered by specifying an IP <var class="Ar">address/network</var> and/or
+      a <var class="Ar">target</var> name and may be further narrowed down by
+      specifying the <code class="Ic">filter</code> keyword followed by at least
+      one <var class="Ar">option</var>. Valid options are:
+    <dl class="Bl-tag">
+      <dt id="active"><a class="permalink" href="#active"><code class="Ic">active</code></a></dt>
+      <dd>Matches only clients currently present in a
+          <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table.</dd>
+      <dt id="addresses"><a class="permalink" href="#addresses"><code class="Ic">addresses</code></a></dt>
+      <dd>Reduces client information to the IP address and omits any further
+          output.</dd>
+    </dl>
+  </dd>
   <dt id="reload"><a class="permalink" href="#reload"><code class="Ic">reload</code></a></dt>
   <dd>Reinitializes the configuration by reloading the configuration file
       <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>. The same
@@ -148,6 +156,16 @@
       <var class="Ar">stdout</var>.</dd>
 </dl>
 </div>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h1>
+<dl class="Bl-tag Bl-compact">
+  <dt><span class="Pa">/var/run/pftbld.sock</span></dt>
+  <dd>Default control socket.</dd>
+</dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
 <p class="Pp">Here's an example for a <code class="Ic">status</code> report:</p>
 <div class="Bd Pp Bd-indent">
 <pre>
@@ -160,6 +178,15 @@ Next scheduled event:
 	[11.22.33.44]:[www]:(2x:50m12s)
 		expires from { attackers } in 9m48s,
 		on [21/Jul/2020:11:22:56 +0200]
+</pre>
+</div>
+<p class="Pp">Figuring out how many managed clients are currently present in a
+    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table may be
+    accomplished like this:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+# pftblctl list filter active addresses | wc -l
+       7
 </pre>
 </div>
 <p class="Pp">The next example shows a <span class="Pa">control</span> command
@@ -179,13 +206,6 @@ Next scheduled event:
 </div>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h1>
-<dl class="Bl-tag Bl-compact">
-  <dt><span class="Pa">/var/run/pftbld.sock</span></dt>
-  <dd>Default control socket.</dd>
-</dl>
-</section>
-<section class="Sh">
 <h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
   ALSO</a></h1>
 <p class="Pp"><a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>,
@@ -200,7 +220,7 @@ Next scheduled event:
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">November 12, 2020</td>
+    <td class="foot-date">November 22, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
