@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: November 22 2020 $
+.Dd $Mdocdate: November 25 2020 $
 .Dt PFTBLCTL 8
 .Os
 .Sh NAME
@@ -34,7 +34,7 @@ acually is a wrapper script facilitating the use of
 in verbose pipe mode.
 It is primarily intended to be used for sending commands to the
 .Ar control socket ,
-but may as well be utilized to simulate client input on a
+but may as well be utilized to forward client data to the corresponding
 .Ar data socket .
 .Pp
 The options are as follows:
@@ -203,6 +203,13 @@ target from memory:
 The corresponding log entry might look like this:
 .Bd -literal -offset indent
 [...] [11.22.33.44]:[www]:(2x:1h3m17s) dropped.
+.Ed
+.Pp
+Last but not least,
+.Nm
+may also be used to send client data to the server:
+.Bd -literal -offset indent
+# pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44 "Test 1"
 .Ed
 .Sh SEE ALSO
 .Xr pf 4 ,
