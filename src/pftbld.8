@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: November 12 2020 $
+.Dd $Mdocdate: November 25 2020 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -50,12 +50,18 @@ tables through system reboots and migrations.
 obtains its configuration from
 .Xr pftbld.conf 5 .
 .Pp
-Sole prerequisite for client programs is the ability to directly or
-indirectly connect and write to UNIX-domain sockets.
+Sole prerequisite for client programs is the ability to directly or indirectly
+(i.e. through some other tool) connect and write to UNIX-domain sockets.
 A FastCGI supported
 .Xr httpd 8
 server reporting offenders through such a socket is a typical example (see also
 .Xr pftbld.conf 5 Ns ).
+Furthermore, sending client data through indirect connections may be easily
+accomplished by means of either the
+.Xr pftblctl 8
+tool or the
+.Nm
+binary itself when used in pipe mode (details described below).
 .Pp
 .Nm
 rereads the configuration file when it receives

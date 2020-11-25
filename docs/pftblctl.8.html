@@ -51,7 +51,8 @@
     facilitating the use of <a class="Xr" href="pftbld.8.html">pftbld(8)</a> in
     verbose pipe mode. It is primarily intended to be used for sending commands
     to the <var class="Ar">control socket</var>, but may as well be utilized to
-    simulate client input on a <var class="Ar">data socket</var>.</p>
+    forward client data to the corresponding <var class="Ar">data
+  socket</var>.</p>
 <p class="Pp">The options are as follows:</p>
 <dl class="Bl-tag">
   <dt id="q"><a class="permalink" href="#q"><code class="Fl">-q</code></a></dt>
@@ -204,6 +205,13 @@ Next scheduled event:
 [...] [11.22.33.44]:[www]:(2x:1h3m17s) dropped.
 </pre>
 </div>
+<p class="Pp">Last but not least, <code class="Nm">pftblctl</code> may also be
+    used to send client data to the server:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+# pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44 &quot;Test 1&quot;
+</pre>
+</div>
 </section>
 <section class="Sh">
 <h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
@@ -220,7 +228,7 @@ Next scheduled event:
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">November 22, 2020</td>
+    <td class="foot-date">November 25, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
