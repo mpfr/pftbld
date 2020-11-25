@@ -70,10 +70,15 @@
 <p class="Pp"><code class="Nm">pftbld</code> obtains its configuration from
     <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.</p>
 <p class="Pp">Sole prerequisite for client programs is the ability to directly
-    or indirectly connect and write to UNIX-domain sockets. A FastCGI supported
+    or indirectly (i.e. through some other tool) connect and write to
+    UNIX-domain sockets. A FastCGI supported
     <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a> server
     reporting offenders through such a socket is a typical example (see also
-    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>).</p>
+    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>). Furthermore,
+    sending client data through indirect connections may be easily accomplished
+    by means of either the <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a>
+    tool or the <code class="Nm">pftbld</code> binary itself when used in pipe
+    mode (details described below).</p>
 <p class="Pp"><code class="Nm">pftbld</code> rereads the configuration file when
     it receives <code class="Dv">SIGHUP</code> and reopens its log file when it
     receives <code class="Dv">SIGUSR1</code>.</p>
@@ -197,7 +202,7 @@ to { attackers } for 1h.
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">November 12, 2020</td>
+    <td class="foot-date">November 25, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
