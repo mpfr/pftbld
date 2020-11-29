@@ -154,6 +154,19 @@ parse_conf(void)
 	SIMPLEQ_INSERT_HEAD(&spq, spath, keyterms);
 
 	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+		if (SIMPLEQ_EMPTY(&tgt->datasocks)) {
+			log_warnx("no sockets defined for target [%s]",
+			    tgt->name);
+			errors++;
+			continue;
+		}
+		if (SIMPLEQ_EMPTY(&tgt->cascade)) {
+			log_warnx("no cascade defined for target [%s]",
+			    tgt->name);
+			errors++;
+			continue;
+		}
+
 		if (!timespecisset(&tgt->drop)) {
 			tgt->drop = conf->drop;
 #if DEBUG
@@ -245,6 +258,7 @@ parse_conf(void)
 				log_warnx("target [%s]: table <%s> cannot "
 				    "expire after drop", tgt->name, tbl->name);
 				errors++;
+				break;
 			}
 		}
 	}
