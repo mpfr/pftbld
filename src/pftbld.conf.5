@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: October 14 2020 $
+.Dd $Mdocdate: November 29 2020 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -145,7 +145,10 @@ of a
 .Ic table
 cascade every managed IP address will traverse during its
 .Xr pftbld 8
-life cycle, followed by a block of options enclosed in curly brackets:
+life cycle.
+There must be exactly one instance defined per
+.Ic target ,
+followed by a block of options enclosed in curly brackets:
 .Bl -tag -width Ds
 .It Oo Ic no Oc Ic drop Ar time
 Overrides any previously specified
