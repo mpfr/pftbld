@@ -134,7 +134,9 @@
           <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>
           <code class="Ic">table</code> cascade every managed IP address will
           traverse during its <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
-          life cycle, followed by a block of options enclosed in curly brackets:
+          life cycle. There must be exactly one instance defined per
+          <code class="Ic">target</code>, followed by a block of options
+          enclosed in curly brackets:
         <dl class="Bl-tag">
           <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
             <var class="Ar">time</var></dt>
@@ -412,7 +414,7 @@ function pftbld_feed() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">October 14, 2020</td>
+    <td class="foot-date">November 29, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
