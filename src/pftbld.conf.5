@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 6 2020 $
+.Dd $Mdocdate: December 7 2020 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -376,7 +376,7 @@ drop 3w
 
 target "www" {
 	persist "/etc/pftbld/clientaddr.list"
-	exclude keyterms "/etc/pftbld/keyterms.list"
+	exclude keytermfile "/etc/pftbld/keyterms.list"
 
 	socket "/var/www/run/pftbld-www.sock" {
 		owner "www"
