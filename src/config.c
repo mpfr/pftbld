@@ -31,6 +31,7 @@ static struct socket
 static int	 check_targets(void);
 static void	 update_sockets(struct socketq *, struct socketq *,
 		    struct target *);
+static char	*esc(const char *);
 
 extern struct config	*conf;
 extern struct clientq	 cltq;
@@ -81,6 +82,7 @@ parse_conf(void)
 	extern struct crangeq	*curr_exclcrangeq;
 	extern struct keytermq	*curr_exclkeytermq;
 
+	struct crange	*self;
 	struct keytermq	 spq;
 	struct keyterm	*spath;
 	struct target	*tgt;
@@ -96,6 +98,9 @@ parse_conf(void)
 	SIMPLEQ_INIT(&conf->exclcranges);
 	SIMPLEQ_INIT(&conf->exclkeyterms);
 
+	CALLOC(self, 1, sizeof(*self));
+	SIMPLEQ_INSERT_HEAD(&conf->exclcranges, self, cranges);
+
 	curr_exclcrangeq = &conf->exclcranges;
 	curr_exclkeytermq = &conf->exclkeyterms;
 
@@ -109,18 +114,13 @@ parse_conf(void)
 	if (fclose(yyfp) == EOF)
 		log_warn("configuration file %s close", conffile);
 
+	if (errors)
+		return (errors);
+
 	if (SIMPLEQ_EMPTY(&conf->ctargets)) {
 		log_warnx("no targets defined in configuration file %s",
 			conffile);
 		errors++;
-	}
-
-	if (errors)
-		return (errors);
-
-	if (!timespecisset(&conf->drop)) {
-		conf->drop = TIMESPEC_INFINITE;
-		DPRINTF("assuming no global drop");
 	}
 
 	if (!conf->backlog) {
@@ -130,6 +130,10 @@ parse_conf(void)
 	if (!conf->datamax) {
 		conf->datamax = DEFAULT_DATAMAX;
 		DPRINTF("using global default datamax (%zu)", conf->datamax);
+	}
+	if (!timespecisset(&conf->drop)) {
+		conf->drop = TIMESPEC_INFINITE;
+		DPRINTF("assuming no global drop");
 	}
 	if (!conf->timeout) {
 		conf->timeout = DEFAULT_TIMEOUT;
@@ -154,19 +158,6 @@ parse_conf(void)
 	SIMPLEQ_INSERT_HEAD(&spq, spath, keyterms);
 
 	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
-		if (SIMPLEQ_EMPTY(&tgt->datasocks)) {
-			log_warnx("no sockets defined for target [%s]",
-			    tgt->name);
-			errors++;
-			continue;
-		}
-		if (SIMPLEQ_EMPTY(&tgt->cascade)) {
-			log_warnx("no cascade defined for target [%s]",
-			    tgt->name);
-			errors++;
-			continue;
-		}
-
 		if (!timespecisset(&tgt->drop)) {
 			tgt->drop = conf->drop;
 #if DEBUG
@@ -253,7 +244,6 @@ parse_conf(void)
 					    tbl->drop.tv_sec, tbl->name);
 #endif
 			}
-
 			if (timespeccmp(&tbl->expire, &tbl->drop, >)) {
 				log_warnx("target [%s]: table <%s> cannot "
 				    "expire after drop", tgt->name, tbl->name);
@@ -286,7 +276,7 @@ update_sockets(struct socketq *new, struct socketq *old, struct target *tgt)
 			waitpid(s->pid, NULL, 0);
 			if (unlink(s->path) == -1)
 				log_warn("failed deleting socket %s", s->path);
-			DPRINTF("socket (%s, %d, %d, %03o) deleted", s->path,
+			DPRINTF("socket (%s, %d, %d, %04o) deleted", s->path,
 			    s->owner, s->group, s->mode);
 		} else {
 			st->pid = s->pid;
@@ -302,7 +292,7 @@ new:
 		st = old == NULL ? NULL : find_socket(old, s);
 		if (st == NULL) {
 			fork_listener(s, tgt ? tgt->name : "");
-			DPRINTF("socket (%s, %d, %d, %03o) created", s->path,
+			DPRINTF("socket (%s, %d, %d, %04o) created", s->path,
 			    s->owner, s->group, s->mode);
 		} else {
 			s->pid = st->pid;
@@ -447,4 +437,238 @@ free_conf(struct config *c)
 		free(kt);
 	}
 	free(c);
+}
+
+static char *
+esc(const char *str)
+{
+	const char	*s;
+	char		*estr, *e;
+	unsigned int	 cnt = 1; /* trailing nul */
+
+	for (s = str; *s != '\0'; s++)
+		if (*s == '\\' || *s == '"')
+			cnt++;
+	MALLOC(estr, s - str + cnt);
+	for (s = str, e = estr; *s != '\0';) {
+		if (*s == '\\' || *s == '"')
+			*e++ = '\\';
+		*e++ = *s++;
+	}
+	*e = '\0';
+	return (estr);
+}
+
+void
+print_conf(struct statfd *sfd)
+{
+
+#define SMSG(m)	"%s"m, step ? "\t" : ""
+
+	char		*age, *estr, *ptbl;
+	struct crange	*cr;
+	struct keyterm	*kt;
+	struct target	*tgt;
+	struct table	*tbl;
+	struct timespec	 pexp;
+	uint8_t		 pflgs;
+	int		 step;
+	struct socket	*sock;
+
+	if (conf->backlog == CONF_NO_BACKLOG)
+		msg_send(sfd, "no backlog\n");
+	else
+		msg_send(sfd, "backlog %d\n", conf->backlog);
+
+	if (conf->datamax == CONF_NO_DATAMAX)
+		msg_send(sfd, "no datamax\n");
+	else
+		msg_send(sfd, "datamax %zu\n", conf->datamax);
+
+	if (timespeccmp(&conf->drop, &CONF_NO_DROP, ==))
+		msg_send(sfd, "no drop\n");
+	else {
+		age = hrage(&conf->drop);
+		msg_send(sfd, "drop %s\n", age);
+		free(age);
+	}
+
+	cr = SIMPLEQ_FIRST(&conf->exclcranges);
+	if ((cr != NULL && *cr->str != '\0') ||
+	    !SIMPLEQ_EMPTY(&conf->exclkeyterms)) {
+		msg_send(sfd, "exclude {\n");
+
+		if (cr != NULL)
+			while ((cr = SIMPLEQ_NEXT(cr, cranges)) != NULL)
+				msg_send(sfd, "\tnet \"%s\"\n", cr->str);
+
+		SIMPLEQ_FOREACH(kt, &conf->exclkeyterms, keyterms) {
+			estr = esc(kt->str);
+			msg_send(sfd, "\tkeyterm \"%s\"\n", estr);
+			free(estr);
+		}
+
+		msg_send(sfd, "}\n");
+	}
+
+	if (conf->flags & FLAG_GLOBAL_NOLOG)
+		msg_send(sfd, "no log\n");
+	else {
+		estr = esc(conf->log);
+		msg_send(sfd, "log \"%s\"\n", estr);
+		free(estr);
+	}
+
+	if (conf->timeout == CONF_NO_TIMEOUT)
+		msg_send(sfd, "no timeout\n");
+	else
+		msg_send(sfd, "timeout %lld\n", conf->timeout);
+
+	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+		estr = esc(tgt->name);
+		msg_send(sfd, "target \"%s\" {\n\tcascade {\n", estr);
+		free(estr);
+
+		step = 0;
+		pexp = TIMESPEC_INFINITE;
+		pflgs = DEFAULT_TABLE_KILL_FLAGS;
+		ptbl = NULL;
+
+		SIMPLEQ_FOREACH(tbl, &tgt->cascade, tables) {
+			if (timespeccmp(&tgt->drop, &tbl->drop, !=)) {
+				if (timespeccmp(&tbl->drop, &CONF_NO_DROP, ==))
+					msg_send(sfd, SMSG("\t\tno drop\n"));
+				else {
+					age = hrage(&tbl->drop);
+					msg_send(sfd, SMSG("\t\tdrop %s\n"),
+					    age);
+					free(age);
+				}
+			}
+
+			if (!timespec_isinfinite(&tbl->expire) &&
+			    timespeccmp(&pexp, &tbl->expire, !=)) {
+				age = hrage(&tbl->expire);
+				msg_send(sfd, SMSG("\t\texpire %s\n"), age);
+				free(age);
+			}
+
+			if (tbl->hits)
+				msg_send(sfd, SMSG("\t\thits %u\n"),
+				    tbl->hits);
+
+			if ((pflgs & FLAG_TABLE_KILL_NODES) !=
+			    (tbl->flags & FLAG_TABLE_KILL_NODES))
+				msg_send(sfd, SMSG("\t\t%s nodes\n"),
+				    tbl->flags & FLAG_TABLE_KILL_NODES ?
+				    "kill" : "keep");
+			if ((pflgs & FLAG_TABLE_KILL_STATES) !=
+			    (tbl->flags & FLAG_TABLE_KILL_STATES))
+				msg_send(sfd, SMSG("\t\t%s states\n"),
+				    tbl->flags & FLAG_TABLE_KILL_STATES ?
+				    "kill" : "keep");
+
+			if (ptbl == NULL || strcmp(ptbl, tbl->name)) {
+				estr = esc(tbl->name);
+				msg_send(sfd, SMSG("\t\ttable \"%s\"\n"),
+				    estr);
+				free(estr);
+			}
+
+			if (step)
+				msg_send(sfd, "\t\t}\n");
+			if (SIMPLEQ_NEXT(tbl, tables) != NULL) {
+				msg_send(sfd, "\t\tstep {\n");
+				step = 1;
+			}
+
+			pexp = tbl->expire;
+			pflgs = tbl->flags;
+			ptbl = tbl->name;
+		}
+
+		msg_send(sfd, "\t}\n");
+
+		if (timespeccmp(&conf->drop, &tgt->drop, !=)) {
+			if (timespeccmp(&tgt->drop, &CONF_NO_DROP, ==))
+				msg_send(sfd, "\tno drop\n");
+			else {
+				age = hrage(&conf->drop);
+				msg_send(sfd, "\tdrop %s\n", age);
+				free(age);
+			}
+		}
+
+		if (!SIMPLEQ_EMPTY(&tgt->exclcranges) ||
+		    !SIMPLEQ_EMPTY(&tgt->exclkeyterms)) {
+			msg_send(sfd, "\texclude {\n");
+
+			SIMPLEQ_FOREACH(cr, &tgt->exclcranges, cranges)
+				msg_send(sfd, "\t\tnet \"%s\"\n", cr->str);
+
+			SIMPLEQ_FOREACH(kt, &tgt->exclkeyterms, keyterms) {
+				estr = esc(kt->str);
+				msg_send(sfd, "\t\tkeyterm \"%s\"\n", estr);
+				free(estr);
+			}
+
+			msg_send(sfd, "\t}\n");
+		}
+
+		if (*tgt->persist != '\0') {
+			estr = esc(tgt->persist);
+			msg_send(sfd, "\tpersist \"%s\"\n", estr);
+			free(estr);
+		}
+
+		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets) {
+			estr = esc(sock->path);
+			msg_send(sfd, "\tsocket \"%s\" {\n", estr);
+			free(estr);
+
+			if (conf->backlog != sock->backlog) {
+				if (sock->backlog == CONF_NO_BACKLOG)
+					msg_send(sfd, "\t\tno backlog\n");
+				else
+					msg_send(sfd, "\t\tbacklog %d\n",
+					    sock->backlog);
+			}
+
+			if (conf->datamax != sock->datamax) {
+				if (sock->datamax == CONF_NO_DATAMAX)
+					msg_send(sfd, "\t\tno datamax\n");
+				else
+					msg_send(sfd, "\t\tdatamax %zu\n",
+					    sock->datamax);
+			}
+
+			msg_send(sfd, "\t\tgroup %d\n", sock->group);
+
+			if (*sock->id != '\0') {
+				estr = esc(sock->id);
+				msg_send(sfd, "\t\tid \"%s\"\n", estr);
+				free(estr);
+			}
+
+			msg_send(sfd, "\t\tmode %04o\n", sock->mode);
+
+			msg_send(sfd, "\t\towner %d\n", sock->owner);
+
+			if (conf->timeout != sock->timeout) {
+				if (sock->timeout == CONF_NO_TIMEOUT)
+					msg_send(sfd, "\t\tno timeout\n");
+				else
+					msg_send(sfd, "\t\ttimeout %lld\n",
+					    sock->timeout);
+			}
+
+			msg_send(sfd, "\t}\n");
+
+		}
+
+		msg_send(sfd, "}\n");
+	}
+
+#undef SMSG
+
 }

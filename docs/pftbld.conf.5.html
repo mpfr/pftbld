@@ -39,12 +39,17 @@
 <h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
 <p class="Pp"><code class="Nm">pftbld.conf</code> maintains the configuration
     for <a class="Xr" href="pftbld.8.html">pftbld(8)</a>. In this context,
-    values of type <span class="Pa">time</span> must be specified as a sequence
-    of number/unit combinations, e.g. <span class="Pa">7w3d</span> for a period
-    of 7 weeks and 3 days. Valid units are: <span class="Pa">w</span> (weeks),
-    <span class="Pa">d</span> (days), <span class="Pa">h</span> (hours),
-    <span class="Pa">m</span> (minutes) and <span class="Pa">s</span>
-  (seconds).</p>
+    values of type <var class="Ar">time</var> must be specified as a sequence of
+    number/unit combinations, with the number assumed in decimal format, e.g.
+    <span class="Pa">7w3d</span> for a period of 7 weeks and 3 days. Valid units
+    are: <span class="Pa">w</span> (weeks), <span class="Pa">d</span> (days),
+    <span class="Pa">h</span> (hours), <span class="Pa">m</span> (minutes) and
+    <span class="Pa">s</span> (seconds). Values of type
+    <var class="Ar">number</var>, on the other hand, may be specified either in
+    decimal, or with a leading zero, in octal format (e.g.
+    <span class="Pa">0740</span>). Furthermore, unless a base path is provided
+    via the <code class="Fl">-b</code> option at daemon startup, only absolute
+    paths are permitted for <var class="Ar">path</var> type values.</p>
 </section>
 <section class="Sh">
 <h1 class="Sh" id="GLOBAL_CONFIGURATION"><a class="permalink" href="#GLOBAL_CONFIGURATION">GLOBAL
@@ -90,11 +95,21 @@
         <var class="Ar">address/network</var></dt>
       <dd>Exclude the specified <var class="Ar">address/network</var> (e.g.
           <var class="Ar">192.168.100/24</var>) from being processed.</dd>
-      <dt id="keyterms"><a class="permalink" href="#keyterms"><code class="Ic">keyterms</code></a>
+      <dt id="netfile"><a class="permalink" href="#netfile"><code class="Ic">netfile</code></a>
         <var class="Ar">path</var></dt>
-      <dd>Skip processing of incoming data containing any of the strings from
-          the file at <var class="Ar">path</var> being read line by line, each
-          line interpreted as a keyterm string.</dd>
+      <dd>Read <code class="Ic">net</code> entries line by line from the file at
+          <var class="Ar">path</var>. The file must be fomatted as outlined in
+          <a class="Xr" href="http://man.openbsd.org/hosts.5">hosts(5)</a>. Any
+          content other than an <span class="Pa">address/network</span> at the
+          beginning of each line will be ignored.</dd>
+      <dt id="keyterm"><a class="permalink" href="#keyterm"><code class="Ic">keyterm</code></a>
+        <var class="Ar">string</var></dt>
+      <dd>Skip processing of incoming data containing the given
+          <var class="Ar">string</var>.</dd>
+      <dt id="keytermfile"><a class="permalink" href="#keytermfile"><code class="Ic">keytermfile</code></a>
+        <var class="Ar">path</var></dt>
+      <dd>Read <code class="Ic">keyterm</code> strings line by line from the
+          file at <var class="Ar">path</var>.</dd>
     </dl>
   </dd>
   <dt>[<code class="Ic">no</code>] <code class="Ic">log</code>
@@ -118,9 +133,9 @@
 <section class="Sh">
 <h1 class="Sh" id="TARGETS"><a class="permalink" href="#TARGETS">TARGETS</a></h1>
 <p class="Pp">Typically, targets are used to distinguish input data by service
-    type and apply appropriate handling. At least one
-    <code class="Ic">target</code> entry needs to be defined to start
-    <a class="Xr" href="pftbld.8.html">pftbld(8)</a>.</p>
+    type and apply appropriate handling. In order to start
+    <a class="Xr" href="pftbld.8.html">pftbld(8)</a>, at least one
+    <code class="Ic">target</code> entry needs to be defined.</p>
 <dl class="Bl-tag">
   <dt id="target"><a class="permalink" href="#target"><code class="Ic">target</code></a>
     <var class="Ar">name</var> {...}</dt>
@@ -140,14 +155,18 @@
         <dl class="Bl-tag">
           <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
             <var class="Ar">time</var></dt>
-          <dd>Overrides any previously specified <code class="Ic">drop</code>
-              option.</dd>
+          <dd>Overrides any <code class="Ic">drop</code> option specified
+              globally or with the enclosing
+            <code class="Ic">target</code>.</dd>
           <dt id="expire"><a class="permalink" href="#expire"><code class="Ic">expire</code></a>
             <var class="Ar">time</var></dt>
           <dd>Specifies the period of time an IP address will be held in the
               corresponding <code class="Ic">table</code>. When that period has
               passed, the address will be deleted from the table. If omitted,
-              addresses will be deleted only when dropped.</dd>
+              addresses will not expire and remain in their tables until deleted
+              manually, e.g. by utilizing the
+              <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a>
+              <code class="Ic">drop</code> command.</dd>
           <dt id="hits"><a class="permalink" href="#hits"><code class="Ic">hits</code></a>
             <var class="Ar">number</var></dt>
           <dd>Maximum number of appearances for a specific IP address in the
@@ -176,17 +195,19 @@
                   entries</span>. The default is
                 <code class="Ic">kill</code>.</dd>
             </dl>
-            Generally, an option's setting will be applied to the current
+            Generally, kill options will be applied to the current
               <code class="Ic">step</code> and all its successors, until revoked
-              by its counterpart.</dd>
+              by their counterparts.</dd>
           <dt id="step"><a class="permalink" href="#step"><code class="Ic">step</code></a>
-            {...}</dt>
-          <dd>The next step in the <code class="Ic">cascade</code>, followed by
-              a block of cascade options (except <code class="Ic">step</code>
-              itself) enclosed in curly brackets. Multiple occurrences are
-              traversed in the order of their appearance. If
-              <code class="Ic">table</code> (inside the options) is omitted, its
-              most recent definition will be used.</dd>
+            <var class="Ar">option</var> | {...}</dt>
+          <dd>The next step in the cascade followed by at least one
+              <code class="Ic">cascade</code> <var class="Ar">option</var>
+              (except <code class="Ic">step</code> itself), multiple options
+              enclosed in curly brackets. If there is no
+              <code class="Ic">table</code> <var class="Ar">option</var>
+              specified for a <code class="Ic">step</code>, it will be inherited
+              from its predecessor. Steps are traversed in the order of their
+              appearance.</dd>
           <dt id="table"><a class="permalink" href="#table"><code class="Ic">table</code></a>
             <var class="Ar">name</var></dt>
           <dd>The <var class="Ar">name</var> of the corresponding
@@ -253,8 +274,9 @@
               allows for their identification.</dd>
           <dt id="mode"><a class="permalink" href="#mode"><code class="Ic">mode</code></a>
             <var class="Ar">number</var></dt>
-          <dd>The absolute mode of the <code class="Ic">socket</code>, as an
-              octal <var class="Ar">number</var>. Defaults to 0660.</dd>
+          <dd>The absolute mode of the <code class="Ic">socket</code>,
+              preferably as an octal <var class="Ar">number</var>. Defaults to
+              0660.</dd>
           <dt id="owner"><a class="permalink" href="#owner"><code class="Ic">owner</code></a>
             <var class="Ar">id</var> | <var class="Ar">name</var></dt>
           <dd>The owner of the <code class="Ic">socket</code>, either as a
@@ -414,7 +436,7 @@ function pftbld_feed() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">November 29, 2020</td>
+    <td class="foot-date">December 6, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

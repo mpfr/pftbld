@@ -19,6 +19,7 @@
 #include <netinet/in.h>
 
 #include <sys/event.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/un.h>
 
@@ -30,6 +31,7 @@
 #define DEFAULT_BACKLOG	5
 #define DEFAULT_DATAMAX	2048
 #define DEFAULT_TIMEOUT	10000
+#define DEFAULT_SOCKMOD	0660
 
 #define ENV_DEBUG	"DEBUG"
 #define ENV_VERBOSE	"VERBOSE"
@@ -41,10 +43,11 @@
 #define TS_FMT		"%d/%b/%Y:%H:%M:%S %z"
 #define TS_SIZE		27
 
-#define FLAG_GLOBAL_NOLOG	0x01
-#define FLAG_GLOBAL_UNLOAD	0x02
-#define FLAG_TABLE_KILL_STATES	0x01
-#define FLAG_TABLE_KILL_NODES	0x02
+#define FLAG_GLOBAL_NOLOG		0x01
+#define FLAG_GLOBAL_UNLOAD		0x02
+#define FLAG_TABLE_KILL_STATES		0x01
+#define FLAG_TABLE_KILL_NODES		0x02
+#define DEFAULT_TABLE_KILL_FLAGS	FLAG_TABLE_KILL_STATES
 
 #define	NANONAP	nanosleep(&(const struct timespec){ 0, 500000L }, NULL)
 
@@ -54,6 +57,11 @@
 #define TIMESPEC_INFINITE	(const struct timespec){ LLONG_MAX, LONG_MAX }
 
 #define timespec_isinfinite(t)	timespeccmp(t, &TIMESPEC_INFINITE, ==)
+
+#define CONF_NO_BACKLOG	INT_MAX
+#define CONF_NO_DATAMAX	LLONG_MAX
+#define CONF_NO_TIMEOUT	LLONG_MAX
+#define CONF_NO_DROP	TIMESPEC_INFINITE
 
 #define EV_DPRINTF(e, s)					\
 	DPRINTF("KEVENT%s(id:%lu, EVFILT_%s%s, data:%lld)",	\
@@ -379,6 +387,11 @@ enum procid {
 	NUM_PROCS /* must be last */
 };
 
+struct statfd {
+	int		 fd;
+	struct stat	 sb;
+};
+
 /* pftbld.c */
 void		 pfexec(struct caddrq *, struct pfresult *, const char *, ...)
 		    __attribute__((__format__ (printf, 3, 4)));
@@ -389,6 +402,7 @@ struct target	*find_target(struct targetq *, const char *);
 int		 parse_conf(void);
 int		 reload_conf(void);
 void		 free_conf(struct config *);
+void		 print_conf(struct statfd *);
 
 /* listener.c */
 __dead void	 listener(int, char **);
@@ -449,4 +463,7 @@ char		*hrage(struct timespec *);
 struct crange	*parse_crange(const char *);
 char		*addrstr(char *, size_t, struct caddr *);
 int		 prefill_socketopts(struct socket *);
-enum pathres	 check_path(const char *, char *, size_t, char **);
+enum pathres	 check_path(const char *, char *, size_t);
+struct statfd	*create_statfd(int);
+void		 msg_send(struct statfd *, const char *, ...)
+		    __attribute__((__format__ (printf, 2, 3)));
