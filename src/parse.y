@@ -30,11 +30,41 @@
 
 #define HOSTS_FILE	"/etc/hosts"
 
+#define CANONICAL_PATH_SET(path, str, txt, err, exit)			\
+	do {								\
+		char		 _cp[PATH_MAX];				\
+		enum pathres	 _pr;					\
+		_pr = check_path(path, _cp, sizeof(_cp));		\
+		switch (_pr) {						\
+		case PATH_OK:						\
+			break;						\
+		case PATH_EMPTY:					\
+			err; yyerror("empty "txt" path");		\
+			exit;						\
+		case PATH_RELATIVE:					\
+			err; yyerror(txt" path cannot be relative");	\
+			exit;						\
+		case PATH_INVALID:					\
+			err; yyerror("invalid "txt" path");		\
+			exit;						\
+		case PATH_DIRECTORY:					\
+			err; yyerror(txt" path cannot be a directory");	\
+			exit;						\
+		case PATH_FILENAME:					\
+			err; yyerror("invalid "txt" name");		\
+			exit;						\
+		default:						\
+			FATALX("invalid path check result (%d)", _pr);	\
+		}							\
+		if (strlcpy(str, _cp, sizeof(str)) >= sizeof(str)) {	\
+			err; yyerror(txt" path too long");		\
+			exit;						\
+		}							\
+	} while (0)
+
 static void	yyerror(const char *, ...);
 static int	yylex(void);
 
-static struct socket
-		*create_socket(const char *);
 static int	 load_exclude_keyterms(const char *);
 static int	 crange_inq(struct crangeq *, struct crange *);
 static int	 keyterm_inq(struct keytermq *, struct keyterm *);
@@ -54,7 +84,7 @@ int		 errors, lineno, colno;
 
 static struct target	*target;
 static struct socket	*sock;
-static struct table	*table;
+static struct table	*table, *ptable;
 static uint8_t		 flags;
 
 struct crangeq	*curr_exclcrangeq;
@@ -62,9 +92,9 @@ struct keytermq	*curr_exclkeytermq;
 
 %}
 
-%token	BACKLOG CASCADE DATAMAX DROP EXCLUDE EXPIRE GROUP HITS ID KEEP KEYTERMS
-%token	KILL LOCALHOSTS LOG MODE NET NO NODES OWNER PERSIST SOCKET STATES STEP
-%token	TABLE TARGET TIMEOUT
+%token	BACKLOG CASCADE DATAMAX DROP EXCLUDE EXPIRE GROUP HITS ID KEEP KEYTERM
+%token	KEYTERMFILE KILL LOCALHOSTS LOG MODE NET NETFILE NO NODES OWNER PERSIST
+%token	SOCKET STATES STEP TABLE TARGET TIMEOUT
 %token	<v.number>	NUMBER
 %token	<v.string>	STRING
 %token	<v.time>	TIME
@@ -77,7 +107,7 @@ grammar		: /* empty */
 		;
 
 main		: BACKLOG NUMBER		{
-			if ($2 <= 0 || $2 >= INT_MAX) {
+			if ($2 <= 0 || $2 >= CONF_NO_BACKLOG) {
 				yyerror("backlog out of bounds");
 				YYERROR;
 			}
@@ -85,7 +115,7 @@ main		: BACKLOG NUMBER		{
 			DPRINTF("global backlog: %d", conf->backlog);
 		}
 		| DATAMAX NUMBER		{
-			if ($2 <= 0 || $2 >= LONG_MAX) {
+			if ($2 <= 0 || $2 >= CONF_NO_DATAMAX) {
 				yyerror("datamax out of bounds");
 				YYERROR;
 			}
@@ -93,7 +123,7 @@ main		: BACKLOG NUMBER		{
 			DPRINTF("global datamax: %zu", conf->datamax);
 		}
 		| DROP TIME			{
-			if ($2 <= 0 || $2 >= LLONG_MAX) {
+			if ($2 <= 0 || $2 >= CONF_NO_DROP.tv_sec) {
 				yyerror("drop time out of bounds");
 				YYERROR;
 			}
@@ -102,27 +132,23 @@ main		: BACKLOG NUMBER		{
 		}
 		| exclude
 		| LOG STRING			{
-			if (strlcpy(conf->log, $2,
-			    sizeof(conf->log)) >= sizeof(conf->log)) {
-				yyerror("log file path '%s' too long", $2);
-				free($2);
-				YYERROR;
-			}
+			CANONICAL_PATH_SET($2, conf->log, "log file", free($2),
+			    YYERROR);
 			free($2);
 			conf->flags &= ~FLAG_GLOBAL_NOLOG;
 			DPRINTF("log file is %s, flags: %02X", conf->log,
 			    conf->flags);
 		}
 		| NO BACKLOG			{
-			conf->backlog = INT_MAX;
+			conf->backlog = CONF_NO_BACKLOG;
 			DPRINTF("no global backlog");
 		}
 		| NO DATAMAX			{
-			conf->datamax = LONG_MAX;
+			conf->datamax = CONF_NO_DATAMAX;
 			DPRINTF("no global datamax");
 		}
 		| NO DROP			{
-			conf->drop = TIMESPEC_INFINITE;
+			conf->drop = CONF_NO_DROP;
 			DPRINTF("no global drop");
 		}
 		| NO LOG			{
@@ -130,11 +156,11 @@ main		: BACKLOG NUMBER		{
 			DPRINTF("no log, flags: %02X", conf->flags);
 		}
 		| NO TIMEOUT			{
-			conf->timeout = LLONG_MAX;
+			conf->timeout = CONF_NO_TIMEOUT;
 			DPRINTF("no global timeout");
 		}
 		| TIMEOUT NUMBER		{
-			if ($2 <= 0 || $2 >= LLONG_MAX) {
+			if ($2 <= 0 || $2 >= CONF_NO_TIMEOUT) {
 				yyerror("timeout out of bounds");
 				YYERROR;
 			}
@@ -145,17 +171,16 @@ main		: BACKLOG NUMBER		{
 			SIMPLEQ_FOREACH(target, &conf->ctargets, targets)
 				if (!strncmp(target->name, $2,
 				    sizeof(target->name))) {
-					yyerror("target [%s] defined twice",
-					    $2);
 					free($2);
+					yyerror("target defined twice");
 					YYERROR;
 				}
 			CALLOC(target, 1, sizeof(*target));
+			SIMPLEQ_INSERT_TAIL(&conf->ctargets, target, targets);
 			if (strlcpy(target->name, $2,
 			    sizeof(target->name)) >= sizeof(target->name)) {
-				yyerror("target name '%s' too long", $2);
 				free($2);
-				free(target);
+				yyerror("target name too long");
 				YYERROR;
 			}
 			free($2);
@@ -164,10 +189,19 @@ main		: BACKLOG NUMBER		{
 			SIMPLEQ_INIT(&target->exclkeyterms);
 			SIMPLEQ_INIT(&target->cascade);
 			DPRINTF("current target is [%s]", target->name);
-			SIMPLEQ_INSERT_TAIL(&conf->ctargets, target, targets);
 			curr_exclcrangeq = &target->exclcranges;
 			curr_exclkeytermq = &target->exclkeyterms;
 		} '{' optnl targetopts_l '}'	{
+			if (SIMPLEQ_EMPTY(&target->datasocks)) {
+				yyerror("no sockets defined for target [%s]",
+				    target->name);
+				YYERROR;
+			}
+			if (SIMPLEQ_EMPTY(&target->cascade)) {
+				yyerror("no cascade defined for target [%s]",
+				    target->name);
+				YYERROR;
+			}
 			curr_exclcrangeq = &conf->exclcranges;
 			curr_exclkeytermq = &conf->exclkeyterms;
 		}
@@ -179,52 +213,67 @@ targetopts_l	: targetopts_l targetoptsl nl
 
 targetoptsl	: CASCADE			{
 			if (!SIMPLEQ_EMPTY(&target->cascade)) {
-				yyerror("only one cascade per target "
-				    "permitted");
+				yyerror("second cascade not permitted");
 				YYERROR;
 			}
 			CALLOC(table, 1, sizeof(*table));
-			table->flags |= FLAG_TABLE_KILL_STATES;
 			SIMPLEQ_INSERT_HEAD(&target->cascade, table, tables);
 			DPRINTF("top cascade table enqueued");
+			ptable = table;
+			table->flags = DEFAULT_TABLE_KILL_FLAGS;
 		} '{' optnl cascadeopts_l '}'	{
 			struct table	*t, *nt;
-			int		 n;
+			unsigned int	 n;
 
 			t = SIMPLEQ_FIRST(&target->cascade);
 			if (*t->name == '\0') {
 				yyerror("missing cascade head table");
 				YYERROR;
 			}
-			n = 1;
-			while ((nt = SIMPLEQ_NEXT(t, tables)) != NULL) {
+			for (n = 1;
+			    (nt = SIMPLEQ_NEXT(t, tables)) != NULL; n++) {
 				if (t->hits == 0) {
-					yyerror("cascade step %d unreachable",
+					yyerror("cascade step %u unreachable",
 					    n);
 					YYERROR;
 				}
 				if (nt->hits == 0)
-					DPRINTF("cascade closed by step %d", n);
+					DPRINTF("cascade closed by step %u", n);
 				else if (nt->hits <= t->hits) {
-					yyerror("hits of cascade step %d must "
-					    "be greater than %d", n, t->hits);
+					yyerror("cascade step %u must catch "
+					    "more than %u hit%s", n, t->hits,
+					    t->hits > 1 ? "s" : "");
 					YYERROR;
 				}
-				if (*nt->name == '\0') {
-					strcpy(nt->name, t->name); /* len ok */
-					DPRINTF("step %d inherited table name "
-					    "<%s>", n, nt->name);
+				if (*nt->name != '\0') {
+					t = nt;
+					continue;
 				}
+				if (nt->flags == t->flags &&
+				    timespeccmp(&nt->drop, &t->drop, ==) &&
+				    timespeccmp(&nt->expire, &t->expire, ==)) {
+					t->hits = nt->hits;
+					SIMPLEQ_REMOVE_AFTER(&target->cascade,
+					    t, tables);
+					free(nt);
+					DPRINTF("merged upwards %u hit%s from "
+					    "cascade step %u", nt->hits,
+					    nt->hits > 1 ? "s" : "", n);
+					continue;
+				}
+				strcpy(nt->name, t->name); /* len ok */
+				DPRINTF("step %u inherited table name <%s>", n,
+				    nt->name);
 				t = nt;
-				n++;
 			}
 			if (t->hits > 0) {
-				yyerror("open cascade after %d hits", t->hits);
+				yyerror("open cascade after %u hit%s", t->hits,
+				    t->hits > 1 ? "s" : "");
 				YYERROR;
 			}
 		}
 		| DROP TIME			{
-			if ($2 <= 0 || $2 >= LLONG_MAX) {
+			if ($2 <= 0 || $2 >= CONF_NO_DROP.tv_sec) {
 				yyerror("drop time out of bounds");
 				YYERROR;
 			}
@@ -234,66 +283,34 @@ targetoptsl	: CASCADE			{
 		}
 		| exclude
 		| NO DROP			{
-			target->drop = TIMESPEC_INFINITE;
+			target->drop = CONF_NO_DROP;
 			DPRINTF("no drop for target [%s]", target->name);
 		}
 		| PERSIST STRING		{
-			char		 path[PATH_MAX];
-			enum pathres	 pres;
-
-			pres = check_path($2, path, sizeof(path), NULL);
-			switch (pres) {
-			case PATH_OK:
-				break;
-			case PATH_EMPTY:
-				yyerror("empty persist file path");
-				free($2);
-				YYERROR;
-			case PATH_RELATIVE:
-				yyerror("persist file path cannot be "
-				    "relative");
-				free($2);
-				YYERROR;
-			case PATH_INVALID:
-				yyerror("invalid persist file path");
-				free($2);
-				YYERROR;
-			case PATH_DIRECTORY:
-				yyerror("persist file path cannot be a "
-				    "directory");
-				free($2);
-				YYERROR;
-			case PATH_FILENAME:
-				yyerror("invalid persist file name");
-				free($2);
-				YYERROR;
-			default:
-				FATALX("invalid path check result (%d)", pres);
-			}
-			if (strlcpy(target->persist, path,
-			    sizeof(target->persist)) >=
-			    sizeof(target->persist)) {
-				yyerror("persist file path too long");
-				free($2);
-				YYERROR;
-			}
+			CANONICAL_PATH_SET($2, target->persist, "persist file",
+			    free($2), YYERROR);
 			free($2);
 			DPRINTF("persist file is %s", target->persist);
 		}
 		| SOCKET STRING			{
-			if ((sock = create_socket($2)) == NULL) {
-				free($2);
-				YYERROR;
-			}
+			struct socket	*s;
+
+			CALLOC(sock, 1, sizeof(*sock));
+			CANONICAL_PATH_SET($2, sock->path, "socket",
+			    free($2); free(sock), YYERROR);
 			free($2);
+			SIMPLEQ_FOREACH(s, &target->datasocks, sockets)
+				if (!strcmp(s->path, sock->path)) {
+					free(sock);
+					yyerror("data socket defined twice");
+					YYERROR;
+				}
+			SIMPLEQ_INSERT_TAIL(&target->datasocks, sock, sockets);
 			if (prefill_socketopts(sock) == -1) {
-				yyerror("prefill socket options failed for %s",
-				    sock->path);
-				free(sock);
+				yyerror("prefill socket options failed");
 				YYERROR;
 			}
 			DPRINTF("current data socket at %s", sock->path);
-			SIMPLEQ_INSERT_TAIL(&target->datasocks, sock, sockets);
 		} sockopts
 		;
 
@@ -301,20 +318,20 @@ cascadeopts_l	: cascadeoptsl optcommanl cascadeopts_l
 		| cascadeoptsl optnl
 		;
 
-cascadeoptsl	: STEP				{
-			struct table	*last, *next;
-
+cascadeoptsl	: STEP		{
 			CALLOC(table, 1, sizeof(*table));
-			last = SIMPLEQ_FIRST(&target->cascade);
-			while ((next = SIMPLEQ_NEXT(last, tables)) != NULL)
-				last = next;
-			table->flags = last->flags;
 			SIMPLEQ_INSERT_TAIL(&target->cascade, table, tables);
-			DPRINTF("next cascade table (flags <- %02X) enqueued",
+			DPRINTF("next cascade step (flags <- %02X) enqueued",
 			    table->flags);
-		} '{' optnl tableopts_l '}'	{
+			table->flags = ptable->flags;
+		} stepopts	{
+			ptable = table;
 			table = SIMPLEQ_FIRST(&target->cascade);
 		}
+		| tableoptsl
+		;
+
+stepopts	: '{' optnl tableopts_l '}'
 		| tableoptsl
 		;
 
@@ -328,7 +345,7 @@ sockopts_l	: sockoptsl optcommanl sockopts_l
 		;
 
 sockoptsl	: BACKLOG NUMBER	{
-			if ($2 <= 0 || $2 >= INT_MAX) {
+			if ($2 <= 0 || $2 >= CONF_NO_BACKLOG) {
 				yyerror("backlog out of bounds");
 				YYERROR;
 			}
@@ -336,7 +353,7 @@ sockoptsl	: BACKLOG NUMBER	{
 			DPRINTF("backlog: %d", conf->backlog);
 		}
 		| DATAMAX NUMBER	{
-			if ($2 <= 0 || $2 >= LONG_MAX) {
+			if ($2 <= 0 || $2 >= CONF_NO_DATAMAX) {
 				yyerror("datamax out of bounds");
 				YYERROR;
 			}
@@ -347,7 +364,7 @@ sockoptsl	: BACKLOG NUMBER	{
 			struct group	*grp;
 
 			if ((grp = getgrgid($2)) == NULL) {
-				yyerror("group id (%d) not found", $2);
+				yyerror("group id not found");
 				YYERROR;
 			}
 			sock->group = $2;
@@ -358,8 +375,8 @@ sockoptsl	: BACKLOG NUMBER	{
 			struct group	*grp;
 
 			if ((grp = getgrnam($2)) == NULL) {
-				yyerror("group '%s' not found", $2);
 				free($2);
+				yyerror("group name not found");
 				YYERROR;
 			}
 			sock->group = grp->gr_gid;
@@ -369,8 +386,8 @@ sockoptsl	: BACKLOG NUMBER	{
 		| ID STRING		{
 			if (strlcpy(sock->id, $2,
 			    sizeof(sock->id)) >= sizeof(sock->id)) {
-				yyerror("socket id '%s' too long", $2);
 				free($2);
+				yyerror("socket id too long");
 				YYERROR;
 			}
 			DPRINTF("id: [%s]", $2);
@@ -382,25 +399,25 @@ sockoptsl	: BACKLOG NUMBER	{
 				YYERROR;
 			}
 			sock->mode = $2;
-			DPRINTF("mode: %03o", sock->mode);
+			DPRINTF("mode: %04o", sock->mode);
 		}
 		| NO BACKLOG			{
-			sock->backlog = INT_MAX;
+			sock->backlog = CONF_NO_BACKLOG;
 			DPRINTF("no backlog");
 		}
 		| NO DATAMAX		{
-			sock->datamax = LONG_MAX;
+			sock->datamax = CONF_NO_DATAMAX;
 			DPRINTF("no datamax");
 		}
 		| NO TIMEOUT		{
-			sock->timeout = LLONG_MAX;
+			sock->timeout = CONF_NO_TIMEOUT;
 			DPRINTF("no timeout");
 		}
 		| OWNER NUMBER		{
 			struct passwd	*pwd;
 
 			if ((pwd = getpwuid($2)) == NULL) {
-				yyerror("user id (%d) not found", $2);
+				yyerror("user id not found");
 				YYERROR;
 			}
 			sock->owner = $2;
@@ -410,8 +427,8 @@ sockoptsl	: BACKLOG NUMBER	{
 			struct passwd	*pwd;
 
 			if ((pwd = getpwnam($2)) == NULL) {
-				yyerror("user '%s' not found", $2);
 				free($2);
+				yyerror("user name not found");
 				YYERROR;
 			}
 			sock->owner = pwd->pw_uid;
@@ -419,7 +436,7 @@ sockoptsl	: BACKLOG NUMBER	{
 			free($2);
 		}
 		| TIMEOUT NUMBER	{
-			if ($2 <= 0 || $2 >= LLONG_MAX) {
+			if ($2 <= 0 || $2 >= CONF_NO_TIMEOUT) {
 				yyerror("timeout out of bounds");
 				YYERROR;
 			}
@@ -444,19 +461,44 @@ excludeoptsl	: LOCALHOSTS		{
 			struct crange	*r;
 
 			if ((r = parse_crange($2)) == NULL) {
-				yyerror("invalid exclude value");
+				free($2);
+				yyerror("invalid exclude net");
+				YYERROR;
+			}
+			free($2);
+			if (crange_inq(curr_exclcrangeq, r)) {
+				DPRINTF("range [%s] already enqueued", r->str);
+				free(r);
+			} else {
+				SIMPLEQ_INSERT_TAIL(curr_exclcrangeq, r,
+				    cranges);
+				DPRINTF("enqueued range [%s]", r->str);
+			}
+		}
+		| NETFILE STRING	{
+			if (load_exclude_cranges($2) == -1) {
 				free($2);
 				YYERROR;
 			}
-			if (!crange_inq(curr_exclcrangeq, r)) {
-				SIMPLEQ_INSERT_TAIL(curr_exclcrangeq, r,
-				    cranges);
-				DPRINTF("enqueued range [%s]", $2);
-			} else
-				DPRINTF("range [%s] already enqueued", $2);
 			free($2);
 		}
-		| KEYTERMS STRING	{
+		| KEYTERM STRING	{
+			struct keyterm	*k;
+
+			MALLOC(k, sizeof(*k));
+			if ((k->str = strdup($2)) == NULL)
+				FATAL("strdup(%s)", $2);
+			free($2);
+			if (keyterm_inq(curr_exclkeytermq, k)) {
+				DPRINTF("keyterm '%s' already enqueued",
+				    k->str);
+				free(k->str);
+				free(k);
+			} else
+				SIMPLEQ_INSERT_TAIL(curr_exclkeytermq, k,
+				    keyterms);
+		}
+		| KEYTERMFILE STRING	{
 			if (load_exclude_keyterms($2) == -1) {
 				free($2);
 				YYERROR;
@@ -470,7 +512,7 @@ tableopts_l	: tableoptsl optcommanl tableopts_l
 		;
 
 tableoptsl	: DROP TIME		{
-			if ($2 <= 0 || $2 >= LLONG_MAX) {
+			if ($2 <= 0 || $2 >= CONF_NO_DROP.tv_sec) {
 				yyerror("drop time out of bounds");
 				YYERROR;
 			}
@@ -478,7 +520,7 @@ tableoptsl	: DROP TIME		{
 			DPRINTF("drop time: %lld", table->drop.tv_sec);
 		}
 		| EXPIRE TIME		{
-			if ($2 <= 0 || $2 >= LLONG_MAX) {
+			if ($2 <= 0 || $2 >= TIMESPEC_INFINITE.tv_sec) {
 				yyerror("expire time out of bounds");
 				YYERROR;
 			}
@@ -486,8 +528,12 @@ tableoptsl	: DROP TIME		{
 			DPRINTF("expire time: %lld", table->expire.tv_sec);
 		}
 		| HITS NUMBER		{
+			if ($2 <= 0 || $2 > UINT_MAX) {
+				yyerror("hit count out of bounds");
+				YYERROR;
+			}
 			table->hits = $2;
-			DPRINTF("max. hits count: %d", table->hits);
+			DPRINTF("max. hit count: %u", table->hits);
 		}
 		| keep			{
 			table->flags &= ~flags;
@@ -502,14 +548,14 @@ tableoptsl	: DROP TIME		{
 			flags = 0;
 		}
 		| NO DROP		{
-			table->drop = TIMESPEC_INFINITE;
+			table->drop = CONF_NO_DROP;
 			DPRINTF("no drop");
 		}
 		| TABLE STRING		{
 			if (strlcpy(table->name, $2,
 			    sizeof(table->name)) >= sizeof(table->name)) {
-				yyerror("table name '%s' too long", $2);
 				free($2);
+				yyerror("table name too long");
 				YYERROR;
 			}
 			free($2);
@@ -577,12 +623,14 @@ static const struct keyword {
 	{ "hits",	HITS },
 	{ "id",		ID },
 	{ "keep",	KEEP },
-	{ "keyterms",	KEYTERMS },
+	{ "keyterm",	KEYTERM },
+	{ "keytermfile", KEYTERMFILE },
 	{ "kill",	KILL },
 	{ "localhosts",	LOCALHOSTS },
 	{ "log",	LOG },
 	{ "mode",	MODE },
 	{ "net",	NET },
+	{ "netfile",	NETFILE },
 	{ "no",		NO },
 	{ "nodes",	NODES },
 	{ "owner",	OWNER },
@@ -594,44 +642,6 @@ static const struct keyword {
 	{ "target",	TARGET },
 	{ "timeout",	TIMEOUT }
 };
-
-static struct socket *
-create_socket(const char *path)
-{
-	char		 cpath[PATH_MAX];
-	enum pathres	 pres;
-	struct socket	*s;
-
-	pres = check_path(path, cpath, sizeof(cpath), NULL);
-	switch (pres) {
-	case PATH_OK:
-		break;
-	case PATH_EMPTY:
-		yyerror("empty socket path");
-		return (NULL);
-	case PATH_RELATIVE:
-		yyerror("socket path cannot be relative");
-		return (NULL);
-	case PATH_INVALID:
-		yyerror("invalid socket path");
-		return (NULL);
-	case PATH_DIRECTORY:
-		yyerror("socket path cannot be a directory");
-		return (NULL);
-	case PATH_FILENAME:
-		yyerror("invalid socket file name");
-		return (NULL);
-	default:
-		FATALX("invalid path check result (%d)", pres);
-	}
-	CALLOC(s, 1, sizeof(*s));
-	if (strlcpy(s->path, cpath, sizeof(s->path)) >= sizeof(s->path)) {
-		yyerror("socket path too long");
-		free(s);
-		return (NULL);
-	}
-	return (s);
-}
 
 static int
 crange_inq(struct crangeq *q, struct crange *r)
@@ -660,15 +670,17 @@ keyterm_inq(struct keytermq *q, struct keyterm *k)
 static int
 load_exclude_keyterms(const char *file)
 {
+	char		 cpath[PATH_MAX], *line;
 	FILE		*fp;
-	char		*line;
 	size_t		 len;
 	ssize_t		 n;
 	int		 cnt;
 	struct keyterm	*k;
 
-	if ((fp = fopen(file, "r")) == NULL) {
-		yyerror("failed opening exclude keyterms file '%s'", file);
+	CANONICAL_PATH_SET(file, cpath, "keyterms file",, return (-1));
+
+	if ((fp = fopen(cpath, "r")) == NULL) {
+		yyerror("failed opening exclude keyterms file");
 		return (-1);
 	}
 
@@ -677,7 +689,7 @@ load_exclude_keyterms(const char *file)
 	cnt = 0;
 
 	while ((n = getline(&line, &len, fp)) != -1) {
-		if (n == 0)
+		if (n == 1)
 			continue;
 
 		CALLOC(k, 1, sizeof(*k));
@@ -707,15 +719,17 @@ load_exclude_keyterms(const char *file)
 static int
 load_exclude_cranges(const char *file)
 {
+	char		 cpath[PATH_MAX], *line;
 	FILE		*fp;
-	char		*line;
 	struct crange	*r;
 	size_t		 len;
 	ssize_t		 n;
 	int		 cnt;
 
-	if ((fp = fopen(file, "r")) == NULL) {
-		yyerror("failed opening exclude addresses file '%s'", file);
+	CANONICAL_PATH_SET(file, cpath, "networks file",, return (-1));
+
+	if ((fp = fopen(cpath, "r")) == NULL) {
+		yyerror("failed opening exclude addresses file");
 		return (-1);
 	}
 
@@ -724,7 +738,7 @@ load_exclude_cranges(const char *file)
 	cnt = 0;
 
 	while ((n = getline(&line, &len, fp)) != -1) {
-		if (n == 0 || *line == '#')
+		if (n == 1 || *line == '#')
 			continue;
 
 		line = replace(line, " \t\n", '\0');
@@ -756,7 +770,7 @@ load_exclude_cranges(const char *file)
 int
 yylex(void)
 {
-	char		 buf[BUFSIZ], *ebuf, *p, *lbuf, *ic;
+	char		 buf[BUFSIZ], *ebuf, *p, *ic;
 	long long	 n;
 	int		 c, quotes = 0, escape = 0, qpos = -1, nonkw = 0;
 
@@ -869,16 +883,21 @@ eow:
 		}
 	if (qpos == -1) {
 		if (isdigit(*buf)) {
+			n = strlen(buf);
+			ic = buf;
 			errno = 0;
-			lbuf = buf + strlen(buf);
-			yylval.v.number = strtoll(buf, &ic, 0);
-			if (errno)
+			yylval.v.number = strtoll(ic, &ic,
+			    *ic == '0' && isdigit(ic[n - 1]) ? 8 : 10);
+			if (errno) {
 				yyerror("invalid number");
-			else if (ic == lbuf)
+				return (0);
+			}
+			if (*ic == '\0')
 				return (NUMBER);
+
 			n = yylval.v.number;
 			yylval.v.time = 0;
-			while (1) {
+			do {
 				switch (*ic) {
 				case 's':
 					break;
@@ -897,16 +916,17 @@ eow:
 				default:
 					errno = EINVAL;
 				}
+				if (errno)
+					break;
 				yylval.v.time += n;
-				if (errno || ++ic >= lbuf)
+				if (*++ic == '\0')
 					break;
-				if ((n = strtoll(ic, &ic, 0)) == 0) {
-					errno = EINVAL;
-					break;
-				}
-			}
-			if (errno)
+				n = strtoll(ic, &ic, 10);
+			} while (!errno);
+			if (errno) {
 				yyerror("invalid number/time");
+				return (0);
+			}
 			return (TIME);
 		}
 		if (*buf == '-')

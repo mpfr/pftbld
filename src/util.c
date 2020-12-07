@@ -27,8 +27,6 @@
 
 #include <net/if.h>
 
-#include <sys/stat.h>
-
 #include "log.h"
 #include "pftbld.h"
 
@@ -370,26 +368,25 @@ addrstr(char *str, size_t size, struct caddr *addr)
 int
 prefill_socketopts(struct socket *s)
 {
-
-#define MODE_SOCK	0660
-
 	char		*dir, *dpath;
-	struct stat	 sbuf;
+	struct stat	 sb;
 
 	if ((dpath = strdup(s->path)) == NULL)
 		FATAL("strdup");
-	if ((dir = dirname(dpath)) == NULL)
-		FATAL("dirname");
+	if ((dir = dirname(dpath)) == NULL) {
+		free(dpath);
+		return (-1);
+	}
 	free(dpath);
-	if (stat(dir, &sbuf) == -1)
+	if (stat(dir, &sb) == -1)
 		return (-1);
 
-	s->owner = sbuf.st_uid;
+	s->owner = sb.st_uid;
 	DPRINTF("socket %s default owner id: %d", s->path, s->owner);
-	s->group = sbuf.st_gid;
+	s->group = sb.st_gid;
 	DPRINTF("socket %s default group id: %d", s->path, s->group);
-	s->mode = MODE_SOCK;
-	DPRINTF("socket %s default mode: %03o", s->path, s->mode);
+	s->mode = DEFAULT_SOCKMOD;
+	DPRINTF("socket %s default mode: %04o", s->path, s->mode);
 
 	return (0);
 }
@@ -450,31 +447,71 @@ canonicalize_path(const char *input, char *path, size_t len)
 }
 
 enum pathres
-check_path(const char *path, char *cpath, size_t cpathsize, char **fp)
+check_path(const char *path, char *cpath, size_t cpathsize)
 {
-	char	*dpath, *file;
+	extern char	*basepath;
 
-	if (fp == NULL)
-		fp = &file;
+	char	*apath, *dpath, *file;
 
 	if (*path == '\0')
 		return (PATH_EMPTY);
 
-	if (*path != '/')
+	if (*path == '/') {
+		if ((apath = strdup(path)) == NULL)
+			FATAL("strdup");
+	} else if (basepath != NULL) {
+		if (asprintf(&apath, "%s/%s", basepath, path) == -1)
+			FATAL("asprintf");
+	} else
 		return (PATH_RELATIVE);
 
-	if (canonicalize_path(path, cpath, cpathsize) == NULL)
+	if (canonicalize_path(apath, cpath, cpathsize) == NULL) {
+		free(apath);
 		return (PATH_INVALID);
-
+	}
+	free(apath);
 	if (cpath[strlen(cpath) - 1] == '/')
 		return (PATH_DIRECTORY);
 
 	if ((dpath = strdup(cpath)) == NULL)
 		FATAL("strdup");
-	if ((*fp = basename(dpath)) == NULL || **fp == '/' || **fp == '.') {
+	if ((file = basename(dpath)) == NULL || *file == '/' || *file == '.') {
 		free(dpath);
 		return (PATH_FILENAME);
 	}
 	free(dpath);
 	return (PATH_OK);
+}
+
+struct statfd *
+create_statfd(int fd)
+{
+	struct statfd	*sfd;
+
+	MALLOC(sfd, sizeof(*sfd));
+	if (fstat(fd, &sfd->sb) == -1)
+		FATAL("fstat");
+	sfd->fd = fd;
+	return (sfd);
+}
+
+void
+msg_send(struct statfd *sfd, const char *fmt, ...)
+{
+	va_list	 args;
+	char	*msg;
+
+	va_start(args, fmt);
+	if (S_ISSOCK(sfd->sb.st_mode)) {
+		if (vasprintf(&msg, fmt, args) == -1)
+			FATAL("vasprintf");
+		while (send(sfd->fd, msg, strlen(msg), MSG_NOSIGNAL) == -1) {
+			if (errno != EAGAIN)
+				break; /* ignore errors */
+			NANONAP;
+		}
+		free(msg);
+	} else if (vdprintf(sfd->fd, fmt, args) == -1)
+		FATAL("vdprintf");
+	va_end(args);
 }

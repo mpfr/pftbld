@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: November 25 2020 $
+.Dd $Mdocdate: December 3 2020 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -24,6 +24,7 @@ table content management
 .Sh SYNOPSIS
 .Nm
 .Op Fl dnuv
+.Op Fl b Ar path
 .Op Fl f Ar file
 .Op Fl s Ar socket
 .Nm
@@ -71,6 +72,10 @@ and reopens its log file when it receives
 .Pp
 The options are as follows:
 .Bl -tag -width "-s socket"
+.It Fl b Ar path
+Specifies a base
+.Ar path
+automatically prepended to all relative paths found in the configuration file.
 .It Fl d
 Debug mode.
 Don't detach or become a daemon.
@@ -114,6 +119,11 @@ If used with pipe mode to write commands to the
 .Pa control socket ,
 this will enable printing server replies to
 .Ar stdout .
+If used along with
+.Fl n ,
+the configuration will be echoed to
+.Ar stderr ,
+if valid.
 .El
 .Sh MESSAGES
 Messages may be sent to any
