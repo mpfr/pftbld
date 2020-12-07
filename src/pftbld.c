@@ -27,8 +27,6 @@
 
 #include <net/if.h>
 
-#include <sys/stat.h>
-
 #include "log.h"
 #include "pftbld.h"
 
@@ -47,6 +45,7 @@ static void	 send_conf(int);
 
 extern struct config	*conf;
 
+char	*basepath = NULL;
 char	*conffile = CONF_FILE;
 int	 privfd;
 
@@ -63,8 +62,8 @@ usage(void)
 {
 	extern char	*__progname;
 
-	fprintf(stderr, "usage:\t%s [-dnuv] [-f <path>] [-s <socket>]\n"
-	    "\t%s [-v] -p <socket>\n", __progname, __progname);
+	fprintf(stderr, "usage:\t%s [-dnuv] [-b <path>] [-f <path>] "
+	    "[-s <socket>]\n\t%s [-v] -p <socket>\n", __progname, __progname);
 	exit(1);
 }
 
@@ -175,13 +174,16 @@ pftbld(int argc, char *argv[])
 	int		 kqfd, c, pfd[2];
 	int		 debug = 0, verbose = 0, noaction = 0, unload = 0;
 	char		*sockfile = SOCK_FILE;
-	struct crange	*self;
+	struct statfd	*sfd;
 	struct target	*tgt;
 	struct socket	*sock;
 	struct kevcb	 signal_handler, privreq_handler;
 
-	while ((c = getopt(argc, argv, "df:np:s:uv")) != -1) {
+	while ((c = getopt(argc, argv, "b:df:np:s:uv")) != -1) {
 		switch (c) {
+		case 'b':
+			basepath = optarg;
+			break;
 		case 'd':
 			debug = 1;
 			break;
@@ -221,6 +223,9 @@ pftbld(int argc, char *argv[])
 		}
 	}
 
+	if (basepath != NULL && *basepath != '/')
+		errx(1, "base path must be absolute");
+
 	log_init(__progname, debug ? debug : 1, verbose);
 
 	argc -= optind;
@@ -240,7 +245,12 @@ pftbld(int argc, char *argv[])
 		    c != 1 ? "s" : "");
 
 	if (noaction) {
-		fprintf(stderr, "configuration OK\n");
+		if (verbose) {
+			sfd = create_statfd(STDERR_FILENO);
+			print_conf(sfd);
+			free(sfd);
+		} else
+			fprintf(stderr, "configuration OK\n");
 		exit(0);
 	}
 
@@ -250,12 +260,9 @@ pftbld(int argc, char *argv[])
 	sock = &conf->ctrlsock;
 	if (strlcpy(sock->path, sockfile,
 	    sizeof(sock->path)) >= sizeof(sock->path))
-		FATALX("control socket path '%s' too long", sockfile);
+		errx(1, "control socket path too long: %s", sockfile);
 	if (prefill_socketopts(sock) == -1)
 		FATAL("prefill control socket options");
-
-	CALLOC(self, 1, sizeof(*self));
-	SIMPLEQ_INSERT_HEAD(&conf->exclcranges, self, cranges);
 
 	if (!debug && daemon(1, 0) == -1)
 		FATAL("daemon");
@@ -361,8 +368,7 @@ static void
 handle_persist(int pfd)
 {
 	size_t		 len;
-	char		*path, cpath[PATH_MAX], *file, *dpath, *dir;
-	enum pathres	 pres;
+	char		*path, *dpath, *dir;
 	struct stat	 dstat;
 	int		 fd;
 	enum msgtype	 mt;
@@ -373,38 +379,7 @@ handle_persist(int pfd)
 	READ(pfd, &len, sizeof(len));
 	MALLOC(path, len);
 	READ(pfd, path, len);
-	pres = check_path(path, cpath, sizeof(cpath), &file);
-	switch (pres) {
-	case PATH_OK:
-		break;
-	case PATH_EMPTY:
-		log_warnx("persist path is empty");
-		free(path);
-		goto fail;
-	case PATH_RELATIVE:
-		log_warnx("persist path '%s' is relative", path);
-		free(path);
-		goto fail;
-	case PATH_INVALID:
-		log_warnx("invalid persist path '%s'", path);
-		free(path);
-		goto fail;
-	case PATH_DIRECTORY:
-		log_warnx("persist path %s is a directory", cpath);
-		free(path);
-		goto fail;
-	case PATH_FILENAME:
-		if (errno)
-			log_warn("persist file name");
-		else
-			log_warnx("invalid persist file '%s'", file);
-		free(path);
-		goto fail;
-	default:
-		FATALX("invalid path check result (%d)", pres);
-	}
-	free(path);
-	if ((dpath = strdup(cpath)) == NULL)
+	if ((dpath = strdup(path)) == NULL)
 		FATAL("strdup");
 	if ((dir = dirname(dpath)) == NULL) {
 		log_warn("persist directory");
@@ -417,11 +392,11 @@ handle_persist(int pfd)
 		goto fail;
 	}
 
-	if (unlink(cpath) == -1 && errno != ENOENT) {
-		log_warn("persist file %s access error", cpath);
+	if (unlink(path) == -1 && errno != ENOENT) {
+		log_warn("persist file %s access error", path);
 		goto fail;
 	}
-	if ((fd = open(cpath, O_CREAT | O_EXCL | O_SYNC | O_WRONLY,
+	if ((fd = open(path, O_CREAT | O_EXCL | O_SYNC | O_WRONLY,
 	    MODE_FILE_WRONLY)) == -1)
 		FATAL("open");
 
@@ -435,7 +410,7 @@ handle_persist(int pfd)
 	    (fchown(fd, dstat.st_uid, dstat.st_gid) == -1 ||
 	    fchmod(fd, MODE_FILE_RDWR & dstat.st_mode) == -1))
 		log_warn("failed setting permissions on persist file %s",
-		    cpath);
+		    path);
 	close(fd);
 	return;
 

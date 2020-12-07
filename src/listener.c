@@ -23,8 +23,6 @@
 
 #include <net/if.h>
 
-#include <sys/stat.h>
-
 #include "log.h"
 #include "pftbld.h"
 
@@ -36,16 +34,17 @@ static struct keyterm
 		*check_exclkeyterms(struct keytermq *, char *);
 static struct crange
 		*check_exclcranges(struct crangeq *, struct caddr *);
-static int	 perform_ctrl_delete(int, char *, char *, size_t,
+static int	 perform_ctrl_config(struct statfd *, char *, char *, size_t);
+static int	 perform_ctrl_delete(struct statfd *, char *, char *, size_t,
 		    int (*)(const char *, struct target *),
 		    int (*)(const char *, struct target *), const char *);
-static int	 perform_ctrl_dump(int, char *, char *, size_t);
-static int	 perform_ctrl_list(int, char *, char *, size_t);
-static int	 perform_ctrl_reload(int, char *, char *, size_t);
-static int	 perform_ctrl_save(int, char *, char *, size_t);
-static int	 perform_ctrl_selfexclude(int, char *, char *, size_t);
-static int	 perform_ctrl_status(int, char *, char *, size_t);
-static int	 perform_ctrl_verbose(int, char *, char *, size_t);
+static int	 perform_ctrl_dump(struct statfd *, char *, char *, size_t);
+static int	 perform_ctrl_list(struct statfd *, char *, char *, size_t);
+static int	 perform_ctrl_save(struct statfd *, char *, char *, size_t);
+static int	 perform_ctrl_selfexclude(struct statfd *, char *, char *,
+		    size_t);
+static int	 perform_ctrl_status(struct statfd *, char *, char *, size_t);
+static int	 perform_ctrl_verbose(struct statfd *, char *, char *, size_t);
 
 extern int		 logfd, sched_ifd;
 extern struct config	*conf;
@@ -199,7 +198,7 @@ listener(int argc, char *argv[])
 	if (chown(sockpath, owner, group) == -1)
 		FATAL("chown(%s, %u, %u)", sockpath, owner, group);
 	if (chmod(sockpath, mode) == -1)
-		FATAL("chmod(%s, %03o)", sockpath, mode);
+		FATAL("chmod(%s, %04o)", sockpath, mode);
 
 	drop_priv();
 
@@ -460,20 +459,6 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	}
 }
 
-#define MSG_SEND(fd, fmt, ...)					\
-	do {							\
-		char	*msg;					\
-		if (asprintf(&msg, fmt, ##__VA_ARGS__) == -1)	\
-			FATAL("asprintf");			\
-		while (send(fd, msg, strlen(msg),		\
-		    MSG_NOSIGNAL) == -1) {			\
-			if (errno != EAGAIN)			\
-				break;				\
-			NANONAP;				\
-		}						\
-		free(msg);					\
-	} while (0)
-
 #define TIME_TO_STR(str, tp)						\
 	do {								\
 		struct timespec	 _tp = *tp;				\
@@ -487,11 +472,12 @@ proc_data(struct inbuf *ibuf, int kqfd)
 void
 proc_ctrl(struct inbuf *ibuf)
 {
-	char	*data = ibuf->data, *arg;
-	size_t	 datalen = ibuf->nr;
-	int	 fd = ibuf->datafd, status;
+	struct statfd	*sfd;
+	char		*data = ibuf->data, *arg;
+	size_t		 datalen = ibuf->nr;
+	int		 status;
 #if DEBUG
-	char	*buf;
+	char		*buf;
 
 	if ((buf = strdup(data)) == NULL)
 		FATAL("strdup");
@@ -499,41 +485,67 @@ proc_ctrl(struct inbuf *ibuf)
 	free(buf);
 #endif
 
+	sfd = create_statfd(ibuf->datafd);
 	arg = shift(replace(data, "\n", '\0'), data, datalen);
 
-	if (!strcmp("drop", data))
-		status = perform_ctrl_delete(fd, arg, data, datalen,
+	if (!strcmp("config", data))
+		status = perform_ctrl_config(sfd, arg, data, datalen);
+	else if (!strcmp("drop", data))
+		status = perform_ctrl_delete(sfd, arg, data, datalen,
 		    &drop_clients, &drop_clients_r, "dropped");
 	else if (!strcmp("dump", data))
-		status = perform_ctrl_dump(fd, arg, data, datalen);
+		status = perform_ctrl_dump(sfd, arg, data, datalen);
 	else if (!strcmp("expire", data))
-		status = perform_ctrl_delete(fd, arg, data, datalen,
+		status = perform_ctrl_delete(sfd, arg, data, datalen,
 		    &expire_clients, &expire_clients_r, "expired");
 	else if (!strcmp("list", data))
-		status = perform_ctrl_list(fd, arg, data, datalen);
-	else if (!strcmp("reload", data))
-		status = perform_ctrl_reload(fd, arg, data, datalen);
+		status = perform_ctrl_list(sfd, arg, data, datalen);
 	else if (!strcmp("save", data))
-		status = perform_ctrl_save(fd, arg, data, datalen);
+		status = perform_ctrl_save(sfd, arg, data, datalen);
 	else if (!strcmp("self-exclude", data))
-		status = perform_ctrl_selfexclude(fd, arg, data, datalen);
+		status = perform_ctrl_selfexclude(sfd, arg, data, datalen);
 	else if (!strcmp("status", data))
-		status = perform_ctrl_status(fd, arg, data, datalen);
+		status = perform_ctrl_status(sfd, arg, data, datalen);
 	else if (!strcmp("verbose", data))
-		status = perform_ctrl_verbose(fd, arg, data, datalen);
+		status = perform_ctrl_verbose(sfd, arg, data, datalen);
 	else {
-		MSG_SEND(fd, "Unknown command.\n");
+		msg_send(sfd, "Unknown command.\n");
 		status = 0;
 	}
 
 	if (errno != EPIPE && status)
-		MSG_SEND(fd, "Syntax error.\n");
+		msg_send(sfd, "Syntax error.\n");
 
-	close(fd);
+	close(sfd->fd);
+	free(sfd);
 }
 
 static int
-perform_ctrl_delete(int fd, char *arg, char *data, size_t datalen,
+perform_ctrl_config(struct statfd *sfd, char *arg, char *data, size_t datalen)
+{
+	extern int	 privfd;
+
+	enum msgtype	 mt;
+
+	if ((shift(arg, data, datalen)) != NULL)
+		return (1);
+
+	if (!strcmp("print", arg))
+		print_conf(sfd);
+	else if (!strcmp("reload", arg)) {
+		mt = CONF_RELOAD;
+		WRITE(privfd, &mt, sizeof(mt));
+		/* wait for reply */
+		READ(privfd, &mt, sizeof(mt));
+		msg_send(sfd, mt == ACK ? "Done.\n" : "Failed.\n");
+	} else
+		return (1);
+
+	return (0);
+}
+
+static int
+perform_ctrl_delete(struct statfd *sfd, char *arg, char *data, size_t datalen,
     int (*func)(const char *, struct target *),
     int (*func_r)(const char *, struct target *), const char *action)
 {
@@ -557,7 +569,7 @@ perform_ctrl_delete(int fd, char *arg, char *data, size_t datalen,
 		tgt = NULL;
 	else {
 		if ((tgt = find_target(&conf->ctargets, arg)) == NULL) {
-			MSG_SEND(fd, "Unknown target.\n");
+			msg_send(sfd, "Unknown target.\n");
 			return (0);
 		}
 		if (shift(arg, data, datalen) != NULL)
@@ -568,13 +580,13 @@ perform_ctrl_delete(int fd, char *arg, char *data, size_t datalen,
 
 	switch (cnt) {
 	case -1:
-		MSG_SEND(fd, "Invalid address/network.\n");
+		msg_send(sfd, "Invalid address/network.\n");
 		break;
 	case 0:
-		MSG_SEND(fd, "No client entries found.\n");
+		msg_send(sfd, "No client entries found.\n");
 		break;
 	default:
-		MSG_SEND(fd, "%d client entr%s %s.\n", cnt,
+		msg_send(sfd, "%d client entr%s %s.\n", cnt,
 		    cnt != 1 ? "ies" : "y", action);
 	}
 
@@ -582,7 +594,7 @@ perform_ctrl_delete(int fd, char *arg, char *data, size_t datalen,
 }
 
 static int
-perform_ctrl_dump(int fd, char *arg, char *data, size_t datalen)
+perform_ctrl_dump(struct statfd *sfd, char *arg, char *data, size_t datalen)
 {
 	struct target	*tgt;
 	struct client	*clt;
@@ -591,20 +603,20 @@ perform_ctrl_dump(int fd, char *arg, char *data, size_t datalen)
 		return (1);
 
 	if ((tgt = find_target(&conf->ctargets, arg)) == NULL) {
-		MSG_SEND(fd, "Unknown target.\n");
+		msg_send(sfd, "Unknown target.\n");
 		return (0);
 	}
 
 	TAILQ_FOREACH(clt, &cltq, clients)
 		if (clt->tgt == tgt)
-			MSG_SEND(fd, "%s %u %lld\n", clt->astr, clt->cnt,
+			msg_send(sfd, "%s %u %lld\n", clt->astr, clt->cnt,
 			    TIMESPEC_SEC_ROUND(&clt->ts));
 
 	return (0);
 }
 
 static int
-perform_ctrl_list(int fd, char *arg, char *data, size_t datalen)
+perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 {
 	int		 act = 0, addrs = 0, cnt;
 	struct target	*tgt = NULL;
@@ -628,15 +640,15 @@ perform_ctrl_list(int fd, char *arg, char *data, size_t datalen)
 		if (tgt != NULL)
 			return (1);
 
-		MSG_SEND(fd, "Unknown target");
+		msg_send(sfd, "Unknown target");
 		if (r == NULL)
-			MSG_SEND(fd, " or invalid address/network");
-		MSG_SEND(fd, ".\n");
+			msg_send(sfd, " or invalid address/network");
+		msg_send(sfd, ".\n");
 		return (0);
 	}
 
 	if ((arg = shift(arg, data, datalen)) == NULL) {
-		MSG_SEND(fd, "Missing filter option.\n");
+		msg_send(sfd, "Missing filter option.\n");
 		return (0);
 	}
 
@@ -664,31 +676,31 @@ start:
 			continue;
 
 		if (addrs) {
-			MSG_SEND(fd, "%s\n", clt->astr);
+			msg_send(sfd, "%s\n", clt->astr);
 			continue;
 		}
 
 		timespecsub(&now, &clt->ts, &tsdiff);
 		age = hrage(&tsdiff);
-		MSG_SEND(fd, "[%s]:[%s]:(%dx:%s)\n\t", clt->astr,
+		msg_send(sfd, "[%s]:[%s]:(%dx:%s)\n\t", clt->astr,
 		    clt->tgt->name, clt->cnt, age);
 		free(age);
 
 		if (timespec_isinfinite(&clt->to)) {
 			if (clt->exp)
-				MSG_SEND(fd, "never gets dropped\n");
+				msg_send(sfd, "never gets dropped\n");
 			else
-				MSG_SEND(fd, "in { %s }, never expires\n",
+				msg_send(sfd, "in { %s }, never expires\n",
 				    clt->tbl->name);
 		} else {
 			timespecsub(&clt->to, &now, &tsdiff);
 			age = hrage(&tsdiff);
 			TIME_TO_STR(tstr, &clt->to);
 			if (clt->exp)
-				MSG_SEND(fd, "getting dropped in %s,\n\ton "
+				msg_send(sfd, "getting dropped in %s,\n\ton "
 				    "[%s]\n", age, tstr);
 			else
-				MSG_SEND(fd, "more %s in { %s },\n\tuntil "
+				msg_send(sfd, "more %s in { %s },\n\tuntil "
 				    "[%s]\n", age, clt->tbl->name, tstr);
 			free(age);
 		}
@@ -697,41 +709,22 @@ start:
 
 	if (!addrs) {
 		if (cnt == 0)
-			MSG_SEND(fd, "No client entries found.\n");
+			msg_send(sfd, "No client entries found.\n");
 		else
-			MSG_SEND(fd, "%d client entr%s found.\n", cnt,
+			msg_send(sfd, "%d client entr%s found.\n", cnt,
 			    cnt != 1 ? "ies" : "y");
 	}
 
 	return (0);
 
 ferr:
-	MSG_SEND(fd, "Filter option '%s' %s.\n", arg,
+	msg_send(sfd, "Filter option '%s' %s.\n", arg,
 	    act > 1 || addrs > 1 ? "defined twice" : "is invalid");
 	return (0);
 }
 
 static int
-perform_ctrl_reload(int fd, char *arg, char *data, size_t datalen)
-{
-	extern int	 privfd;
-
-	enum msgtype	 mt;
-
-	if (shift(arg, data, datalen) != NULL)
-		return (1);
-
-	mt = CONF_RELOAD;
-	WRITE(privfd, &mt, sizeof(mt));
-	/* wait for reply */
-	READ(privfd, &mt, sizeof(mt));
-	MSG_SEND(fd, mt == ACK ? "Done.\n" : "Failed.\n");
-
-	return (0);
-}
-
-static int
-perform_ctrl_save(int fd, char *arg, char *data, size_t datalen)
+perform_ctrl_save(struct statfd *sfd, char *arg, char *data, size_t datalen)
 {
 	int		 cnt;
 	struct target	*tgt;
@@ -740,26 +733,27 @@ perform_ctrl_save(int fd, char *arg, char *data, size_t datalen)
 		return (1);
 
 	if ((tgt = find_target(&conf->ctargets, arg)) == NULL) {
-		MSG_SEND(fd, "Unknown target.\n");
+		msg_send(sfd, "Unknown target.\n");
 		return (0);
 	}
 
 	if (*tgt->persist == '\0') {
-		MSG_SEND(fd, "No persist file specified.\n");
+		msg_send(sfd, "No persist file specified.\n");
 		return (0);
 	}
 
 	if ((cnt = save(tgt)) != -1)
-		MSG_SEND(fd, "%d client entr%s written.\n", cnt,
+		msg_send(sfd, "%d client entr%s written.\n", cnt,
 		    cnt != 1 ? "ies" : "y");
 	else
-		MSG_SEND(fd, "Failed. Check the system log.\n");
+		msg_send(sfd, "Failed. Check the system log.\n");
 
 	return (0);
 }
 
 static int
-perform_ctrl_selfexclude(int fd, char *arg, char *data, size_t datalen)
+perform_ctrl_selfexclude(struct statfd *sfd, char *arg, char *data,
+    size_t datalen)
 {
 	struct crange	*r, *r2;
 
@@ -769,40 +763,40 @@ perform_ctrl_selfexclude(int fd, char *arg, char *data, size_t datalen)
 	r = SIMPLEQ_FIRST(&conf->exclcranges);
 	if (arg == NULL) {
 		if (*r->str != '\0')
-			MSG_SEND(fd, "[%s]\n", r->str);
+			msg_send(sfd, "[%s]\n", r->str);
 		else
-			MSG_SEND(fd, "None.\n");
+			msg_send(sfd, "None.\n");
 		return (0);
 	}
 	if (!strcmp("remove", arg)) {
 		memset(r, 0, sizeof(*r));
 		print_ts_log("Removed self exclude.\n");
-		MSG_SEND(fd, "Done.\n");
+		msg_send(sfd, "Done.\n");
 		return (0);
 	}
 	if ((r2 = parse_crange(arg)) == NULL) {
-		MSG_SEND(fd, "Invalid address/network.\n");
+		msg_send(sfd, "Invalid address/network.\n");
 		return (0);
 	}
 	if (cranges_eq(r, r2)) {
 		free(r2);
-		MSG_SEND(fd, "Ditto.\n");
+		msg_send(sfd, "Ditto.\n");
 		return (0);
 	}
 	SIMPLEQ_REMOVE_HEAD(&conf->exclcranges, cranges);
 	free(r);
 	SIMPLEQ_INSERT_HEAD(&conf->exclcranges, r2, cranges);
 	print_ts_log("Updated self exclude to [%s].\n", r2->str);
-	MSG_SEND(fd, "Done.\n");
+	msg_send(sfd, "Done.\n");
 
 	return (0);
 }
 
 static int
-perform_ctrl_status(int fd, char *arg, char *data, size_t datalen)
+perform_ctrl_status(struct statfd *sfd, char *arg, char *data, size_t datalen)
 {
 	struct crange	*r;
-	int		*cnt, c;
+	int		*cnt[2], c;
 	struct client	*clt;
 	struct target	*tgt;
 	char		*age, tstr[TS_SIZE];
@@ -812,52 +806,60 @@ perform_ctrl_status(int fd, char *arg, char *data, size_t datalen)
 		return (1);
 
 	r = SIMPLEQ_FIRST(&conf->exclcranges);
-	MSG_SEND(fd, "Self-exclude: [%s]\nVerbosity level: %d\n",
+	msg_send(sfd, "Self-exclude: [%s]\nVerbosity level: %d\n",
 	    *r->str != '\0' ? r->str : "N/A", log_getverbose());
 	c = 0;
 	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
 		c++;
-	CALLOC(cnt, c, sizeof(int));
+	CALLOC(cnt[0], c, sizeof(int));
+	CALLOC(cnt[1], c, sizeof(int));
 	TAILQ_FOREACH(clt, &cltq, clients) {
 		c = 0;
 		SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
 			if (clt->tgt == tgt) {
-				cnt[c]++;
+				cnt[0][c]++;
+				if (!clt->exp)
+					cnt[1][c]++;
 				break;
 			} else
 				c++;
 	}
 	c = 0;
-	MSG_SEND(fd, "Client count:\n");
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
-		MSG_SEND(fd, "\ttarget [%s]: %d\n", tgt->name, cnt[c++]);
-	free(cnt);
+	msg_send(sfd, "Client count:");
+	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+		msg_send(sfd, "\n\ttarget [%s]: %d", tgt->name, cnt[0][c]);
+		if (cnt[1][c])
+			msg_send(sfd, " (%d active)", cnt[1][c]);
+		c++;
+	}
+	free(cnt[0]);
+	free(cnt[1]);
 	clt = TAILQ_FIRST(&cltq);
 	if (clt == NULL || timespec_isinfinite(&clt->to)) {
-		MSG_SEND(fd, "No event pending.\n");
+		msg_send(sfd, "\nNo event pending.\n");
 		return (0);
 	}
 	TIME_TO_STR(tstr, &clt->to);
 	GET_TIME(&now);
 	timespecsub(&now, &clt->ts, &tsdiff);
 	age = hrage(&tsdiff);
-	MSG_SEND(fd, "Next scheduled event:\n\t[%s]:[%s]:(%dx:%s)\n\t\t",
+	msg_send(sfd, "\nNext scheduled event:\n\t[%s]:[%s]:(%dx:%s)\n\t\t",
 	    clt->astr, clt->tgt->name, clt->cnt, age);
 	free(age);
 	if (clt->exp)
-		MSG_SEND(fd, "getting dropped");
+		msg_send(sfd, "getting dropped");
 	else
-		MSG_SEND(fd, "expires from { %s }", clt->tbl->name);
+		msg_send(sfd, "expires from { %s }", clt->tbl->name);
 	timespecsub(&clt->to, &now, &tsdiff);
 	age = hrage(&tsdiff);
-	MSG_SEND(fd, " in %s,\n\t\ton [%s]\n", age, tstr);
+	msg_send(sfd, " in %s,\n\t\ton [%s]\n", age, tstr);
 	free(age);
 
 	return (0);
 }
 
 static int
-perform_ctrl_verbose(int fd, char *arg, char *data, size_t datalen)
+perform_ctrl_verbose(struct statfd *sfd, char *arg, char *data, size_t datalen)
 {
 	extern int	 privfd;
 
@@ -869,12 +871,12 @@ perform_ctrl_verbose(int fd, char *arg, char *data, size_t datalen)
 		return (1);
 
 	if (arg == NULL) {
-		MSG_SEND(fd, "%d\n", log_getverbose());
+		msg_send(sfd, "%d\n", log_getverbose());
 		return (0);
 	}
 	v = strtonum(arg, 0, INT_MAX, &err);
 	if (err != NULL) {
-		MSG_SEND(fd, "Verbosity level %s.\n", err);
+		msg_send(sfd, "Verbosity level %s.\n", err);
 		return (0);
 	}
 	log_setverbose(v);
@@ -884,7 +886,7 @@ perform_ctrl_verbose(int fd, char *arg, char *data, size_t datalen)
 	WRITE2(privfd, &mt, sizeof(mt), &v, sizeof(v));
 	/* wait for reply */
 	READ(privfd, &mt, sizeof(mt));
-	MSG_SEND(fd, mt == ACK ? "Done.\n" : "Failed.\n");
+	msg_send(sfd, mt == ACK ? "Done.\n" : "Failed.\n");
 
 	return (0);
 }

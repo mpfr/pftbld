@@ -69,6 +69,31 @@
     commands will be accepted:</p>
 <div class="Bd-indent">
 <dl class="Bl-tag">
+  <dt id="config"><a class="permalink" href="#config"><code class="Ic">config</code></a>
+    <var class="Ar">option</var></dt>
+  <dd>Runs the specified configuration <var class="Ar">option</var>. Valid
+      options are:
+    <dl class="Bl-tag">
+      <dt id="print"><a class="permalink" href="#print"><code class="Ic">print</code></a></dt>
+      <dd>Prints the current configuration to <var class="Ar">stdout</var>.</dd>
+      <dt id="reload"><a class="permalink" href="#reload"><code class="Ic">reload</code></a></dt>
+      <dd>Reinitializes the configuration by reloading the configuration file
+          <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>. The same
+          effect may be accomplished by either using the
+          <a class="Xr" href="http://man.openbsd.org/rcctl.8">rcctl(8)</a>
+          utility:
+        <p class="Pp"></p>
+        <div class="Bd Bd-indent"><code class="Li"># rcctl reload
+          pftbld</code></div>
+        <p class="Pp">or the
+            <a class="Xr" href="http://man.openbsd.org/pkill.1">pkill(1)</a>
+            command:</p>
+        <p class="Pp"></p>
+        <div class="Bd Bd-indent"><code class="Li"># pkill -HUP
+          pftbld</code></div>
+      </dd>
+    </dl>
+  </dd>
   <dt id="drop"><a class="permalink" href="#drop"><code class="Ic">drop</code></a>
     [<code class="Ic">recap</code>] <var class="Ar">address/network</var>
     [<var class="Ar">target</var>]</dt>
@@ -115,20 +140,6 @@
           output.</dd>
     </dl>
   </dd>
-  <dt id="reload"><a class="permalink" href="#reload"><code class="Ic">reload</code></a></dt>
-  <dd>Reinitializes the configuration by reloading the configuration file
-      <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>. The same
-      effect may be accomplished by either using the
-      <a class="Xr" href="http://man.openbsd.org/rcctl.8">rcctl(8)</a> utility:
-    <p class="Pp"></p>
-    <div class="Bd Bd-indent"><code class="Li"># rcctl reload
-      pftbld</code></div>
-    <p class="Pp">or the
-        <a class="Xr" href="http://man.openbsd.org/pkill.1">pkill(1)</a>
-        command:</p>
-    <p class="Pp"></p>
-    <div class="Bd Bd-indent"><code class="Li"># pkill -HUP pftbld</code></div>
-  </dd>
   <dt id="save"><a class="permalink" href="#save"><code class="Ic">save</code></a>
     <var class="Ar">target</var></dt>
   <dd>Writes managed addresses and meta-data (number of hits and timestamp of
@@ -174,7 +185,7 @@
 Self-exclude: [129.128.5/24]
 Verbosity level: 0
 Client count:
-	target [www]: 249
+	target [www]: 249 (7 active)
 Next scheduled event:
 	[11.22.33.44]:[www]:(2x:50m12s)
 		expires from { attackers } in 9m48s,
@@ -228,7 +239,7 @@ Next scheduled event:
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">November 25, 2020</td>
+    <td class="foot-date">December 2, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

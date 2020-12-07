@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: November 29 2020 $
+.Dd $Mdocdate: December 6 2020 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -25,8 +25,9 @@
 maintains the configuration for
 .Xr pftbld 8 .
 In this context, values of type
-.Pa time
-must be specified as a sequence of number/unit combinations, e.g.
+.Ar time
+must be specified as a sequence of number/unit combinations, with the number
+assumed in decimal format, e.g.
 .Pa 7w3d
 for a period of 7 weeks and 3 days.
 Valid units are:
@@ -40,6 +41,16 @@ Valid units are:
 (minutes) and
 .Pa s
 (seconds).
+Values of type
+.Ar number ,
+on the other hand, may be specified either in decimal, or with a leading zero,
+in octal format (e.g.
+.Pa 0740 Ns ).
+Furthermore, unless a base path is provided via the
+.Fl b
+option at daemon startup, only absolute paths are permitted for
+.Ar path
+type values.
 .Sh GLOBAL CONFIGURATION
 Here are the settings that may be applied globally:
 .Bl -tag -width Ds
@@ -95,10 +106,24 @@ Exclude the specified
 (e.g.
 .Ar 192.168.100/24 )
 from being processed.
-.It Ic keyterms Ar path
-Skip processing of incoming data containing any of the strings from the file at
-.Ar path
-being read line by line, each line interpreted as a keyterm string.
+.It Ic netfile Ar path
+Read
+.Ic net
+entries line by line from the file at
+.Ar path .
+The file must be fomatted as outlined in
+.Xr hosts 5 .
+Any content other than an
+.Pa address/network
+at the beginning of each line will be ignored.
+.It Ic keyterm Ar string
+Skip processing of incoming data containing the given
+.Ar string .
+.It Ic keytermfile Ar path
+Read
+.Ic keyterm
+strings line by line from the file at
+.Ar path .
 .El
 .It Oo Ic no Oc Ic log Ar path
 Make
@@ -126,10 +151,11 @@ The default value is 10000 milliseconds.
 .Sh TARGETS
 Typically, targets are used to distinguish input data by service type and apply
 appropriate handling.
-At least one
+In order to start
+.Xr pftbld 8 ,
+at least one
 .Ic target
-entry needs to be defined to start
-.Xr pftbld 8 .
+entry needs to be defined.
 .Bl -tag -width Ds
 .It Ic target Ar name Brq ...
 The
@@ -151,14 +177,20 @@ There must be exactly one instance defined per
 followed by a block of options enclosed in curly brackets:
 .Bl -tag -width Ds
 .It Oo Ic no Oc Ic drop Ar time
-Overrides any previously specified
+Overrides any
 .Ic drop
-option.
+option specified globally or with the enclosing
+.Ic target .
 .It Ic expire Ar time
 Specifies the period of time an IP address will be held in the corresponding
 .Ic table .
 When that period has passed, the address will be deleted from the table.
-If omitted, addresses will be deleted only when dropped.
+If omitted,
+addresses will not expire and remain in their tables until deleted manually,
+e.g. by utilizing the
+.Xr pftblctl 8
+.Ic drop
+command.
 .It Ic hits Ar number
 Maximum number of appearances for a specific IP address in the corresponding
 .Ic table .
@@ -191,19 +223,23 @@ Refers to a reported address'
 The default is
 .Ic kill .
 .El
-Generally, an option's setting will be applied to the current
+Generally, kill options will be applied to the current
 .Ic step
-and all its successors, until revoked by its counterpart.
-.It Ic step Brq ...
-The next step in the
-.Ic cascade ,
-followed by a block of cascade options (except
+and all its successors, until revoked by their counterparts.
+.It Ic step Ar option | Brq ...
+The next step in the cascade followed by at least one
+.Ic cascade
+.Ar option
+(except
 .Ic step
-itself) enclosed in curly brackets.
-Multiple occurrences are traversed in the order of their appearance.
-If
+itself), multiple options enclosed in curly brackets.
+If there is no
 .Ic table
-(inside the options) is omitted, its most recent definition will be used.
+.Ar option
+specified for a
+.Ic step ,
+it will be inherited from its predecessor.
+Steps are traversed in the order of their appearance.
 .It Ic table Ar name
 The
 .Ar name
@@ -288,7 +324,7 @@ is defined for a target as it later allows for their identification.
 .It Ic mode Ar number
 The absolute mode of the
 .Ic socket ,
-as an octal
+preferably as an octal
 .Ar number .
 Defaults to 0660.
 .It Ic owner Ar id | name
