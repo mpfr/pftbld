@@ -407,9 +407,9 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	    tbl->flags & FLAG_TABLE_KILL_STATES ? "\nskill" : "",
 	    tbl->flags & FLAG_TABLE_KILL_NODES ? "\nnkill" : "");
 
-	print_ts_log("%s [%s]:[%s%s]:(%dx",
+	print_ts_log("%s [%s]:[%s]:(%dx",
 	    pfres.nadd > 0 ? ">>> Added" : "Aquired",
-	    clt->astr, tgtname, sockid, clt->cnt);
+	    clt->astr, tgtname, clt->cnt);
 
 	GET_TIME(&now);
 
