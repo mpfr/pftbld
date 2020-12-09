@@ -56,7 +56,16 @@
 <p class="Pp">The options are as follows:</p>
 <dl class="Bl-tag">
   <dt id="q"><a class="permalink" href="#q"><code class="Fl">-q</code></a></dt>
-  <dd>Quiet mode, suppressing output on <var class="Ar">stdout</var>.</dd>
+  <dd>Quiet mode, generally preventing output on <var class="Ar">stdout</var>.
+      This flag may be specified multiple times. If specified just once, the
+      <var class="Ar">command</var> will be sent to the server and
+      <code class="Nm">pftblctl</code> will silently wait for the conversation
+      to finish. If specified more than once, right after having sent the
+      <var class="Ar">command</var> to the server
+      <code class="Nm">pftblctl</code> will return immediately, not awaiting any
+      reply. Please note that, in this case, <code class="Nm">pftblctl</code>
+      may even return before the <var class="Ar">command</var> was acually
+      executed on the server.</dd>
   <dt id="s"><a class="permalink" href="#s"><code class="Fl">-s</code></a>
     <var class="Ar">socket</var></dt>
   <dd>Specifies the <var class="Ar">socket</var> used to send data to and
@@ -77,9 +86,10 @@
       <dt id="print"><a class="permalink" href="#print"><code class="Ic">print</code></a></dt>
       <dd>Prints the current configuration to <var class="Ar">stdout</var>.</dd>
       <dt id="reload"><a class="permalink" href="#reload"><code class="Ic">reload</code></a></dt>
-      <dd>Reinitializes the configuration by reloading the configuration file
-          <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>. The same
-          effect may be accomplished by either using the
+      <dd>Reconfigures <a class="Xr" href="pftbld.8.html">pftbld(8)</a> by
+          initiating a reload of its configuration file
+          <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.
+          Alternative means to achieve the same goal are for example the
           <a class="Xr" href="http://man.openbsd.org/rcctl.8">rcctl(8)</a>
           utility:
         <p class="Pp"></p>
@@ -172,9 +182,24 @@
 <section class="Sh">
 <h1 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h1>
 <dl class="Bl-tag Bl-compact">
+  <dt><span class="Pa">/var/log/pftbld.log</span></dt>
+  <dd>Default log file.</dd>
   <dt><span class="Pa">/var/run/pftbld.sock</span></dt>
   <dd>Default control socket.</dd>
 </dl>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="EXIT_STATUS"><a class="permalink" href="#EXIT_STATUS">EXIT
+  STATUS</a></h1>
+<p class="Pp"><code class="Nm">pftblctl</code> returns 0 when it was able to
+    successfully send a <var class="Ar">command</var> to the server and, unless
+    quietened, also successfully read the server's reply, and returns &gt;0
+    otherwise.</p>
+<p class="Pp">Please note that the <code class="Nm">pftblctl</code> exit status
+    does not tell anything about the exit status of the
+    <var class="Ar">command</var> it submitted to the server. In order to gain
+    this information, catching the reply from the server and/or examining the
+    server's log file is the way to go.</p>
 </section>
 <section class="Sh">
 <h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
@@ -239,7 +264,7 @@ Next scheduled event:
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">December 2, 2020</td>
+    <td class="foot-date">December 9, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

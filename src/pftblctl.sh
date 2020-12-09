@@ -31,11 +31,11 @@ err()
 PFTBLD='/usr/local/sbin/pftbld'
 [[ -x ${PFTBLD} ]] || err 'pftbld binary missing or not executable'
 
+QUIET=0
 CTRLSOCK='/var/run/pftbld.sock'
-VERBOSE='v'
 while getopts qs: arg; do
 	case ${arg} in
-	q)	VERBOSE='';;
+	q)	QUIET=$((QUIET+1));;
 	s)	CTRLSOCK=$OPTARG;;
 	*)	usage;;
 	esac
@@ -49,5 +49,8 @@ while [[ -n "$1" ]]; do
 done
 
 [[ -n "${cmd}" ]] || usage
+
+((${QUIET} < 2)) && VERBOSE='v'
+((${QUIET} == 1)) && exec 1>/dev/null
 
 echo -n "${cmd}" | ${PFTBLD} -${VERBOSE}p ${CTRLSOCK}
