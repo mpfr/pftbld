@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 2 2020 $
+.Dd $Mdocdate: December 9 2020 $
 .Dt PFTBLCTL 8
 .Os
 .Sh NAME
@@ -40,8 +40,24 @@ but may as well be utilized to forward client data to the corresponding
 The options are as follows:
 .Bl -tag -width "-s socket"
 .It Fl q
-Quiet mode, suppressing output on
+Quiet mode, generally preventing output on
 .Ar stdout .
+This flag may be specified multiple times.
+If specified just once, the
+.Ar command
+will be sent to the server and
+.Nm
+will silently wait for the conversation to finish.
+If specified more than once, right after having sent the
+.Ar command
+to the server
+.Nm
+will return immediately, not awaiting any reply.
+Please note that, in this case,
+.Nm
+may even return before the
+.Ar command
+was acually executed on the server.
 .It Fl s Ar socket
 Specifies the
 .Ar socket
@@ -62,9 +78,11 @@ Valid options are:
 Prints the current configuration to
 .Ar stdout .
 .It Ic reload
-Reinitializes the configuration by reloading the configuration file
+Reconfigures
+.Xr pftbld 8
+by initiating a reload of its configuration file
 .Xr pftbld.conf 5 .
-The same effect may be accomplished by either using the
+Alternative means to achieve the same goal are for example the
 .Xr rcctl 8
 utility:
 .Pp
@@ -170,9 +188,25 @@ If issued without parameter, the current level will be printed to
 .El
 .Sh FILES
 .Bl -tag -width "/var/run/pftbld.sock" -compact
+.It Pa /var/log/pftbld.log
+Default log file.
 .It Pa /var/run/pftbld.sock
 Default control socket.
 .El
+.Sh EXIT STATUS
+.Nm
+returns 0 when it was able to successfully send a
+.Ar command
+to the server and, unless quietened, also successfully read the server's reply,
+and returns >0 otherwise.
+.Pp
+Please note that the
+.Nm
+exit status does not tell anything about the exit status of the
+.Ar command
+it submitted to the server.
+In order to gain this information, catching the reply from the server and/or
+examining the server's log file is the way to go.
 .Sh EXAMPLES
 Here's an example for a
 .Ic status

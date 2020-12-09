@@ -527,7 +527,7 @@ perform_ctrl_config(struct statfd *sfd, char *arg, char *data, size_t datalen)
 
 	enum msgtype	 mt;
 
-	if ((shift(arg, data, datalen)) != NULL)
+	if (shift(arg, data, datalen) != NULL)
 		return (1);
 
 	if (!strcmp("print", arg))
@@ -537,7 +537,7 @@ perform_ctrl_config(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		WRITE(privfd, &mt, sizeof(mt));
 		/* wait for reply */
 		READ(privfd, &mt, sizeof(mt));
-		msg_send(sfd, mt == ACK ? "Done.\n" : "Failed.\n");
+		msg_send(sfd, mt == ACK ? "Initiated.\n" : "Failed.\n");
 	} else
 		return (1);
 
