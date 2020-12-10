@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 9 2020 $
+.Dd $Mdocdate: December 10 2020 $
 .Dt PFTBLCTL 8
 .Os
 .Sh NAME
@@ -114,12 +114,15 @@ deleted addresses per
 .Ar target
 and the overall number of dropped client entries) gets written into the log
 file instead.
-.It Ic dump Ar target
-Writes managed addresses and meta-data (number of hits and timestamp of last
+.It Ic dump Oo Ar target Oc
+Prints managed addresses and meta-data (number of hits and timestamp of last
 occurrence) of the specified
 .Ar target
 to
 .Ar stdout .
+If there is no
+.Ar target
+specified, addresses of all targets will be printed.
 .It Ic expire Oo Ic recap Oc Ar address/network Oo Ar target Oc
 Like the
 .Ic drop
