@@ -599,16 +599,18 @@ perform_ctrl_dump(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	struct target	*tgt;
 	struct client	*clt;
 
-	if (arg == NULL || shift(arg, data, datalen) != NULL)
+	if (arg != NULL && shift(arg, data, datalen) != NULL)
 		return (1);
 
-	if ((tgt = find_target(&conf->ctargets, arg)) == NULL) {
+	if (arg == NULL)
+		tgt = NULL;
+	else if ((tgt = find_target(&conf->ctargets, arg)) == NULL) {
 		msg_send(sfd, "Unknown target.\n");
 		return (0);
 	}
 
 	TAILQ_FOREACH(clt, &cltq, clients)
-		if (clt->tgt == tgt)
+		if (tgt == NULL || clt->tgt == tgt)
 			msg_send(sfd, "%s %u %lld\n", clt->astr, clt->cnt,
 			    TIMESPEC_SEC_ROUND(&clt->ts));
 
