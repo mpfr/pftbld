@@ -209,6 +209,9 @@ parse_addr(struct caddr *addr, const char *str)
 int
 addr_inrange(struct crange *cr, struct caddr *addr)
 {
+	if (cr == NULL || addr == NULL)
+		return (0);
+
 	return (addr->type == cr->type &&
 	    addrvals_cmp(&addr->value, &cr->first, cr->type) >= 0 &&
 	    addrvals_cmp(&addr->value, &cr->last, cr->type) <= 0);

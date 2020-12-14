@@ -146,6 +146,7 @@ pfexec(struct caddrq *caq, struct pfresult *pfres, const char *fmt, ...)
 		FATAL("vasprintf");
 	va_end(ap);
 
+	clen++;
 	mt = EXEC_PFCMD;
 	if (write(privfd, &mt, sizeof(mt)) == -1 ||
 	    write(privfd, &clen, sizeof(clen)) == -1 ||
@@ -277,8 +278,7 @@ pftbld(int argc, char *argv[])
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGUSR1, SIG_IGN);
 
-	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
-	    pfd) == -1)
+	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, pfd) == -1)
 		FATAL("socketpair");
 
 	privfd = pfd[1];
@@ -342,9 +342,8 @@ exec_pfcmd(int pfd)
 	size_t		 acnt;
 
 	READ(pfd, &clen, sizeof(clen));
-	MALLOC(cmd, clen + 1);
+	MALLOC(cmd, clen);
 	READ(pfd, cmd, clen);
-	cmd[clen] = '\0';
 	SIMPLEQ_INIT(&caq);
 	acnt = 0;
 	while (1) {
@@ -515,7 +514,7 @@ send_conf(int fd)
 	struct socket	*sock;
 	struct target	*tgt;
 	struct crange	*cr;
-	struct keyterm	*kt;
+	struct ptr	*kt;
 	struct table	*tab;
 
 	WRITE(fd, &mt, sizeof(mt));
@@ -537,10 +536,10 @@ send_conf(int fd)
 			WRITE2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
 		WRITE(fd, &iend, sizeof(iend));
 
-		SIMPLEQ_FOREACH(kt, &tgt->exclkeyterms, keyterms) {
+		SIMPLEQ_FOREACH(kt, &tgt->exclkeyterms, ptrs) {
 			WRITE2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
-			n = strlen(kt->str) + 1;
-			WRITE2(fd, &n, sizeof(n), kt->str, n);
+			n = strlen(kt->p) + 1;
+			WRITE2(fd, &n, sizeof(n), kt->p, n);
 		}
 		WRITE(fd, &iend, sizeof(iend));
 
@@ -554,10 +553,10 @@ send_conf(int fd)
 		WRITE2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
 	WRITE(fd, &iend, sizeof(iend));
 
-	SIMPLEQ_FOREACH(kt, &conf->exclkeyterms, keyterms) {
+	SIMPLEQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
 		WRITE2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
-		n = strlen(kt->str) + 1;
-		WRITE2(fd, &n, sizeof(n), kt->str, n);
+		n = strlen(kt->p) + 1;
+		WRITE2(fd, &n, sizeof(n), kt->p, n);
 	}
 	WRITE(fd, &iend, sizeof(iend));
 

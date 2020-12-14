@@ -67,7 +67,7 @@ static int	yylex(void);
 
 static int	 load_exclude_keyterms(const char *);
 static int	 crange_inq(struct crangeq *, struct crange *);
-static int	 keyterm_inq(struct keytermq *, struct keyterm *);
+static int	 keyterm_inq(struct ptrq *, struct ptr *);
 static int	 load_exclude_cranges(const char *);
 
 typedef struct {
@@ -88,7 +88,7 @@ static struct table	*table, *ptable;
 static uint8_t		 flags;
 
 struct crangeq	*curr_exclcrangeq;
-struct keytermq	*curr_exclkeytermq;
+struct ptrq	*curr_exclkeytermq;
 
 %}
 
@@ -483,20 +483,19 @@ excludeoptsl	: LOCALHOSTS		{
 			free($2);
 		}
 		| KEYTERM STRING	{
-			struct keyterm	*k;
+			struct ptr	*k;
 
 			MALLOC(k, sizeof(*k));
-			if ((k->str = strdup($2)) == NULL)
+			if ((k->p = strdup($2)) == NULL)
 				FATAL("strdup(%s)", $2);
 			free($2);
 			if (keyterm_inq(curr_exclkeytermq, k)) {
-				DPRINTF("keyterm '%s' already enqueued",
-				    k->str);
-				free(k->str);
+				DPRINTF("keyterm '%s' already enqueued", k->p);
+				free(k->p);
 				free(k);
 			} else
 				SIMPLEQ_INSERT_TAIL(curr_exclkeytermq, k,
-				    keyterms);
+				    ptrs);
 		}
 		| KEYTERMFILE STRING	{
 			if (load_exclude_keyterms($2) == -1) {
@@ -656,12 +655,12 @@ crange_inq(struct crangeq *q, struct crange *r)
 }
 
 static int
-keyterm_inq(struct keytermq *q, struct keyterm *k)
+keyterm_inq(struct ptrq *q, struct ptr *k)
 {
-	struct keyterm	*k2;
+	struct ptr	*k2;
 
-	SIMPLEQ_FOREACH(k2, q, keyterms)
-		if (!strcmp(k->str, k2->str))
+	SIMPLEQ_FOREACH(k2, q, ptrs)
+		if (!strcmp(k->p, k2->p))
 			return (1);
 
 	return (0);
@@ -675,7 +674,7 @@ load_exclude_keyterms(const char *file)
 	size_t		 len;
 	ssize_t		 n;
 	int		 cnt;
-	struct keyterm	*k;
+	struct ptr	*k;
 
 	CANONICAL_PATH_SET(file, cpath, "keyterms file",, return (-1));
 
@@ -693,17 +692,17 @@ load_exclude_keyterms(const char *file)
 			continue;
 
 		CALLOC(k, 1, sizeof(*k));
-		if ((k->str = strndup(line, n - 1)) == NULL)
+		if ((k->p = strndup(line, n - 1)) == NULL)
 			FATAL("strndup(%s, %ld)", line, n - 1);
 		if (keyterm_inq(curr_exclkeytermq, k)) {
-			DPRINTF("keyterm '%s' already enqueued", k->str);
-			free(k->str);
+			DPRINTF("keyterm '%s' already enqueued", k->p);
+			free(k->p);
 			free(k);
 			continue;
 		}
 
-		SIMPLEQ_INSERT_TAIL(curr_exclkeytermq, k, keyterms);
-		DPRINTF("enqueued keyterm '%s'", k->str);
+		SIMPLEQ_INSERT_TAIL(curr_exclkeytermq, k, ptrs);
+		DPRINTF("enqueued keyterm '%s'", k->p);
 		cnt++;
 	}
 	free(line);
