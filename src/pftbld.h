@@ -73,6 +73,13 @@
 	    (e)->flags & EV_DELETE ? "/DELETE" : "/???" : "",	\
 	    (e)->data)
 
+#define SIMPLEQ_MATCH(q, e, t, m)		\
+	do {					\
+		SIMPLEQ_FOREACH(e, q, t)	\
+			if (m)			\
+				break;		\
+	} while (0)
+
 #define READ(d, b, n)				\
 	do {					\
 		if (read(d, b, n) == -1)	\
@@ -239,12 +246,12 @@ struct crange {
 };
 SIMPLEQ_HEAD(crangeq, crange);
 
-struct keyterm {
-	char	*str;
+struct ptr {
+	void	*p;
 
-	SIMPLEQ_ENTRY(keyterm) keyterms;
+	SIMPLEQ_ENTRY(ptr) ptrs;
 };
-SIMPLEQ_HEAD(keytermq, keyterm);
+SIMPLEQ_HEAD(ptrq, ptr);
 
 struct client {
 	struct caddr	 addr;
@@ -312,7 +319,7 @@ struct target {
 	struct timespec	 drop;
 	struct socketq	 datasocks;
 	struct crangeq	 exclcranges;
-	struct keytermq	 exclkeyterms;
+	struct ptrq	 exclkeyterms;
 	struct tableq	 cascade;
 
 	SIMPLEQ_ENTRY(target) targets;
@@ -328,7 +335,7 @@ struct config {
 	struct timespec	 drop;
 	struct targetq	 ctargets;
 	struct crangeq	 exclcranges;
-	struct keytermq	 exclkeyterms;
+	struct ptrq	 exclkeyterms;
 	uint8_t		 flags;
 };
 
@@ -428,10 +435,10 @@ int		 load(struct target *);
 /* scheduler.c */
 void		 sort_client_asc(struct client *);
 void		 sort_client_desc(struct client *);
-int		 drop_clients(const char *, struct target *);
-int		 drop_clients_r(const char *, struct target *);
-int		 expire_clients(const char *, struct target *);
-int		 expire_clients_r(const char *, struct target *);
+int		 drop_clients(struct crangeq *, struct ptrq *);
+int		 drop_clients_r(struct crangeq *, struct ptrq *);
+int		 expire_clients(struct crangeq *, struct ptrq *);
+int		 expire_clients_r(struct crangeq *, struct ptrq *);
 __dead void	 scheduler(int, char **);
 void		 fork_scheduler(void);
 int		 bind_table(struct client *, struct pfaddrlistq *,

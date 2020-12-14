@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 3 2020 $
+.Dd $Mdocdate: December 13 2020 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -115,10 +115,17 @@ Verbose mode.
 If used with the server, multiple
 .Fl v
 options increase the verbosity.
-If used with pipe mode to write commands to the
-.Pa control socket ,
-this will enable printing server replies to
+If used with pipe mode to write either commands to the
+.Pa control socket
+or data to a
+.Pa data socket ,
+this enables printing server replies to
 .Ar stdout .
+In the latter case, receiving the sequence
+.Sq ACK
+indicates that the server successfully received all data, while
+.Sq NAK
+would imply that communication has failed and all received data was discarded.
 If used along with
 .Fl n ,
 the configuration will be echoed to

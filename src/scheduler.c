@@ -26,7 +26,8 @@
 #include "log.h"
 #include "pftbld.h"
 
-#define HAS_TIMEOUT(ibuf)	(ibuf->timeout < LLONG_MAX)
+#define HAS_DATAMAX(ibuf)	ibuf->datamax < CONF_NO_DATAMAX
+#define HAS_TIMEOUT(ibuf)	ibuf->timeout < CONF_NO_TIMEOUT
 
 static struct client
 		*evtimer_client(void);
@@ -68,14 +69,14 @@ static void
 evtimer_start(int fd, struct kevent *kev, struct client *clt,
     struct kevcb *handler)
 {
-	struct timespec	 tp;
+	struct timespec	 ts;
 
-	GET_TIME(&tp);
-	timespecsub(&clt->to, &tp, &tp);
-	if (tp.tv_sec < 0 || tp.tv_nsec < 0)
-		timespecclear(&tp);
+	GET_TIME(&ts);
+	timespecsub(&clt->to, &ts, &ts);
+	if (ts.tv_sec < 0 || ts.tv_nsec < 0)
+		timespecclear(&ts);
 	EV_MOD(fd, kev, (unsigned long)clt, EVFILT_TIMER, EV_ADD, 0,
-	    TIMESPEC_TO_MSEC(&tp), handler);
+	    TIMESPEC_TO_MSEC(&ts), handler);
 }
 
 static void
@@ -163,8 +164,9 @@ sort_client_desc(struct client *clt)
 }
 
 int
-drop_clients(const char *net, struct target *tgt)
+drop_clients(struct crangeq *crq, struct ptrq *tpq)
 {
+	struct ptr	*tp;
 	struct crange	*cr;
 	struct client	*clt, *nc, *first;
 	struct caddrq	 caq;
@@ -172,10 +174,7 @@ drop_clients(const char *net, struct target *tgt)
 	char		*age;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
-	struct timespec	 tp;
-
-	if ((cr = parse_crange(net)) == NULL)
-		return (-1);
+	struct timespec	 ts;
 
 	SIMPLEQ_INIT(&caq);
 	cnt = 0;
@@ -183,9 +182,17 @@ drop_clients(const char *net, struct target *tgt)
 	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
-		if ((tgt != NULL && clt->tgt != tgt) ||
-		    !addr_inrange(cr, &clt->addr))
-			continue;
+		if (!SIMPLEQ_EMPTY(tpq)) {
+			SIMPLEQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+			if (tp == NULL)
+				continue;
+		}
+		if (!SIMPLEQ_EMPTY(crq)) {
+			SIMPLEQ_MATCH(crq, cr, cranges,
+			    addr_inrange(cr, &clt->addr));
+			if (cr == NULL)
+				continue;
+		}
 
 		if (clt == first) {
 			EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER,
@@ -196,9 +203,9 @@ drop_clients(const char *net, struct target *tgt)
 		SIMPLEQ_INSERT_TAIL(&caq, &clt->addr, caddrs);
 		pfexec(&caq, &pfres, "delete\n%s", clt->tbl->name);
 
-		GET_TIME(&tp);
-		timespecsub(&tp, &clt->ts, &tp);
-		age = hrage(&tp);
+		GET_TIME(&ts);
+		timespecsub(&ts, &clt->ts, &ts);
+		age = hrage(&ts);
 		print_ts_log("%s[%s]:[%s]:(%dx:%s) ",
 		    pfres.ndel > 0 ? ">>> Deleted " : "",
 		    clt->astr, clt->tgt->name, clt->cnt, age);
@@ -220,17 +227,15 @@ drop_clients(const char *net, struct target *tgt)
 }
 
 int
-drop_clients_r(const char *net, struct target *tgt)
+drop_clients_r(struct crangeq *crq, struct ptrq *tpq)
 {
+	struct ptr		*tp;
 	struct crange		*cr;
 	struct client		*clt, *nc, *first;
 	struct pfaddrlistq	 delq;
 	struct clientq		 dcq;
 	int			 cnt;
 	struct kevent		 kev;
-
-	if ((cr = parse_crange(net)) == NULL)
-		return (-1);
 
 	SIMPLEQ_INIT(&delq);
 	TAILQ_INIT(&dcq);
@@ -239,9 +244,17 @@ drop_clients_r(const char *net, struct target *tgt)
 	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
-		if ((tgt != NULL && clt->tgt != tgt) ||
-		    !addr_inrange(cr, &clt->addr))
-			continue;
+		if (!SIMPLEQ_EMPTY(tpq)) {
+			SIMPLEQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+			if (tp == NULL)
+				continue;
+		}
+		if (!SIMPLEQ_EMPTY(crq)) {
+			SIMPLEQ_MATCH(crq, cr, cranges,
+			    addr_inrange(cr, &clt->addr));
+			if (cr == NULL)
+				continue;
+		}
 
 		if (clt == first) {
 			EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER,
@@ -262,10 +275,6 @@ drop_clients_r(const char *net, struct target *tgt)
 		free(clt);
 	}
 
-	if (cnt > 0)
-		print_ts_log("%d client entr%s dropped.\n", cnt,
-		    cnt != 1 ? "ies" : "y");
-
 	if (first == NULL && (clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
 
@@ -273,8 +282,9 @@ drop_clients_r(const char *net, struct target *tgt)
 }
 
 int
-expire_clients(const char *net, struct target *tgt)
+expire_clients(struct crangeq *crq, struct ptrq *tpq)
 {
+	struct ptr	*tp;
 	struct crange	*cr;
 	struct client	*clt, *nc, *first;
 	struct caddrq	 caq;
@@ -283,10 +293,7 @@ expire_clients(const char *net, struct target *tgt)
 	char		*age;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
-	struct timespec	 tp;
-
-	if ((cr = parse_crange(net)) == NULL)
-		return (-1);
+	struct timespec	 ts;
 
 	SIMPLEQ_INIT(&caq);
 	TAILQ_INIT(&dcq);
@@ -295,9 +302,19 @@ expire_clients(const char *net, struct target *tgt)
 	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
-		if (clt->exp || (tgt != NULL && clt->tgt != tgt) ||
-		    !addr_inrange(cr, &clt->addr))
+		if (clt->exp)
 			continue;
+		if (!SIMPLEQ_EMPTY(tpq)) {
+			SIMPLEQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+			if (tp == NULL)
+				continue;
+		}
+		if (!SIMPLEQ_EMPTY(crq)) {
+			SIMPLEQ_MATCH(crq, cr, cranges,
+			    addr_inrange(cr, &clt->addr));
+			if (cr == NULL)
+				continue;
+		}
 
 		if (clt == first) {
 			EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER,
@@ -308,14 +325,14 @@ expire_clients(const char *net, struct target *tgt)
 		SIMPLEQ_INSERT_TAIL(&caq, &clt->addr, caddrs);
 		pfexec(&caq, &pfres, "delete\n%s", clt->tbl->name);
 
-		GET_TIME(&tp);
+		GET_TIME(&ts);
 		if (timespec_isinfinite(&clt->tgt->drop))
 			clt->to = TIMESPEC_INFINITE;
 		else
-			timespecadd(&tp, &clt->tgt->drop, &clt->to);
+			timespecadd(&ts, &clt->tgt->drop, &clt->to);
 		clt->exp = 1;
-		timespecsub(&tp, &clt->ts, &tp);
-		age = hrage(&tp);
+		timespecsub(&ts, &clt->ts, &ts);
+		age = hrage(&ts);
 		print_ts_log("%sDeleted [%s]:[%s]:(%dx:%s)",
 		    pfres.ndel > 0 ? ">>> " : "",
 		    clt->astr, clt->tgt->name, clt->cnt, age);
@@ -342,18 +359,16 @@ expire_clients(const char *net, struct target *tgt)
 }
 
 int
-expire_clients_r(const char *net, struct target *tgt)
+expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 {
+	struct ptr		*tp;
 	struct crange		*cr;
 	struct client		*clt, *nc, *first;
 	struct pfaddrlistq	 delq;
 	struct clientq		 dcq;
 	int			 cnt;
 	struct kevent		 kev;
-	struct timespec		 tp;
-
-	if ((cr = parse_crange(net)) == NULL)
-		return (-1);
+	struct timespec		 ts;
 
 	TAILQ_INIT(&dcq);
 	cnt = 0;
@@ -361,9 +376,19 @@ expire_clients_r(const char *net, struct target *tgt)
 	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
-		if (clt->exp || (tgt != NULL && clt->tgt != tgt) ||
-		    !addr_inrange(cr, &clt->addr))
+		if (clt->exp )
 			continue;
+		if (!SIMPLEQ_EMPTY(tpq)) {
+			SIMPLEQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+			if (tp == NULL)
+				continue;
+		}
+		if (!SIMPLEQ_EMPTY(crq)) {
+			SIMPLEQ_MATCH(crq, cr, cranges,
+			    addr_inrange(cr, &clt->addr));
+			if (cr == NULL)
+				continue;
+		}
 
 		if (clt == first) {
 			EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER,
@@ -381,11 +406,11 @@ expire_clients_r(const char *net, struct target *tgt)
 	while ((clt = TAILQ_FIRST(&dcq)) != NULL) {
 		TAILQ_REMOVE(&dcq, clt, clients);
 
-		GET_TIME(&tp);
+		GET_TIME(&ts);
 		if (timespec_isinfinite(&clt->tgt->drop))
 			clt->to = TIMESPEC_INFINITE;
 		else
-			timespecadd(&tp, &clt->tgt->drop, &clt->to);
+			timespecadd(&ts, &clt->tgt->drop, &clt->to);
 		clt->exp = 1;
 
 		sort_client_desc(clt);
@@ -393,10 +418,6 @@ expire_clients_r(const char *net, struct target *tgt)
 	}
 
 	apply_pfaddrlists(NULL, &delq);
-
-	if (cnt > 0)
-		print_ts_log("%d client entr%s expired.\n", cnt,
-		    cnt != 1 ? "ies" : "y");
 
 	if (first == NULL && (clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
@@ -420,13 +441,11 @@ check_targets(void)
 	n = 0;
 	TAILQ_FOREACH(clt, &cltq, clients) {
 		tgt = buf;
-		do {
-			if (strncmp(clt->tgt->name, tgt,
-			    sizeof(clt->tgt->name)) == 0)
+		while (strncmp(clt->tgt->name, tgt, sizeof(clt->tgt->name)))
+			if ((tgt = shift(tgt, buf, len)) == NULL) {
+				n++;
 				break;
-		} while ((tgt = shift(tgt, buf, len)) != NULL);
-		if (tgt == NULL)
-			n++;
+			}
 	}
 	free(buf);
 
@@ -450,7 +469,7 @@ recv_conf(void)
 	struct socket	*sock;
 	struct target	*tgt;
 	struct crange	*cr;
-	struct keyterm	*kt;
+	struct ptr	*kt;
 	struct table	*tbl;
 
 	MALLOC(nc, sizeof(*nc));
@@ -496,9 +515,9 @@ recv_conf(void)
 
 			MALLOC(kt, sizeof(*kt));
 			READ2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
-			MALLOC(kt->str, n);
-			READ(sched_cfd, kt->str, n);
-			SIMPLEQ_INSERT_TAIL(&tgt->exclkeyterms, kt, keyterms);
+			MALLOC(kt->p, n);
+			READ(sched_cfd, kt->p, n);
+			SIMPLEQ_INSERT_TAIL(&tgt->exclkeyterms, kt, ptrs);
 		}
 
 		SIMPLEQ_INIT(&tgt->cascade);
@@ -529,9 +548,9 @@ recv_conf(void)
 
 		MALLOC(kt, sizeof(*kt));
 		READ2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
-		MALLOC(kt->str, n);
-		READ(sched_cfd, kt->str, n);
-		SIMPLEQ_INSERT_TAIL(&nc->exclkeyterms, kt, keyterms);
+		MALLOC(kt->p, n);
+		READ(sched_cfd, kt->p, n);
+		SIMPLEQ_INSERT_TAIL(&nc->exclkeyterms, kt, ptrs);
 	}
 
 #undef CHECK_NEXTITEM
@@ -632,9 +651,11 @@ handle_inbfd(struct kevent *kev)
 static void
 handle_inbuf(struct kevent *kev)
 {
+	static const char	 nak[] = "NAK\n";
+
 	unsigned long	 kevid = kev->ident;
 	struct inbuf	*ibuf = kev->udata;
-	char		 buf[BUFSIZ + 1], *data;
+	char		 buf[BUFSIZ], *data;
 	ssize_t		 nr;
 	struct target	*tgt;
 	struct socket	*sock;
@@ -647,6 +668,7 @@ handle_inbuf(struct kevent *kev)
 		if (HAS_TIMEOUT(ibuf))
 			EV_MOD(kqfd, kev, kevid, EVFILT_TIMER, EV_DELETE, 0, 0,
 			    NULL);
+		send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
 		close(ibuf->datafd);
 		goto remove;
 	}
@@ -660,31 +682,34 @@ handle_inbuf(struct kevent *kev)
 		if (HAS_TIMEOUT(ibuf))
 			EV_MOD(kqfd, kev, kevid, EVFILT_TIMER, EV_DELETE, 0, 0,
 			    NULL);
+		send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
 		close(ibuf->datafd);
 		goto remove;
 	}
-	if (nr > 0) {
-		buf[nr] = '\0';
-		ibuf->nr += nr;
-		if (ibuf->datamax < LONG_MAX && ibuf->nr > ibuf->datamax) {
-			log_warnx("read on target [%s%s] exceeded size limit "
-			    "(%zu)", ibuf->tgtname, ibuf->sockid,
-			    ibuf->datamax);
-			EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0,
+	if (nr <= 0)
+		goto eof;
+
+	buf[nr] = '\0';
+	ibuf->nr += nr;
+	if (HAS_DATAMAX(ibuf) && ibuf->nr > ibuf->datamax) {
+		log_warnx("read on target [%s%s] exceeded size limit (%zu)",
+		    ibuf->tgtname, ibuf->sockid, ibuf->datamax);
+		EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+		if (HAS_TIMEOUT(ibuf))
+			EV_MOD(kqfd, kev, kevid, EVFILT_TIMER, EV_DELETE, 0, 0,
 			    NULL);
-			if (HAS_TIMEOUT(ibuf))
-				EV_MOD(kqfd, kev, kevid, EVFILT_TIMER,
-				    EV_DELETE, 0, 0, NULL);
-			close(ibuf->datafd);
-			goto remove;
-		}
-		if (asprintf(&data, "%s%s", ibuf->data, buf) == -1)
-			FATAL("asprintf");
-		free(ibuf->data);
-		ibuf->data = data;
-		if (buf[nr - 1] != '\0')
-			return;
+		send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
+		close(ibuf->datafd);
+		goto remove;
 	}
+	if (asprintf(&data, "%s%s", ibuf->data, buf) == -1)
+		FATAL("asprintf");
+	free(ibuf->data);
+	ibuf->data = data;
+	if (buf[nr - 1] != '\0')
+		return;
+
+eof:
 	/* EOF */
 	EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0, NULL);
 	if (HAS_TIMEOUT(ibuf))
@@ -731,9 +756,9 @@ handle_expire(struct kevent *kev)
 	int		 exp, drop;
 	struct pfresult	 pfres;
 	char		*age;
-	struct timespec	 tp;
+	struct timespec	 ts;
 
-	GET_TIME(&tp);
+	GET_TIME(&ts);
 
 	EV_MOD(kqfd, kev, kev->ident, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
 
@@ -757,8 +782,8 @@ handle_expire(struct kevent *kev)
 		clt->exp = 1;
 	}
 
-	timespecsub(&tp, &clt->ts, &tp);
-	age = hrage(&tp);
+	timespecsub(&ts, &clt->ts, &ts);
+	age = hrage(&ts);
 	print_ts_log("%s%s[%s]:[%s]:(%dx:%s)", pfres.ndel > 0 ? ">>> " : "",
 	    exp ? "Deleted " : "", clt->astr, clt->tgt->name, clt->cnt, age);
 	free(age);
@@ -883,10 +908,8 @@ fork_scheduler(void)
 	int	 ctrlfd[2], inbfd[2];
 	char	*argv[3];
 
-	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
-	    ctrlfd) == -1 ||
-	    socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
-	    inbfd) == -1)
+	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, ctrlfd) == -1 ||
+	    socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, inbfd) == -1)
 		FATAL("socketpair");
 
 	if ((sched_pid = fork()) == -1)
@@ -918,7 +941,7 @@ bind_table(struct client *clt, struct pfaddrlistq *addq,
     struct pfaddrlistq *delq)
 {
 	struct table	*tbl;
-	struct timespec	 tp;
+	struct timespec	 ts;
 
 	tbl = SIMPLEQ_FIRST(&clt->tgt->cascade);
 	while (tbl != NULL && tbl->hits > 0 && tbl->hits < clt->cnt)
@@ -931,19 +954,19 @@ bind_table(struct client *clt, struct pfaddrlistq *addq,
 
 	clt->tbl = tbl;
 
-	GET_TIME(&tp);
-	timespecsub(&tp, &clt->ts, &tp);
+	GET_TIME(&ts);
+	timespecsub(&ts, &clt->ts, &ts);
 
 	if (timespec_isinfinite(&tbl->expire)) {
 		clt->exp = 0;
 		clt->to = TIMESPEC_INFINITE;
-	} else if (timespeccmp(&tp, &tbl->expire, <)) {
+	} else if (timespeccmp(&ts, &tbl->expire, <)) {
 		clt->exp = 0;
 		timespecadd(&clt->ts, &tbl->expire, &clt->to);
 	} else if (timespec_isinfinite(&tbl->drop)) {
 		clt->exp = 1;
 		clt->to = TIMESPEC_INFINITE;
-	} else if (timespeccmp(&tp, &tbl->drop, <)) {
+	} else if (timespeccmp(&ts, &tbl->drop, <)) {
 		clt->exp = 1;
 		timespecadd(&clt->ts, &tbl->drop, &clt->to);
 	} else

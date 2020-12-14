@@ -116,10 +116,14 @@
       will be unloaded from corresponding tables on shutdown.</dd>
   <dt id="v"><a class="permalink" href="#v"><code class="Fl">-v</code></a></dt>
   <dd>Verbose mode. If used with the server, multiple <code class="Fl">-v</code>
-      options increase the verbosity. If used with pipe mode to write commands
-      to the <span class="Pa">control socket</span>, this will enable printing
-      server replies to <var class="Ar">stdout</var>. If used along with
-      <code class="Fl">-n</code>, the configuration will be echoed to
+      options increase the verbosity. If used with pipe mode to write either
+      commands to the <span class="Pa">control socket</span> or data to a
+      <span class="Pa">data socket</span>, this enables printing server replies
+      to <var class="Ar">stdout</var>. In the latter case, receiving the
+      sequence &#x2018;ACK&#x2019; indicates that the server successfully
+      received all data, while &#x2018;NAK&#x2019; would imply that
+      communication has failed and all received data was discarded. If used
+      along with <code class="Fl">-n</code>, the configuration will be echoed to
       <var class="Ar">stderr</var>, if valid.</dd>
 </dl>
 </section>
@@ -209,7 +213,7 @@ to { attackers } for 1h.
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">December 3, 2020</td>
+    <td class="foot-date">December 13, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
