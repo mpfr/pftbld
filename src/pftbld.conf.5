@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 7 2020 $
+.Dd $Mdocdate: December 13 2020 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -428,9 +428,14 @@ binary in pipe mode may be used for testing:
 .Ed
 .Pp
 Alternatively, the same result can be achieved by utilizing
-.Xr pftblctl 8 :
+.Xr pftblctl 8
+along with
+.Fl q
+suppressing the server acknowledge that would be printed to
+.Pa stdout
+otherwise:
 .Bd -literal -offset indent
-# pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44
+# pftblctl -q -s /var/www/run/pftbld-www.sock 11.22.33.44
 .Ed
 .Pp
 If everything went right, two entries were appended to the default log file

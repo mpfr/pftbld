@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 10 2020 $
+.Dd $Mdocdate: December 13 2020 $
 .Dt PFTBLCTL 8
 .Os
 .Sh NAME
@@ -67,7 +67,7 @@ used to send data to and defaults to
 .Sh COMMANDS
 On the
 .Pa control socket ,
-the following commands will be accepted:
+the following commands are accepted:
 .Bl -tag -width Ds -offset Ds
 .It Ic config Ar option
 Runs the specified configuration
@@ -82,6 +82,10 @@ Reconfigures
 .Xr pftbld 8
 by initiating a reload of its configuration file
 .Xr pftbld.conf 5 .
+Please note that, figuring out whether or not reloading completed successfully
+after all, an appropriate message will be printed either into the daemon's or
+the system log, respectively.
+.Pp
 Alternative means to achieve the same goal are for example the
 .Xr rcctl 8
 utility:
@@ -94,16 +98,14 @@ command:
 .Pp
 .Dl # pkill -HUP pftbld
 .El
-.It Ic drop Oo Ic recap Oc Ar address/network Oo Ar target Oc
-Deletes the given
+.It Ic drop Oo Ic recap Oc Ar address/network | target ...
+Deletes client entries matching the given
 .Ar address/network
-ahead of schedule from corresponding
-.Xr pf 4
-tables and from memory, optionally filtered for the given
-.Ar target .
-If
+and
 .Ar target
-is omitted, removal will affect all targets.
+specifiers ahead of schedule from corresponding
+.Xr pf 4
+tables and from the daemon's memory.
 Since normally every single deletion will be logged, specifying large
 .Ar network
 ranges may lead to log files getting flooded with deletion entries.
@@ -114,37 +116,37 @@ deleted addresses per
 .Ar target
 and the overall number of dropped client entries) gets written into the log
 file instead.
-.It Ic dump Oo Ar target Oc
+.It Ic dump Oo Ar target ... Oc
 Prints managed addresses and meta-data (number of hits and timestamp of last
 occurrence) of the specified
 .Ar target
-to
+names to
 .Ar stdout .
 If there is no
 .Ar target
 specified, addresses of all targets will be printed.
-.It Ic expire Oo Ic recap Oc Ar address/network Oo Ar target Oc
+.It Ic expire Oo Ic recap Oc Ar address/network | target ...
 Like the
 .Ic drop
-command, but just deletes
-.Ar address/network
-from
+command, but deletes matching client entries from
 .Xr pf 4
-tables while still keeping memorized.
-.It Ic list Oo Ar address/network Oc Oo Ar target Oc Oo Ic filter
-.Ar option ... Oc
+tables only, still keeping them memorized.
+.It Ic list Oo Ar option ... Oc Oo Ic from Ar address/network | target ... Oc
 Prints a list of memorized client information to
 .Ar stdout .
 The list will be reversely ordered by expiration/drop date with the next event
 printed last.
-Output may be filtered by specifying an IP
+There are multiple ways to filter the output.
+One or more
 .Ar address/network
-and/or a
+and/or
 .Ar target
-name and may be further narrowed down by specifying the
-.Ic filter
-keyword followed by at least one
-.Ar option .
+specifiers may be passed after the
+.Ic from
+keyword.
+Beyond that, one or more
+.Ar option
+may be specified to further narrow down the result of the query.
 Valid options are:
 .Bl -tag -width Ds
 .It Ic active
@@ -154,16 +156,19 @@ table.
 .It Ic addresses
 Reduces client information to the IP address and omits any further output.
 .El
-.It Ic save Ar target
+.It Ic save Oo Ar target ... Oc
 Writes managed addresses and meta-data (number of hits and timestamp of last
 occurrence) of the specified
 .Ar target
-to the corresponding
+names to the corresponding
 .Ic persist
 .Ar path
 specified in the configuration file
 .Xr pftbld.conf 5 ,
 or (if not specified) no action will be performed.
+If there is no
+.Ar target
+specified, addresses of all targets will be saved.
 .It Ic self-exclude Oo Ar address/network | Ic remove Oc
 Writes
 .Ar address/network
@@ -205,11 +210,11 @@ and returns >0 otherwise.
 .Pp
 Please note that the
 .Nm
-exit status does not tell anything about the exit status of the
+exit status does not tell anything about success or failure of the
 .Ar command
-it submitted to the server.
-In order to gain this information, catching the reply from the server and/or
-examining the server's log file is the way to go.
+running on the server.
+To gain that information, catching the reply sent from the server along with
+examining the server/system log is the way to go.
 .Sh EXAMPLES
 Here's an example for a
 .Ic status
@@ -226,12 +231,16 @@ Next scheduled event:
 		on [21/Jul/2020:11:22:56 +0200]
 .Ed
 .Pp
-Figuring out how many managed clients are currently present in a
+Figuring out how many managed clients from the
+.Pa 192/8
+network received on the
+.Pa www
+target are currently present in a
 .Xr pf 4
 table may be accomplished like this:
 .Bd -literal -offset indent
-# pftblctl list filter active addresses | wc -l
-       7
+# pftblctl list active addresses from www 192/8 | wc -l
+       3
 .Ed
 .Pp
 The next example shows a
@@ -256,7 +265,12 @@ Last but not least,
 may also be used to send client data to the server:
 .Bd -literal -offset indent
 # pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44 "Test 1"
+ACK
 .Ed
+.Pp
+Also note the server acknowledge being printed to
+.Pa stdout
+indicating that the daemon successfully received all transmitted data.
 .Sh SEE ALSO
 .Xr pf 4 ,
 .Xr pftbld.conf 5 ,

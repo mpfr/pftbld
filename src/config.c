@@ -80,11 +80,11 @@ parse_conf(void)
 	extern int		 errors, lineno, colno;
 	extern char		*conffile;
 	extern struct crangeq	*curr_exclcrangeq;
-	extern struct keytermq	*curr_exclkeytermq;
+	extern struct ptrq	*curr_exclkeytermq;
 
 	struct crange	*self;
-	struct keytermq	 spq;
-	struct keyterm	*spath;
+	struct ptrq	 spq;
+	struct ptr	*spath;
 	struct target	*tgt;
 	struct table	*tbl;
 	struct socket	*sock;
@@ -154,8 +154,8 @@ parse_conf(void)
 
 	SIMPLEQ_INIT(&spq);
 	MALLOC(spath, sizeof(*spath));
-	spath->str = sock->path;
-	SIMPLEQ_INSERT_HEAD(&spq, spath, keyterms);
+	spath->p = sock->path;
+	SIMPLEQ_INSERT_HEAD(&spq, spath, ptrs);
 
 	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
 		if (!timespecisset(&tgt->drop)) {
@@ -174,19 +174,19 @@ parse_conf(void)
 		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets) {
 			spath = SIMPLEQ_FIRST(&spq);
 			while (spath != NULL) {
-				if (!strcmp(spath->str, sock->path)) {
+				if (!strcmp(spath->p, sock->path)) {
 					log_warnx("socket path %s repeatedly "
 					    "defined on target [%s%s]",
 					    sock->path, tgt->name, sock->id);
 					errors++;
 					break;
 				}
-				spath = SIMPLEQ_NEXT(spath, keyterms);
+				spath = SIMPLEQ_NEXT(spath, ptrs);
 			}
 			if (spath == NULL) {
 				MALLOC(spath, sizeof(*spath));
-				spath->str = sock->path;
-				SIMPLEQ_INSERT_TAIL(&spq, spath, keyterms);
+				spath->p = sock->path;
+				SIMPLEQ_INSERT_TAIL(&spq, spath, ptrs);
 			}
 			if (!sock->backlog) {
 				sock->backlog = conf->backlog;
@@ -254,7 +254,7 @@ parse_conf(void)
 	}
 
 	while ((spath = SIMPLEQ_FIRST(&spq)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&spq, keyterms);
+		SIMPLEQ_REMOVE_HEAD(&spq, ptrs);
 		free(spath);
 	}
 
@@ -272,7 +272,7 @@ update_sockets(struct socketq *new, struct socketq *old, struct target *tgt)
 	SIMPLEQ_FOREACH(s, old, sockets) {
 		st = new == NULL ? NULL : find_socket(new, s);
 		if (st == NULL) {
-			kill(s->pid, SIGINT);
+			kill(s->pid, SIGUSR2);
 			waitpid(s->pid, NULL, 0);
 			if (unlink(s->path) == -1)
 				log_warn("failed deleting socket %s", s->path);
@@ -404,7 +404,7 @@ free_conf(struct config *c)
 	struct table	*tbl;
 	struct socket	*sock;
 	struct crange	*cr;
-	struct keyterm	*kt;
+	struct ptr	*kt;
 
 	while ((tgt = SIMPLEQ_FIRST(&c->ctargets)) != NULL) {
 		SIMPLEQ_REMOVE_HEAD(&c->ctargets, targets);
@@ -421,8 +421,8 @@ free_conf(struct config *c)
 			free(cr);
 		}
 		while ((kt = SIMPLEQ_FIRST(&tgt->exclkeyterms)) != NULL) {
-			SIMPLEQ_REMOVE_HEAD(&tgt->exclkeyterms, keyterms);
-			free(kt->str);
+			SIMPLEQ_REMOVE_HEAD(&tgt->exclkeyterms, ptrs);
+			free(kt->p);
 			free(kt);
 		}
 		free(tgt);
@@ -432,8 +432,8 @@ free_conf(struct config *c)
 		free(cr);
 	}
 	while ((kt = SIMPLEQ_FIRST(&c->exclkeyterms)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&c->exclkeyterms, keyterms);
-		free(kt->str);
+		SIMPLEQ_REMOVE_HEAD(&c->exclkeyterms, ptrs);
+		free(kt->p);
 		free(kt);
 	}
 	free(c);
@@ -467,7 +467,7 @@ print_conf(struct statfd *sfd)
 
 	char		*age, *estr, *ptbl;
 	struct crange	*cr;
-	struct keyterm	*kt;
+	struct ptr	*kt;
 	struct target	*tgt;
 	struct table	*tbl;
 	struct timespec	 pexp;
@@ -502,8 +502,8 @@ print_conf(struct statfd *sfd)
 			while ((cr = SIMPLEQ_NEXT(cr, cranges)) != NULL)
 				msg_send(sfd, "\tnet \"%s\"\n", cr->str);
 
-		SIMPLEQ_FOREACH(kt, &conf->exclkeyterms, keyterms) {
-			estr = esc(kt->str);
+		SIMPLEQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
+			estr = esc(kt->p);
 			msg_send(sfd, "\tkeyterm \"%s\"\n", estr);
 			free(estr);
 		}
@@ -606,8 +606,8 @@ print_conf(struct statfd *sfd)
 			SIMPLEQ_FOREACH(cr, &tgt->exclcranges, cranges)
 				msg_send(sfd, "\t\tnet \"%s\"\n", cr->str);
 
-			SIMPLEQ_FOREACH(kt, &tgt->exclkeyterms, keyterms) {
-				estr = esc(kt->str);
+			SIMPLEQ_FOREACH(kt, &tgt->exclkeyterms, ptrs) {
+				estr = esc(kt->p);
 				msg_send(sfd, "\t\tkeyterm \"%s\"\n", estr);
 				free(estr);
 			}

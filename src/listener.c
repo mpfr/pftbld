@@ -30,14 +30,17 @@
 
 static void	 handle_ctrl(struct kevent *);
 static void	 handle_srvsock(struct kevent *);
-static struct keyterm
-		*check_exclkeyterms(struct keytermq *, char *);
+static struct ptr
+		*check_exclkeyterms(struct ptrq *, char *);
 static struct crange
 		*check_exclcranges(struct crangeq *, struct caddr *);
+static char	*enq_target_address_params(char *, char *, size_t,
+		    struct ptrq *, struct crangeq *);
+static void	 free_target_address_queues(struct ptrq *, struct crangeq *);
 static int	 perform_ctrl_config(struct statfd *, char *, char *, size_t);
 static int	 perform_ctrl_delete(struct statfd *, char *, char *, size_t,
-		    int (*)(const char *, struct target *),
-		    int (*)(const char *, struct target *), const char *);
+		    int (*)(struct crangeq *, struct ptrq *),
+		    int (*)(struct crangeq *, struct ptrq *), const char *);
 static int	 perform_ctrl_dump(struct statfd *, char *, char *, size_t);
 static int	 perform_ctrl_list(struct statfd *, char *, char *, size_t);
 static int	 perform_ctrl_save(struct statfd *, char *, char *, size_t);
@@ -245,8 +248,7 @@ fork_listener(struct socket *sockcfg, char *tgtname)
 	pid_t	 pid;
 	char	*argv[12];
 
-	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
-	    cfd) == -1)
+	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, cfd) == -1)
 		FATAL("socketpair");
 
 	if ((pid = fork()) == -1)
@@ -280,13 +282,13 @@ fork_listener(struct socket *sockcfg, char *tgtname)
 	FATAL("execvp");
 }
 
-static struct keyterm *
-check_exclkeyterms(struct keytermq *ktq, char *buf)
+static struct ptr *
+check_exclkeyterms(struct ptrq *ktq, char *buf)
 {
-	struct keyterm	*exclk;
+	struct ptr	*exclk;
 
-	SIMPLEQ_FOREACH(exclk, ktq, keyterms)
-		if (strstr(buf, exclk->str) != NULL)
+	SIMPLEQ_FOREACH(exclk, ktq, ptrs)
+		if (strstr(buf, exclk->p) != NULL)
 			return (exclk);
 
 	return (NULL);
@@ -307,10 +309,12 @@ check_exclcranges(struct crangeq *crq, struct caddr *addr)
 void
 proc_data(struct inbuf *ibuf, int kqfd)
 {
+	static const char	 ack[] = "ACK\n";
+
 	struct target	*tgt;
 	char		*tgtname, *sockid, *data, *age;
 	struct caddr	 addr;
-	struct keyterm	*exclk;
+	struct ptr	*exclk;
 	struct crange	*exclr;
 	struct client	*clt, *first;
 	struct timespec	 now, tsdiff;
@@ -320,7 +324,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	struct pfresult	 pfres;
 	struct kevent	 kev;
 
-	send(ibuf->datafd, "", 1, MSG_NOSIGNAL);
+	send(ibuf->datafd, ack, sizeof(ack), MSG_NOSIGNAL);
 	close(ibuf->datafd);
 
 	tgtname = ibuf->tgtname;
@@ -335,7 +339,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	    (exclk = check_exclkeyterms(&conf->exclkeyterms, data)) != NULL) {
 		data = replace(data, "\n", '\0');
 		print_ts_log("Ignored excluded keyterm '%s' :: [%s] <- [%s]",
-		    exclk->str, tgtname, data);
+		    exclk->p, tgtname, data);
 		append_data_log(data, datalen);
 		return;
 	}
@@ -454,20 +458,66 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		if (first != NULL)
 			EV_MOD(kqfd, &kev, (unsigned long)first, EVFILT_TIMER,
 			    EV_DELETE, 0, 0, NULL);
-		EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER, EV_ADD,
-		    0, tbl->expire.tv_sec * 1000, &expire_handler);
+		if (!timespec_isinfinite(&tbl->expire))
+			EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER,
+			    EV_ADD, 0, tbl->expire.tv_sec * 1000,
+			    &expire_handler);
 	}
 }
 
-#define TIME_TO_STR(str, tp)						\
+#define TIME_TO_STR(str, ts)						\
 	do {								\
-		struct timespec	 _tp = *tp;				\
+		struct timespec	 _ts = *ts;				\
 		struct tm	*_tm;					\
-		if ((_tm = localtime(&_tp.tv_sec)) == NULL)		\
+		if ((_tm = localtime(&_ts.tv_sec)) == NULL)		\
 			FATALX("localtime failed");			\
 		if (strftime(str, sizeof(str), TS_FMT, _tm) == 0)	\
 			FATALX("strftime overflow");			\
 	} while (0)
+
+static char *
+enq_target_address_params(char *arg, char *data, size_t datalen,
+    struct ptrq *tpq, struct crangeq *crq)
+{
+	struct target	*tgt;
+	struct ptr	*tp;
+	struct crange	*cr;
+
+	do {
+		if ((tgt = find_target(&conf->ctargets, arg)) != NULL) {
+			MALLOC(tp, sizeof(*tp));
+			tp->p = tgt;
+			SIMPLEQ_INSERT_TAIL(tpq, tp, ptrs);
+			continue;
+		}
+		if (crq != NULL && (cr = parse_crange(arg)) != NULL) {
+			SIMPLEQ_INSERT_TAIL(crq, cr, cranges);
+			continue;
+		}
+		break;
+	} while ((arg = shift(arg, data, datalen)) != NULL);
+
+	return (arg);
+}
+
+static void
+free_target_address_queues(struct ptrq *tpq, struct crangeq *crq)
+{
+	struct ptr	*tp;
+	struct crange	*cr;
+
+	while ((tp = SIMPLEQ_FIRST(tpq)) != NULL) {
+		SIMPLEQ_REMOVE_HEAD(tpq, ptrs);
+		free(tp);
+	}
+	if (crq == NULL)
+		return;
+
+	while ((cr = SIMPLEQ_FIRST(crq)) != NULL) {
+		SIMPLEQ_REMOVE_HEAD(crq, cranges);
+		free(cr);
+	}
+}
 
 void
 proc_ctrl(struct inbuf *ibuf)
@@ -546,12 +596,12 @@ perform_ctrl_config(struct statfd *sfd, char *arg, char *data, size_t datalen)
 
 static int
 perform_ctrl_delete(struct statfd *sfd, char *arg, char *data, size_t datalen,
-    int (*func)(const char *, struct target *),
-    int (*func_r)(const char *, struct target *), const char *action)
+    int (*func)(struct crangeq *, struct ptrq *),
+    int (*func_r)(struct crangeq *, struct ptrq *), const char *action)
 {
-	int		 cnt, recap;
-	struct target	*tgt;
-	char		*net;
+	struct ptrq	 tpq;
+	struct crangeq	 crq;
+	int		 recap, cnt;
 
 	if (arg == NULL)
 		return (1);
@@ -564,118 +614,126 @@ perform_ctrl_delete(struct statfd *sfd, char *arg, char *data, size_t datalen,
 	} else
 		recap = 0;
 
-	net = arg;
-	if ((arg = shift(arg, data, datalen)) == NULL)
-		tgt = NULL;
-	else {
-		if ((tgt = find_target(&conf->ctargets, arg)) == NULL) {
-			msg_send(sfd, "Unknown target.\n");
-			return (0);
-		}
-		if (shift(arg, data, datalen) != NULL)
-			return (1);
+	SIMPLEQ_INIT(&tpq);
+	SIMPLEQ_INIT(&crq);
+
+	if ((arg = enq_target_address_params(arg, data, datalen, &tpq,
+	    &crq)) != NULL) {
+		msg_send(sfd, "Invalid address/network or unknown target "
+		    "[%s].\n", arg);
+		goto end;
 	}
 
-	cnt = recap ? func_r(net, tgt) : func(net, tgt);
+	cnt = recap ? func_r(&crq, &tpq) : func(&crq, &tpq);
 
-	switch (cnt) {
-	case -1:
-		msg_send(sfd, "Invalid address/network.\n");
-		break;
-	case 0:
+	if (cnt == 0)
 		msg_send(sfd, "No client entries found.\n");
-		break;
-	default:
+	else {
+		if (recap)
+			print_ts_log("%d client entr%s %s.\n", cnt,
+			    cnt != 1 ? "ies" : "y", action);
 		msg_send(sfd, "%d client entr%s %s.\n", cnt,
 		    cnt != 1 ? "ies" : "y", action);
 	}
 
+end:
+	free_target_address_queues(&tpq, &crq);
 	return (0);
 }
 
 static int
 perform_ctrl_dump(struct statfd *sfd, char *arg, char *data, size_t datalen)
 {
-	struct target	*tgt;
+	struct ptrq	 tpq;
+	struct ptr	*tp;
 	struct client	*clt;
 
-	if (arg != NULL && shift(arg, data, datalen) != NULL)
-		return (1);
+	SIMPLEQ_INIT(&tpq);
 
-	if (arg == NULL)
-		tgt = NULL;
-	else if ((tgt = find_target(&conf->ctargets, arg)) == NULL) {
-		msg_send(sfd, "Unknown target.\n");
-		return (0);
+	if (arg != NULL && (arg = enq_target_address_params(arg, data, datalen,
+	    &tpq, NULL)) != NULL) {
+		msg_send(sfd, "Unknown target [%s].\n", arg);
+		goto end;
 	}
 
-	TAILQ_FOREACH(clt, &cltq, clients)
-		if (tgt == NULL || clt->tgt == tgt)
-			msg_send(sfd, "%s %u %lld\n", clt->astr, clt->cnt,
-			    TIMESPEC_SEC_ROUND(&clt->ts));
+	TAILQ_FOREACH(clt, &cltq, clients) {
+		if (!SIMPLEQ_EMPTY(&tpq)) {
+			SIMPLEQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
+			if (tp == NULL)
+				continue;
+		}
+		msg_send(sfd, "%s %u %lld\n", clt->astr, clt->cnt,
+		    TIMESPEC_SEC_ROUND(&clt->ts));
+	}
 
+end:
+	free_target_address_queues(&tpq, NULL);
 	return (0);
 }
 
 static int
 perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 {
+	struct ptrq	 tpq;
+	struct crangeq	 crq;
+	struct ptr	*tp;
+	struct crange	*cr;
 	int		 act = 0, addrs = 0, cnt;
-	struct target	*tgt = NULL;
-	struct crange	*r = NULL;
 	struct timespec	 now, tsdiff;
 	struct client	*clt;
 	char		*age, tstr[TS_SIZE];
 
 	if (arg == NULL)
-		goto start;
-
-	if ((r = parse_crange(arg)) != NULL &&
-	    (arg = shift(arg, data, datalen)) == NULL)
-		goto start;
-
-	if ((tgt = find_target(&conf->ctargets, arg)) != NULL &&
-	    (arg = shift(arg, data, datalen)) == NULL)
-		goto start;
-
-	if (strcmp("filter", arg)) {
-		if (tgt != NULL)
-			return (1);
-
-		msg_send(sfd, "Unknown target");
-		if (r == NULL)
-			msg_send(sfd, " or invalid address/network");
-		msg_send(sfd, ".\n");
-		return (0);
-	}
-
-	if ((arg = shift(arg, data, datalen)) == NULL) {
-		msg_send(sfd, "Missing filter option.\n");
-		return (0);
-	}
+		return (1);
 
 	do {
+		if (!strcmp("from", arg)) {
+			if ((arg = shift(arg, data, datalen)) != NULL)
+				break;
+			return (1);
+		}
 		if (!strcmp("active", arg)) {
 			if (act++)
-				goto ferr;
+				return (1);
+
 		} else if (!strcmp("addresses", arg)) {
 			if (addrs++)
-				goto ferr;
+				return (1);
+
 		} else
-			goto ferr;
+			return (1);
+
 	} while ((arg = shift(arg, data, datalen)) != NULL);
 
-start:
+	SIMPLEQ_INIT(&tpq);
+	SIMPLEQ_INIT(&crq);
+
+	if (arg != NULL && (arg = enq_target_address_params(arg, data, datalen,
+	    &tpq, &crq)) != NULL) {
+		msg_send(sfd, "Invalid address/network or unknown target "
+		    "[%s].\n", arg);
+		goto end;
+	}
+
 	if (!addrs) {
 		cnt = 0;
 		GET_TIME(&now);
 	}
 
 	TAILQ_FOREACH_REVERSE(clt, &cltq, clientq, clients) {
-		if ((act && clt->exp) ||
-		    (r != NULL && !addr_inrange(r, &clt->addr)) ||
-		    (tgt != NULL && clt->tgt != tgt))
+		if (act && clt->exp)
 			continue;
+		if (!SIMPLEQ_EMPTY(&tpq)) {
+			SIMPLEQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
+			if (tp == NULL)
+				continue;
+		}
+		if (!SIMPLEQ_EMPTY(&crq)) {
+			SIMPLEQ_MATCH(&crq, cr, cranges,
+			    addr_inrange(cr, &clt->addr));
+			if (cr == NULL)
+				continue;
+		}
 
 		if (addrs) {
 			msg_send(sfd, "%s\n", clt->astr);
@@ -717,39 +775,50 @@ start:
 			    cnt != 1 ? "ies" : "y");
 	}
 
-	return (0);
-
-ferr:
-	msg_send(sfd, "Filter option '%s' %s.\n", arg,
-	    act > 1 || addrs > 1 ? "defined twice" : "is invalid");
+end:
+	free_target_address_queues(&tpq, &crq);
 	return (0);
 }
 
 static int
 perform_ctrl_save(struct statfd *sfd, char *arg, char *data, size_t datalen)
 {
-	int		 cnt;
+	struct ptrq	 tpq;
 	struct target	*tgt;
+	struct ptr	*tp;
+	int		 cnt;
 
-	if (arg == NULL || shift(arg, data, datalen) != NULL)
-		return (1);
+	SIMPLEQ_INIT(&tpq);
 
-	if ((tgt = find_target(&conf->ctargets, arg)) == NULL) {
-		msg_send(sfd, "Unknown target.\n");
-		return (0);
+	if (arg == NULL)
+		SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+			MALLOC(tp, sizeof(*tp));
+			tp->p = tgt;
+			SIMPLEQ_INSERT_TAIL(&tpq, tp, ptrs);
+		}
+	else if ((arg = enq_target_address_params(arg, data, datalen, &tpq,
+	    NULL)) != NULL) {
+		msg_send(sfd, "Unknown target [%s].\n", arg);
+		goto end;
 	}
 
-	if (*tgt->persist == '\0') {
-		msg_send(sfd, "No persist file specified.\n");
-		return (0);
+	cnt = 0;
+	SIMPLEQ_FOREACH(tp, &tpq, ptrs) {
+		tgt = tp->p;
+		if (*tgt->persist == '\0')
+			msg_send(sfd, "No persist file specified for [%s].\n",
+			    tgt->name);
+
+		if ((cnt = save(tgt)) != -1)
+			msg_send(sfd, "%d client entr%s written for [%s].\n",
+			    cnt, cnt != 1 ? "ies" : "y", tgt->name);
+		else
+			msg_send(sfd, "Saving failed for [%s]. Check the "
+			    "system log.\n", tgt->name);
 	}
 
-	if ((cnt = save(tgt)) != -1)
-		msg_send(sfd, "%d client entr%s written.\n", cnt,
-		    cnt != 1 ? "ies" : "y");
-	else
-		msg_send(sfd, "Failed. Check the system log.\n");
-
+end:
+	free_target_address_queues(&tpq, NULL);
 	return (0);
 }
 

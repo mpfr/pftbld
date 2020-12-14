@@ -75,7 +75,7 @@
 <section class="Sh">
 <h1 class="Sh" id="COMMANDS"><a class="permalink" href="#COMMANDS">COMMANDS</a></h1>
 <p class="Pp">On the <span class="Pa">control socket</span>, the following
-    commands will be accepted:</p>
+    commands are accepted:</p>
 <div class="Bd-indent">
 <dl class="Bl-tag">
   <dt id="config"><a class="permalink" href="#config"><code class="Ic">config</code></a>
@@ -88,10 +88,13 @@
       <dt id="reload"><a class="permalink" href="#reload"><code class="Ic">reload</code></a></dt>
       <dd>Reconfigures <a class="Xr" href="pftbld.8.html">pftbld(8)</a> by
           initiating a reload of its configuration file
-          <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.
-          Alternative means to achieve the same goal are for example the
-          <a class="Xr" href="http://man.openbsd.org/rcctl.8">rcctl(8)</a>
-          utility:
+          <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>. Please
+          note that, figuring out whether or not reloading completed
+          successfully after all, an appropriate message will be printed either
+          into the daemon's or the system log, respectively.
+        <p class="Pp">Alternative means to achieve the same goal are for example
+            the <a class="Xr" href="http://man.openbsd.org/rcctl.8">rcctl(8)</a>
+            utility:</p>
         <p class="Pp"></p>
         <div class="Bd Bd-indent"><code class="Li"># rcctl reload
           pftbld</code></div>
@@ -105,43 +108,43 @@
     </dl>
   </dd>
   <dt id="drop"><a class="permalink" href="#drop"><code class="Ic">drop</code></a>
-    [<code class="Ic">recap</code>] <var class="Ar">address/network</var>
-    [<var class="Ar">target</var>]</dt>
-  <dd>Deletes the given <var class="Ar">address/network</var> ahead of schedule
-      from corresponding
+    [<code class="Ic">recap</code>] <var class="Ar">address/network</var> |
+    <var class="Ar">target ...</var></dt>
+  <dd>Deletes client entries matching the given
+      <var class="Ar">address/network</var> and <var class="Ar">target</var>
+      specifiers ahead of schedule from corresponding
       <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables and from
-      memory, optionally filtered for the given <var class="Ar">target</var>. If
-      <var class="Ar">target</var> is omitted, removal will affect all targets.
-      Since normally every single deletion will be logged, specifying large
-      <var class="Ar">network</var> ranges may lead to log files getting flooded
-      with deletion entries. This can be avoided by passing the
-      <code class="Ic">recap</code> keyword which will make sure just a short
-      summary (providing the number of deleted addresses per
+      the daemon's memory. Since normally every single deletion will be logged,
+      specifying large <var class="Ar">network</var> ranges may lead to log
+      files getting flooded with deletion entries. This can be avoided by
+      passing the <code class="Ic">recap</code> keyword which will make sure
+      just a short summary (providing the number of deleted addresses per
       <var class="Ar">target</var> and the overall number of dropped client
       entries) gets written into the log file instead.</dd>
   <dt id="dump"><a class="permalink" href="#dump"><code class="Ic">dump</code></a>
-    [<var class="Ar">target</var>]</dt>
+    [<var class="Ar">target ...</var>]</dt>
   <dd>Prints managed addresses and meta-data (number of hits and timestamp of
-      last occurrence) of the specified <var class="Ar">target</var> to
+      last occurrence) of the specified <var class="Ar">target</var> names to
       <var class="Ar">stdout</var>. If there is no <var class="Ar">target</var>
       specified, addresses of all targets will be printed.</dd>
   <dt id="expire"><a class="permalink" href="#expire"><code class="Ic">expire</code></a>
-    [<code class="Ic">recap</code>] <var class="Ar">address/network</var>
-    [<var class="Ar">target</var>]</dt>
-  <dd>Like the <code class="Ic">drop</code> command, but just deletes
-      <var class="Ar">address/network</var> from
-      <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables while
-      still keeping memorized.</dd>
+    [<code class="Ic">recap</code>] <var class="Ar">address/network</var> |
+    <var class="Ar">target ...</var></dt>
+  <dd>Like the <code class="Ic">drop</code> command, but deletes matching client
+      entries from <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>
+      tables only, still keeping them memorized.</dd>
   <dt id="list"><a class="permalink" href="#list"><code class="Ic">list</code></a>
-    [<var class="Ar">address/network</var>] [<var class="Ar">target</var>]
-    [<code class="Ic">filter</code> <var class="Ar">option ...</var>]</dt>
+    [<var class="Ar">option ...</var>] [<code class="Ic">from</code>
+    <var class="Ar">address/network</var> | <var class="Ar">target
+    ...</var>]</dt>
   <dd>Prints a list of memorized client information to
       <var class="Ar">stdout</var>. The list will be reversely ordered by
-      expiration/drop date with the next event printed last. Output may be
-      filtered by specifying an IP <var class="Ar">address/network</var> and/or
-      a <var class="Ar">target</var> name and may be further narrowed down by
-      specifying the <code class="Ic">filter</code> keyword followed by at least
-      one <var class="Ar">option</var>. Valid options are:
+      expiration/drop date with the next event printed last. There are multiple
+      ways to filter the output. One or more
+      <var class="Ar">address/network</var> and/or <var class="Ar">target</var>
+      specifiers may be passed after the <code class="Ic">from</code> keyword.
+      Beyond that, one or more <var class="Ar">option</var> may be specified to
+      further narrow down the result of the query. Valid options are:
     <dl class="Bl-tag">
       <dt id="active"><a class="permalink" href="#active"><code class="Ic">active</code></a></dt>
       <dd>Matches only clients currently present in a
@@ -152,13 +155,15 @@
     </dl>
   </dd>
   <dt id="save"><a class="permalink" href="#save"><code class="Ic">save</code></a>
-    <var class="Ar">target</var></dt>
+    [<var class="Ar">target ...</var>]</dt>
   <dd>Writes managed addresses and meta-data (number of hits and timestamp of
-      last occurrence) of the specified <var class="Ar">target</var> to the
-      corresponding <code class="Ic">persist</code> <var class="Ar">path</var>
-      specified in the configuration file
+      last occurrence) of the specified <var class="Ar">target</var> names to
+      the corresponding <code class="Ic">persist</code>
+      <var class="Ar">path</var> specified in the configuration file
       <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>, or (if not
-      specified) no action will be performed.</dd>
+      specified) no action will be performed. If there is no
+      <var class="Ar">target</var> specified, addresses of all targets will be
+      saved.</dd>
   <dt id="self-exclude"><a class="permalink" href="#self-exclude"><code class="Ic">self-exclude</code></a>
     [<var class="Ar">address/network</var> |
     <code class="Ic">remove</code>]</dt>
@@ -197,10 +202,10 @@
     quietened, also successfully read the server's reply, and returns &gt;0
     otherwise.</p>
 <p class="Pp">Please note that the <code class="Nm">pftblctl</code> exit status
-    does not tell anything about the exit status of the
-    <var class="Ar">command</var> it submitted to the server. In order to gain
-    this information, catching the reply from the server and/or examining the
-    server's log file is the way to go.</p>
+    does not tell anything about success or failure of the
+    <var class="Ar">command</var> running on the server. To gain that
+    information, catching the reply sent from the server along with examining
+    the server/system log is the way to go.</p>
 </section>
 <section class="Sh">
 <h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
@@ -218,13 +223,15 @@ Next scheduled event:
 		on [21/Jul/2020:11:22:56 +0200]
 </pre>
 </div>
-<p class="Pp">Figuring out how many managed clients are currently present in a
+<p class="Pp">Figuring out how many managed clients from the
+    <span class="Pa">192/8</span> network received on the
+    <span class="Pa">www</span> target are currently present in a
     <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table may be
     accomplished like this:</p>
 <div class="Bd Pp Bd-indent">
 <pre>
-# pftblctl list filter active addresses | wc -l
-       7
+# pftblctl list active addresses from www 192/8 | wc -l
+       3
 </pre>
 </div>
 <p class="Pp">The next example shows a <span class="Pa">control</span> command
@@ -247,8 +254,12 @@ Next scheduled event:
 <div class="Bd Pp Bd-indent">
 <pre>
 # pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44 &quot;Test 1&quot;
+ACK
 </pre>
 </div>
+<p class="Pp">Also note the server acknowledge being printed to
+    <span class="Pa">stdout</span> indicating that the daemon successfully
+    received all transmitted data.</p>
 </section>
 <section class="Sh">
 <h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
@@ -265,7 +276,7 @@ Next scheduled event:
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">December 10, 2020</td>
+    <td class="foot-date">December 13, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
