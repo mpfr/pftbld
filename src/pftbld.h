@@ -42,6 +42,8 @@
 
 #define TS_FMT		"%d/%b/%Y:%H:%M:%S %z"
 #define TS_SIZE		27
+#define ACK_ACK		"ACK\n"
+#define ACK_NAK		"NAK\n"
 
 #define FLAG_GLOBAL_NOLOG		0x01
 #define FLAG_GLOBAL_UNLOAD		0x02
