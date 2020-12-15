@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 13 2020 $
+.Dd $Mdocdate: December 15 2020 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -123,9 +123,10 @@ this enables printing server replies to
 .Ar stdout .
 In the latter case, receiving the sequence
 .Sq ACK
-indicates that the server successfully received all data, while
+indicates that the server successfully received and processed all data, while
 .Sq NAK
-would imply that communication has failed and all received data was discarded.
+would imply that received data was discarded, either because communication has
+failed or because the data was invalid.
 If used along with
 .Fl n ,
 the configuration will be echoed to
