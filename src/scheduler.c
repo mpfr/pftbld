@@ -689,7 +689,7 @@ handle_inbuf(struct kevent *kev)
 	if (nr <= 0)
 		goto eof;
 
-	buf[nr] = '\0';
+	buf[nr--] = '\0';
 	ibuf->nr += nr;
 	if (HAS_DATAMAX(ibuf) && ibuf->nr > ibuf->datamax) {
 		log_warnx("read on target [%s%s] exceeded size limit (%zu)",
@@ -706,7 +706,7 @@ handle_inbuf(struct kevent *kev)
 		FATAL("asprintf");
 	free(ibuf->data);
 	ibuf->data = data;
-	if (buf[nr - 1] != '\0')
+	if (buf[nr] != '\0')
 		return;
 
 eof:
