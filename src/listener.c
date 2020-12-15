@@ -841,7 +841,9 @@ perform_ctrl_selfexclude(struct statfd *sfd, char *arg, char *data,
 		return (0);
 	}
 	if (!strcmp("remove", arg)) {
+		SIMPLEQ_REMOVE_HEAD(&conf->exclcranges, cranges);
 		memset(r, 0, sizeof(*r));
+		SIMPLEQ_INSERT_HEAD(&conf->exclcranges, r, cranges);
 		print_ts_log("Removed self exclude.\n");
 		msg_send(sfd, "Done.\n");
 		return (0);
