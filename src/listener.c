@@ -309,7 +309,7 @@ check_exclcranges(struct crangeq *crq, struct caddr *addr)
 void
 proc_data(struct inbuf *ibuf, int kqfd)
 {
-	static const char	 ack[] = "ACK\n";
+	static const char	 ack[] = ACK_ACK, nak[] = ACK_NAK;
 
 	struct target	*tgt;
 	char		*tgtname, *sockid, *data, *age;
@@ -323,9 +323,6 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	struct caddrq	 caq;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
-
-	send(ibuf->datafd, ack, sizeof(ack), MSG_NOSIGNAL);
-	close(ibuf->datafd);
 
 	tgtname = ibuf->tgtname;
 	sockid = ibuf->sockid;
@@ -341,13 +338,15 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		print_ts_log("Ignored excluded keyterm '%s' :: [%s] <- [%s]",
 		    exclk->p, tgtname, data);
 		append_data_log(data, datalen);
-		return;
+		goto end;
 	}
 
 	data = replace(data, "\n", '\0');
 	memset(&addr, 0, sizeof(addr));
 	if (parse_addr(&addr, data) == -1) {
 		log_warnx("ignored invalid address (%s)", data);
+		send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
+		close(ibuf->datafd);
 		return;
 	}
 
@@ -360,7 +359,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 			print_log("address");
 		print_log(" :: [%s%s] <- [%s]", tgtname, sockid, data);
 		append_data_log(data, datalen);
-		return;
+		goto end;
 	}
 
 	if ((first = clt = TAILQ_FIRST(&cltq)) != NULL) {
@@ -387,7 +386,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		if (tsdiff.tv_sec <= 1) {
 			print_ts_log("Ignored [%s]:[%s%s] duplicate hit.\n",
 			    clt->astr, tgtname, sockid);
-			return;
+			goto end;
 		}
 		clt->exp = 0;
 		TAILQ_REMOVE(&cltq, clt, clients);
@@ -454,6 +453,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	print_log(".\n");
 
 	sort_client_asc(clt);
+
 	if (clt == TAILQ_FIRST(&cltq)) {
 		if (first != NULL)
 			EV_MOD(kqfd, &kev, (unsigned long)first, EVFILT_TIMER,
@@ -463,6 +463,10 @@ proc_data(struct inbuf *ibuf, int kqfd)
 			    EV_ADD, 0, tbl->expire.tv_sec * 1000,
 			    &expire_handler);
 	}
+
+end:
+	send(ibuf->datafd, ack, sizeof(ack), MSG_NOSIGNAL);
+	close(ibuf->datafd);
 }
 
 #define TIME_TO_STR(str, ts)						\
@@ -488,13 +492,10 @@ enq_target_address_params(char *arg, char *data, size_t datalen,
 			MALLOC(tp, sizeof(*tp));
 			tp->p = tgt;
 			SIMPLEQ_INSERT_TAIL(tpq, tp, ptrs);
-			continue;
-		}
-		if (crq != NULL && (cr = parse_crange(arg)) != NULL) {
+		} else if (crq != NULL && (cr = parse_crange(arg)) != NULL)
 			SIMPLEQ_INSERT_TAIL(crq, cr, cranges);
-			continue;
-		}
-		break;
+		else
+			break;
 	} while ((arg = shift(arg, data, datalen)) != NULL);
 
 	return (arg);
