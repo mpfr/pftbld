@@ -50,7 +50,7 @@ done
 
 [[ -n "${cmd}" ]] || usage
 
-((${QUIET} < 2)) && VERBOSE='v'
-((${QUIET} == 1)) && exec 1>/dev/null
+((QUIET < 2)) && VERBOSE='v'
+((QUIET == 1)) && exec 1>/dev/null
 
 echo -n "${cmd}" | ${PFTBLD} -${VERBOSE}p ${CTRLSOCK}
