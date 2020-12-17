@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 13 2020 $
+.Dd $Mdocdate: December 17 2020 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -311,16 +311,23 @@ to derive the
 from.
 Defaults to the group of the parent directory.
 .It Ic id Ar name
-Appends the given
+Appends
 .Ar name
 to the
 .Ar name
 of the enclosing
 .Ic target
 in all log entries and in the process list.
-This is useful in case more than one
+This is mandatory in case there is more than one
 .Ic socket
-is defined for a target as it later allows for their identification.
+defined for a target as it later allows for their identification.
+The combination of
+.Ic target
+.Ar name
+and
+.Ic id
+.Ar name
+must be unique.
 .It Ic mode Ar number
 The absolute mode of the
 .Ic socket ,

@@ -293,25 +293,72 @@ targetoptsl	: CASCADE			{
 			DPRINTF("persist file is %s", target->persist);
 		}
 		| SOCKET STRING			{
+			struct target	*t;
 			struct socket	*s;
 
 			CALLOC(sock, 1, sizeof(*sock));
 			CANONICAL_PATH_SET($2, sock->path, "socket",
 			    free($2); free(sock), YYERROR);
 			free($2);
-			SIMPLEQ_FOREACH(s, &target->datasocks, sockets)
-				if (!strcmp(s->path, sock->path)) {
+			if ((s = SIMPLEQ_FIRST(&target->datasocks)) != NULL &&
+			    *s->id == '\0') {
+				free(sock);
+				yyerror("no more sockets allowed as first "
+				    "socket has no id");
+				YYERROR;
+			}
+			if (!strcmp(conf->ctrlsock.path, sock->path)) {
+				free(sock);
+				yyerror("attempt to overwrite control socket");
+				YYERROR;
+			}
+			SIMPLEQ_FOREACH(t, &conf->ctargets, targets)
+				SIMPLEQ_FOREACH(s, &t->datasocks, sockets) {
+					if (strcmp(s->path, sock->path))
+						continue;
 					free(sock);
-					yyerror("data socket defined twice");
+					yyerror("socket path defined twice");
 					YYERROR;
 				}
-			SIMPLEQ_INSERT_TAIL(&target->datasocks, sock, sockets);
 			if (prefill_socketopts(sock) == -1) {
+				free(sock);
 				yyerror("prefill socket options failed");
 				YYERROR;
 			}
+			SIMPLEQ_INSERT_TAIL(&target->datasocks, sock, sockets);
 			DPRINTF("current data socket at %s", sock->path);
-		} sockopts
+		} sockopts			{
+			struct target	*t;
+			struct socket	*s;
+			char		*i0, *i1;
+
+			if (*sock->id == '\0' &&
+			    sock != SIMPLEQ_FIRST(&target->datasocks)) {
+				yyerror("socket requires id");
+				YYERROR;
+			}
+			if (asprintf(&i0, "%s%s", target->name,
+			    sock->id) == -1)
+				FATAL("asprintf");
+			SIMPLEQ_FOREACH(t, &conf->ctargets, targets)
+				SIMPLEQ_FOREACH(s, &t->datasocks, sockets) {
+					if (s == sock)
+						continue;
+					if (asprintf(&i1, "%s%s", t->name,
+					    s->id) == -1)
+						FATAL("asprintf");
+					if (strcmp(i0, i1)) {
+						free(i1);
+						continue;
+					}
+					free(i1);
+					free(i0);
+					yyerror("combination of target name "
+					    "and socket id defined twice");
+					YYERROR;
+				}
+			free(i0);
+		}
 		;
 
 cascadeopts_l	: cascadeoptsl optcommanl cascadeopts_l
@@ -384,14 +431,23 @@ sockoptsl	: BACKLOG NUMBER	{
 			free($2);
 		}
 		| ID STRING		{
+			struct socket	*s;
+
+			SIMPLEQ_FOREACH(s, &target->datasocks, sockets)
+				if (!strncmp(s->id, $2, sizeof(s->id))) {
+					free($2);
+					yyerror("socket id defined twice "
+					    "for same target");
+					YYERROR;
+				}
 			if (strlcpy(sock->id, $2,
 			    sizeof(sock->id)) >= sizeof(sock->id)) {
 				free($2);
 				yyerror("socket id too long");
 				YYERROR;
 			}
-			DPRINTF("id: [%s]", $2);
 			free($2);
+			DPRINTF("id: [%s]", sock->id);
 		}
 		| MODE NUMBER		{
 			if ($2 < 0 || $2 > 0777) {
