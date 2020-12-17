@@ -266,12 +266,15 @@
               from. Defaults to the group of the parent directory.</dd>
           <dt id="id"><a class="permalink" href="#id"><code class="Ic">id</code></a>
             <var class="Ar">name</var></dt>
-          <dd>Appends the given <var class="Ar">name</var> to the
+          <dd>Appends <var class="Ar">name</var> to the
               <var class="Ar">name</var> of the enclosing
               <code class="Ic">target</code> in all log entries and in the
-              process list. This is useful in case more than one
-              <code class="Ic">socket</code> is defined for a target as it later
-              allows for their identification.</dd>
+              process list. This is mandatory in case there is more than one
+              <code class="Ic">socket</code> defined for a target as it later
+              allows for their identification. The combination of
+              <code class="Ic">target</code> <var class="Ar">name</var> and
+              <code class="Ic">id</code> <var class="Ar">name</var> must be
+              unique.</dd>
           <dt id="mode"><a class="permalink" href="#mode"><code class="Ic">mode</code></a>
             <var class="Ar">number</var></dt>
           <dd>The absolute mode of the <code class="Ic">socket</code>,
@@ -438,7 +441,7 @@ function pftbld_feed() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">December 13, 2020</td>
+    <td class="foot-date">December 17, 2020</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

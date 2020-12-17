@@ -83,8 +83,6 @@ parse_conf(void)
 	extern struct ptrq	*curr_exclkeytermq;
 
 	struct crange	*self;
-	struct ptrq	 spq;
-	struct ptr	*spath;
 	struct target	*tgt;
 	struct table	*tbl;
 	struct socket	*sock;
@@ -152,11 +150,6 @@ parse_conf(void)
 		errors++;
 	}
 
-	SIMPLEQ_INIT(&spq);
-	MALLOC(spath, sizeof(*spath));
-	spath->p = sock->path;
-	SIMPLEQ_INSERT_HEAD(&spq, spath, ptrs);
-
 	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
 		if (!timespecisset(&tgt->drop)) {
 			tgt->drop = conf->drop;
@@ -172,22 +165,6 @@ parse_conf(void)
 		}
 
 		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets) {
-			spath = SIMPLEQ_FIRST(&spq);
-			while (spath != NULL) {
-				if (!strcmp(spath->p, sock->path)) {
-					log_warnx("socket path %s repeatedly "
-					    "defined on target [%s%s]",
-					    sock->path, tgt->name, sock->id);
-					errors++;
-					break;
-				}
-				spath = SIMPLEQ_NEXT(spath, ptrs);
-			}
-			if (spath == NULL) {
-				MALLOC(spath, sizeof(*spath));
-				spath->p = sock->path;
-				SIMPLEQ_INSERT_TAIL(&spq, spath, ptrs);
-			}
 			if (!sock->backlog) {
 				sock->backlog = conf->backlog;
 #if DEBUG
@@ -251,11 +228,6 @@ parse_conf(void)
 				break;
 			}
 		}
-	}
-
-	while ((spath = SIMPLEQ_FIRST(&spq)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&spq, ptrs);
-		free(spath);
 	}
 
 	return (errors);
