@@ -26,8 +26,8 @@
 #include "log.h"
 #include "pftbld.h"
 
-#define HAS_DATAMAX(ibuf)	ibuf->datamax < CONF_NO_DATAMAX
-#define HAS_TIMEOUT(ibuf)	ibuf->timeout < CONF_NO_TIMEOUT
+#define HAS_DATAMAX(ibuf)	(ibuf->datamax < CONF_NO_DATAMAX)
+#define HAS_TIMEOUT(ibuf)	(ibuf->timeout < CONF_NO_TIMEOUT)
 
 static struct client
 		*evtimer_client(void);
@@ -42,6 +42,7 @@ static void	 handle_ctrl(struct kevent *);
 static void	 handle_inbfd(struct kevent *);
 static void	 handle_inbuf(struct kevent *);
 static void	 handle_expire(struct kevent *);
+static void	 append_client(struct pfcmdq *, struct client *, enum pfcmdid);
 static __dead void
 		 shutdown_scheduler(void);
 
@@ -59,10 +60,9 @@ static int		 kqfd;
 static struct client *
 evtimer_client(void)
 {
-	struct client	*first = TAILQ_FIRST(&cltq);
+	struct client	*clt = TAILQ_FIRST(&cltq);
 
-	return (first == NULL || timespec_isinfinite(&first->to) ?
-	    NULL : first);
+	return (clt == NULL || timespec_isinfinite(&clt->to) ? NULL : clt);
 }
 
 static void
@@ -76,26 +76,25 @@ evtimer_start(int fd, struct kevent *kev, struct client *clt,
 	if (ts.tv_sec < 0 || ts.tv_nsec < 0)
 		timespecclear(&ts);
 	EV_MOD(fd, kev, (unsigned long)clt, EVFILT_TIMER, EV_ADD, 0,
-	    TIMESPEC_TO_MSEC(&ts), handler);
+	    ts.tv_sec * 1000 + ts.tv_nsec / 1000000L, handler);
 }
 
 static void
 update_conf(struct config *nc)
 {
-	struct client		*clt;
-	struct pfaddrlistq	 addq, delq;
-	struct clientq		 cqc, dcq;
-	struct kevent		 kev;
-	struct target		*tgt;
-	struct crange		*self;
-	struct socket		*sock;
+	struct client	*clt;
+	struct pfcmdq	 cmdq;
+	struct clientq	 cqc, dcq;
+	struct kevent	 kev;
+	struct target	*tgt;
+	struct crange	*self;
+	struct socket	*sock;
 
 	if ((clt = evtimer_client()) != NULL)
 		EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER, EV_DELETE,
 		    0, 0, NULL);
 
-	SIMPLEQ_INIT(&addq);
-	SIMPLEQ_INIT(&delq);
+	SIMPLEQ_INIT(&cmdq);
 	TAILQ_INIT(&cqc);
 	TAILQ_INIT(&dcq);
 
@@ -104,13 +103,13 @@ update_conf(struct config *nc)
 	while ((clt = TAILQ_FIRST(&cqc)) != NULL) {
 		TAILQ_REMOVE(&cqc, clt, clients);
 		clt->tgt = find_target(&nc->ctargets, clt->tgt->name);
-		if (bind_table(clt, &addq, &delq))
+		if (bind_table(clt, &cmdq))
 			sort_client_desc(clt);
 		else
 			TAILQ_INSERT_TAIL(&dcq, clt, clients);
 	}
 
-	apply_pfaddrlists(&addq, &delq);
+	apply_pfcmds(&cmdq);
 
 	while ((clt = TAILQ_FIRST(&dcq)) != NULL) {
 		TAILQ_REMOVE(&dcq, clt, clients);
@@ -166,17 +165,19 @@ sort_client_desc(struct client *clt)
 int
 drop_clients(struct crangeq *crq, struct ptrq *tpq)
 {
+	struct pfcmd	 cmd;
 	struct ptr	*tp;
 	struct crange	*cr;
 	struct client	*clt, *nc, *first;
-	struct caddrq	 caq;
 	int		 cnt;
 	char		*age;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
 	struct timespec	 ts;
 
-	SIMPLEQ_INIT(&caq);
+	PFCMD_INIT(&cmd, PFCMD_DELETE, NULL, 0);
+	cmd.addrcnt = 1;
+
 	cnt = 0;
 
 	first = evtimer_client();
@@ -200,8 +201,9 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 			first = NULL;
 		}
 
-		SIMPLEQ_INSERT_TAIL(&caq, &clt->addr, caddrs);
-		pfexec(&caq, &pfres, "delete\n%s", clt->tbl->name);
+		cmd.tblname = clt->tbl->name;
+		SIMPLEQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
+		pfexec(&pfres, &cmd);
 
 		GET_TIME(&ts);
 		timespecsub(&ts, &clt->ts, &ts);
@@ -229,15 +231,15 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 int
 drop_clients_r(struct crangeq *crq, struct ptrq *tpq)
 {
-	struct ptr		*tp;
-	struct crange		*cr;
-	struct client		*clt, *nc, *first;
-	struct pfaddrlistq	 delq;
-	struct clientq		 dcq;
-	int			 cnt;
-	struct kevent		 kev;
+	struct pfcmdq	 cmdq;
+	struct clientq	 dcq;
+	int		 cnt;
+	struct client	*clt, *nc, *first;
+	struct ptr	*tp;
+	struct crange	*cr;
+	struct kevent	 kev;
 
-	SIMPLEQ_INIT(&delq);
+	SIMPLEQ_INIT(&cmdq);
 	TAILQ_INIT(&dcq);
 	cnt = 0;
 
@@ -263,12 +265,12 @@ drop_clients_r(struct crangeq *crq, struct ptrq *tpq)
 		}
 
 		TAILQ_REMOVE(&cltq, clt, clients);
-		append_client(&delq, clt);
+		append_client(&cmdq, clt, PFCMD_DELETE);
 		TAILQ_INSERT_TAIL(&dcq, clt, clients);
 		cnt++;
 	}
 
-	apply_pfaddrlists(NULL, &delq);
+	apply_pfcmds(&cmdq);
 
 	while ((clt = TAILQ_FIRST(&dcq)) != NULL) {
 		TAILQ_REMOVE(&dcq, clt, clients);
@@ -284,10 +286,10 @@ drop_clients_r(struct crangeq *crq, struct ptrq *tpq)
 int
 expire_clients(struct crangeq *crq, struct ptrq *tpq)
 {
+	struct pfcmd	 cmd;
 	struct ptr	*tp;
 	struct crange	*cr;
 	struct client	*clt, *nc, *first;
-	struct caddrq	 caq;
 	struct clientq	 dcq;
 	int		 cnt;
 	char		*age;
@@ -295,7 +297,9 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 	struct kevent	 kev;
 	struct timespec	 ts;
 
-	SIMPLEQ_INIT(&caq);
+	PFCMD_INIT(&cmd, PFCMD_DELETE, NULL, 0);
+	cmd.addrcnt = 1;
+
 	TAILQ_INIT(&dcq);
 	cnt = 0;
 
@@ -322,8 +326,9 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 			first = NULL;
 		}
 
-		SIMPLEQ_INSERT_TAIL(&caq, &clt->addr, caddrs);
-		pfexec(&caq, &pfres, "delete\n%s", clt->tbl->name);
+		cmd.tblname = clt->tbl->name;
+		SIMPLEQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
+		pfexec(&pfres, &cmd);
 
 		GET_TIME(&ts);
 		if (timespec_isinfinite(&clt->tgt->drop))
@@ -361,15 +366,16 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 int
 expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 {
-	struct ptr		*tp;
-	struct crange		*cr;
-	struct client		*clt, *nc, *first;
-	struct pfaddrlistq	 delq;
-	struct clientq		 dcq;
-	int			 cnt;
-	struct kevent		 kev;
-	struct timespec		 ts;
+	struct pfcmdq	 cmdq;
+	struct clientq	 dcq;
+	int		 cnt;
+	struct client	*clt, *nc, *first;
+	struct ptr	*tp;
+	struct crange	*cr;
+	struct kevent	 kev;
+	struct timespec	 ts;
 
+	SIMPLEQ_INIT(&cmdq);
 	TAILQ_INIT(&dcq);
 	cnt = 0;
 
@@ -401,8 +407,6 @@ expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 		cnt++;
 	}
 
-	SIMPLEQ_INIT(&delq);
-
 	while ((clt = TAILQ_FIRST(&dcq)) != NULL) {
 		TAILQ_REMOVE(&dcq, clt, clients);
 
@@ -414,10 +418,10 @@ expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 		clt->exp = 1;
 
 		sort_client_desc(clt);
-		append_client(&delq, clt);
+		append_client(&cmdq, clt, PFCMD_DELETE);
 	}
 
-	apply_pfaddrlists(NULL, &delq);
+	apply_pfcmds(&cmdq);
 
 	if (first == NULL && (clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
@@ -651,7 +655,7 @@ handle_inbfd(struct kevent *kev)
 static void
 handle_inbuf(struct kevent *kev)
 {
-	static const char	 nak[] = ACK_NAK;
+	static const char	 nak[] = REPLY_NAK;
 
 	unsigned long	 kevid = kev->ident;
 	struct inbuf	*ibuf = kev->udata;
@@ -752,7 +756,7 @@ handle_expire(struct kevent *kev)
 {
 	struct client	*clt = (struct client *)kev->ident;
 	struct table	*tbl = clt->tbl;
-	struct caddrq	 caq;
+	struct pfcmd	 cmd;
 	int		 exp, drop;
 	struct pfresult	 pfres;
 	char		*age;
@@ -762,7 +766,6 @@ handle_expire(struct kevent *kev)
 
 	EV_MOD(kqfd, kev, kev->ident, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
 
-	SIMPLEQ_INIT(&caq);
 	memset(&pfres, 0, sizeof(pfres));
 
 	TAILQ_REMOVE(&cltq, clt, clients);
@@ -772,8 +775,10 @@ handle_expire(struct kevent *kev)
 	    !timespec_isinfinite(&tbl->drop));
 
 	if (exp) {
-		SIMPLEQ_INSERT_TAIL(&caq, &clt->addr, caddrs);
-		pfexec(&caq, &pfres, "delete\n%s", tbl->name);
+		PFCMD_INIT(&cmd, PFCMD_DELETE, tbl->name, 0);
+		SIMPLEQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
+		cmd.addrcnt = 1;
+		pfexec(&pfres, &cmd);
 
 		if (timespec_isinfinite(&tbl->drop))
 			clt->to = TIMESPEC_INFINITE;
@@ -937,8 +942,7 @@ fork_scheduler(void)
 }
 
 int
-bind_table(struct client *clt, struct pfaddrlistq *addq,
-    struct pfaddrlistq *delq)
+bind_table(struct client *clt, struct pfcmdq *cmdq)
 {
 	struct table	*tbl;
 	struct timespec	 ts;
@@ -949,8 +953,8 @@ bind_table(struct client *clt, struct pfaddrlistq *addq,
 	if (tbl == NULL)
 		FATALX("open cascade");
 
-	if (clt->tbl != NULL && strcmp(tbl->name, clt->tbl->name))
-		append_client(delq, clt);
+	if (clt->tbl != NULL && tbl->name != clt->tbl->name) /* ptrcmp ok */
+		append_client(cmdq, clt, PFCMD_DELETE);
 
 	clt->tbl = tbl;
 
@@ -972,69 +976,59 @@ bind_table(struct client *clt, struct pfaddrlistq *addq,
 	} else
 		clt->exp = -1;
 
-	if (clt->exp == 0)
-		append_client(addq, clt);
-	else
-		append_client(delq, clt);
+	append_client(cmdq, clt, clt->exp == 0 ? PFCMD_ADD : PFCMD_DELETE);
 
 	return (clt->exp != -1);
 }
 
-void
-append_client(struct pfaddrlistq *pfalq, struct client *clt)
+static void
+append_client(struct pfcmdq *cmdq, struct client *clt, enum pfcmdid cmdid)
 {
-	struct pfaddrlist	*pfal = SIMPLEQ_FIRST(pfalq);
+	struct pfcmd	*cmd = SIMPLEQ_FIRST(cmdq);
 
-	while (pfal != NULL && strcmp(pfal->tblname, clt->tbl->name))
-		pfal = SIMPLEQ_NEXT(pfal, pfaddrlists);
-	if (pfal == NULL) {
-		MALLOC(pfal, sizeof(*pfal));
-		if (strlcpy(pfal->tblname, clt->tbl->name,
-		    sizeof(pfal->tblname)) >= sizeof(pfal->tblname))
-			FATALX("table name '%s' too long", clt->tbl->name);
-		SIMPLEQ_INIT(&pfal->addrq);
-		SIMPLEQ_INSERT_TAIL(pfalq, pfal, pfaddrlists);
+	while (cmd != NULL && (cmd->id != cmdid ||
+	    cmd->tblname != clt->tbl->name)) /* ptrcmp ok */
+		cmd = SIMPLEQ_NEXT(cmd, pfcmds);
+	if (cmd == NULL) {
+		MALLOC(cmd, sizeof(*cmd));
+		PFCMD_INIT(cmd, cmdid, clt->tbl->name, 0);
+		SIMPLEQ_INSERT_TAIL(cmdq, cmd, pfcmds);
+		cmd->addrcnt = 0;
 	}
-	SIMPLEQ_INSERT_TAIL(&pfal->addrq, &clt->addr, caddrs);
+	SIMPLEQ_INSERT_TAIL(&cmd->addrq, &clt->addr, caddrs);
+	cmd->addrcnt++;
 }
 
 void
-apply_pfaddrlists(struct pfaddrlistq *addq, struct pfaddrlistq *delq)
+apply_pfcmds(struct pfcmdq *cmdq)
 {
-	struct pfaddrlist	*pfal;
-	struct pfresult		 pfres;
+	struct pfcmd	*cmd;
+	struct pfresult	 pfres;
 
-	if (addq == NULL)
-		goto del;
-
-	while ((pfal = SIMPLEQ_FIRST(addq)) != NULL) {
-		if (!SIMPLEQ_EMPTY(&pfal->addrq)) {
-			pfexec(&pfal->addrq, &pfres, "add\n%s", pfal->tblname);
-			if (pfres.nadd > 0)
-				print_ts_log(">>> Added %d address%s to "
-				    "{ %s }.\n", pfres.nadd,
-				    pfres.nadd != 1 ? "es" : "",
-				    pfal->tblname);
+	while ((cmd = SIMPLEQ_FIRST(cmdq)) != NULL) {
+		if (cmd->addrcnt > 0) {
+			pfexec(&pfres, cmd);
+			switch (cmd->id) {
+			case PFCMD_ADD:
+				if (pfres.nadd > 0)
+					print_ts_log(">>> Added %d address%s"
+					    " to { %s }.\n", pfres.nadd,
+					    pfres.nadd != 1 ? "es" : "",
+					    cmd->tblname);
+				break;
+			case PFCMD_DELETE:
+				if (pfres.ndel > 0)
+					print_ts_log(">>> Deleted %d address%s"
+					    " from { %s }.\n", pfres.ndel,
+					    pfres.ndel != 1 ? "es" : "",
+					    cmd->tblname);
+				break;
+			default:
+				FATAL("invalid cmd id (%d)", cmd->id);
+			}
 		}
-		SIMPLEQ_REMOVE_HEAD(addq, pfaddrlists);
-		free(pfal);
-	}
-del:
-	if (delq == NULL)
-		return;
-
-	while ((pfal = SIMPLEQ_FIRST(delq)) != NULL) {
-		if (!SIMPLEQ_EMPTY(&pfal->addrq)) {
-			pfexec(&pfal->addrq, &pfres, "delete\n%s",
-			    pfal->tblname);
-			if (pfres.ndel > 0)
-				print_ts_log(">>> Deleted %d address%s from "
-				    "{ %s }.\n", pfres.ndel,
-				    pfres.ndel != 1 ? "es" : "",
-				    pfal->tblname);
-		}
-		SIMPLEQ_REMOVE_HEAD(delq, pfaddrlists);
-		free(pfal);
+		SIMPLEQ_REMOVE_HEAD(cmdq, pfcmds);
+		free(cmd);
 	}
 }
 
@@ -1043,11 +1037,11 @@ shutdown_scheduler(void)
 {
 	extern int	 privfd;
 
-	struct target		*tgt;
-	int			 c;
-	struct pfaddrlistq	 delq;
-	struct client		*clt;
-	enum msgtype		 mt;
+	struct target	*tgt;
+	int		 c;
+	struct pfcmdq	 cmdq;
+	struct client	*clt;
+	enum msgtype	 mt;
 
 	if (conf == NULL || SIMPLEQ_EMPTY(&conf->ctargets))
 		goto end;
@@ -1065,13 +1059,13 @@ shutdown_scheduler(void)
 	}
 
 	if (conf->flags & FLAG_GLOBAL_UNLOAD) {
-		SIMPLEQ_INIT(&delq);
+		SIMPLEQ_INIT(&cmdq);
 		TAILQ_FOREACH(clt, &cltq, clients)
 			if (!clt->exp)
-				append_client(&delq, clt);
-		if (!SIMPLEQ_EMPTY(&delq)) {
+				append_client(&cmdq, clt, PFCMD_DELETE);
+		if (!SIMPLEQ_EMPTY(&cmdq)) {
 			print_ts_log("Unloading client addresses ...\n");
-			apply_pfaddrlists(NULL, &delq);
+			apply_pfcmds(&cmdq);
 		}
 	}
 

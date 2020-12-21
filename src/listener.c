@@ -193,9 +193,8 @@ listener(int argc, char *argv[])
 
 	memset(&ssa_un, 0, sizeof(ssa_un));
 	ssa_un.sun_family = AF_UNIX;
-	if (strlcpy(ssa_un.sun_path, sockpath,
-	    sizeof(ssa_un.sun_path)) >= sizeof(ssa_un.sun_path))
-		FATALX("socket path truncated (%s)", sockpath);
+	STRLCPY(ssa_un.sun_path, sockpath, sizeof(ssa_un.sun_path),
+	    "socket path");
 	if (bind(srvsockfd, (struct sockaddr *)&ssa_un, sizeof(ssa_un)) == -1)
 		FATAL("bind(%s)", sockpath);
 	if (chown(sockpath, owner, group) == -1)
@@ -211,12 +210,9 @@ listener(int argc, char *argv[])
 	ccnt = 0;
 	flags = 0;
 	memset(&ibuftmpl, 0, sizeof(ibuftmpl));
-	if (strlcpy(ibuftmpl.tgtname, tgtname,
-	    sizeof(ibuftmpl.tgtname)) >= sizeof(ibuftmpl.tgtname))
-		FATALX("target name truncated (%s)", tgtname);
-	if (strlcpy(ibuftmpl.sockid, sockid,
-	    sizeof(ibuftmpl.sockid)) >= sizeof(ibuftmpl.sockid))
-		FATALX("socket id truncated (%s)", sockid);
+	STRLCPY(ibuftmpl.tgtname, tgtname, sizeof(ibuftmpl.tgtname),
+	    "target name");
+	STRLCPY(ibuftmpl.sockid, sockid, sizeof(ibuftmpl.sockid), "socket id");
 	ibuftmpl.datamax = datamax;
 	ibuftmpl.timeout = timeout;
 
@@ -309,7 +305,8 @@ check_exclcranges(struct crangeq *crq, struct caddr *addr)
 void
 proc_data(struct inbuf *ibuf, int kqfd)
 {
-	static const char	 ack[] = ACK_ACK, nak[] = ACK_NAK;
+	static const char	 ack[] = REPLY_ACK,
+				 nak[] = REPLY_NAK;
 
 	struct target	*tgt;
 	char		*tgtname, *sockid, *data, *age;
@@ -320,7 +317,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	struct timespec	 now, tsdiff;
 	struct table	*tbl;
 	size_t		 datalen;
-	struct caddrq	 caq;
+	struct pfcmd	 cmd;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
 
@@ -392,9 +389,6 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		TAILQ_REMOVE(&cltq, clt, clients);
 	}
 
-	SIMPLEQ_INIT(&caq);
-	SIMPLEQ_INSERT_TAIL(&caq, &clt->addr, caddrs);
-
 	print_ts_log("Hit :: [%s%s] <- [%s]", tgtname, sockid, data);
 	append_data_log(data, datalen);
 
@@ -406,9 +400,11 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	if (tbl == NULL)
 		FATALX("open cascade");
 
-	pfexec(&caq, &pfres, "add\n%s%s%s", tbl->name,
-	    tbl->flags & FLAG_TABLE_KILL_STATES ? "\nskill" : "",
-	    tbl->flags & FLAG_TABLE_KILL_NODES ? "\nnkill" : "");
+	PFCMD_INIT(&cmd, PFCMD_ADD, tbl->name, tbl->flags);
+	SIMPLEQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
+	cmd.addrcnt = 1;
+
+	pfexec(&pfres, &cmd);
 
 	print_ts_log("%s [%s]:[%s]:(%dx",
 	    pfres.nadd > 0 ? ">>> Added" : "Aquired",
