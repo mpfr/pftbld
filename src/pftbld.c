@@ -133,33 +133,20 @@ handle_privreq(struct kevent *kev)
 }
 
 void
-pfexec(struct caddrq *caq, struct pfresult *pfres, const char *fmt, ...)
+pfexec(struct pfresult *pfres, struct pfcmd *cmd)
 {
-	va_list		 ap;
 	enum msgtype	 mt;
-	char		*cmd;
-	int		 clen;
+	size_t		 len;
 	struct caddr	*ca;
 
-	va_start(ap, fmt);
-	if ((clen = vasprintf(&cmd, fmt, ap)) == -1)
-		FATAL("vasprintf");
-	va_end(ap);
-
-	clen++;
 	mt = EXEC_PFCMD;
-	if (write(privfd, &mt, sizeof(mt)) == -1 ||
-	    write(privfd, &clen, sizeof(clen)) == -1 ||
-	    write(privfd, cmd, clen) == -1)
-		FATAL("write");
-	free(cmd);
-	mt = QUEUE_NEXTITEM;
-	while ((ca = SIMPLEQ_FIRST(caq)) != NULL) {
-		WRITE2(privfd, &mt, sizeof(mt), ca, sizeof(*ca));
-		SIMPLEQ_REMOVE_HEAD(caq, caddrs);
+	WRITE2(privfd, &mt, sizeof(mt), cmd, sizeof(*cmd));
+	len = strlen(cmd->tblname) + 1;
+	WRITE2(privfd, &len, sizeof(len), cmd->tblname, len);
+	while ((ca = SIMPLEQ_FIRST(&cmd->addrq)) != NULL) {
+		WRITE(privfd, ca, sizeof(*ca));
+		SIMPLEQ_REMOVE_HEAD(&cmd->addrq, caddrs);
 	}
-	mt = QUEUE_ENDITEMS;
-	WRITE(privfd, &mt, sizeof(mt));
 	/* wait for reply */
 	READ(privfd, pfres, sizeof(*pfres));
 }
@@ -334,32 +321,21 @@ static void
 exec_pfcmd(int pfd)
 {
 	struct pfresult	 pfres;
-	char		*cmd;
-	int		 clen;
-	struct caddrq	 caq;
-	enum msgtype	 mt;
+	struct pfcmd	 cmd;
+	size_t		 c;
 	struct caddr	*ca;
-	size_t		 acnt;
 
-	READ(pfd, &clen, sizeof(clen));
-	MALLOC(cmd, clen);
-	READ(pfd, cmd, clen);
-	SIMPLEQ_INIT(&caq);
-	acnt = 0;
-	while (1) {
-		READ(pfd, &mt, sizeof(mt));
-		if (mt == QUEUE_ENDITEMS)
-			break;
-		if (mt != QUEUE_NEXTITEM)
-			FATALX("invalid message type (%d)", mt);
+	READ2(pfd, &cmd, sizeof(cmd), &c, sizeof(c));
+	MALLOC(cmd.tblname, c);
+	READ(pfd, cmd.tblname, c);
+	SIMPLEQ_INIT(&cmd.addrq);
+	for (c = 0; c < cmd.addrcnt; c++) {
 		MALLOC(ca, sizeof(*ca));
 		READ(pfd, ca, sizeof(*ca));
-		SIMPLEQ_INSERT_TAIL(&caq, ca, caddrs);
-		acnt++;
+		SIMPLEQ_INSERT_TAIL(&cmd.addrq, ca, caddrs);
 	}
-	fork_tinypfctl(&pfres, cmd, &caq, acnt);
+	fork_tinypfctl(&pfres, &cmd);
 	/* wait for reply */
-	free(cmd);
 	WRITE(pfd, &pfres, sizeof(pfres));
 }
 

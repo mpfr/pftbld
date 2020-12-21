@@ -269,10 +269,10 @@ __dead void
 tinypfctl(int argc, char *argv[])
 {
 	int		 debug, verbose, ctrlfd, pffd;
-	char		*cmd, *table, *buf;
-	size_t		 buflen, acnt, c;
+	struct pfcmd	 cmd;
+	size_t		 c;
 	struct pfr_addr	*pfaddr;
-	struct caddr	 caddr;
+	struct caddr	 addr;
 	struct pfresult	 pfres;
 
 	ETOI(debug, ENV_DEBUG);
@@ -282,31 +282,30 @@ tinypfctl(int argc, char *argv[])
 
 	ETOI(ctrlfd, ENV_CTRLFD);
 
-	buf = argv[2];
-	buflen = strlen(buf) + 1;
+	STOI(cmd.id, argv[2]);
+	cmd.tblname = argv[3];
+	STOI(cmd.flags, argv[4]);
+	STOLL(cmd.addrcnt, argv[5]);
 
-	cmd = replace(buf, "\n", '\0');
-	if ((table = shift(cmd, buf, buflen)) == NULL)
-		FATALX("missing table");
-	DPRINTF("received cmd:'%s', table:'%s'", cmd, table);
+	DPRINTF("received cmdid:%d, tblname:'%s', flags:%u, addrcnt:%zu",
+	    cmd.id, cmd.tblname, cmd.flags, cmd.addrcnt);
 	/* wait for client addresses */
-	READ(ctrlfd, &acnt, sizeof(acnt));
-	CALLOC(pfaddr, acnt, sizeof(*pfaddr));
-	for (c = 0; c < acnt; c++) {
-		READ(ctrlfd, &caddr, sizeof(caddr));
-		switch (caddr.type) {
+	CALLOC(pfaddr, cmd.addrcnt, sizeof(*pfaddr));
+	for (c = 0; c < cmd.addrcnt; c++) {
+		READ(ctrlfd, &addr, sizeof(addr));
+		switch (addr.type) {
 		case IPv4:
 			pfaddr[c].pfra_af = AF_INET;
-			pfaddr[c].pfra_ip4addr = caddr.value.ipv4;
+			pfaddr[c].pfra_ip4addr = addr.value.ipv4;
 			pfaddr[c].pfra_net = 32;
 			break;
 		case IPv6:
 			pfaddr[c].pfra_af = AF_INET6;
-			pfaddr[c].pfra_ip6addr = caddr.value.ipv6;
+			pfaddr[c].pfra_ip6addr = addr.value.ipv6;
 			pfaddr[c].pfra_net = 128;
 			break;
 		default:
-			FATALX("invalid address");
+			FATALX("invalid address type (%d)", addr.type);
 		}
 	}
 
@@ -315,39 +314,33 @@ tinypfctl(int argc, char *argv[])
 	if ((pffd = open(PF_DEVICE, O_RDWR)) == -1)
 		FATAL("open");
 
-	if (!strcmp("add", cmd)) {
-		if ((pfres.nadd = pf_add_addresses(pffd, table, pfaddr,
-		    acnt)) == -1)
+	switch (cmd.id) {
+	case PFCMD_ADD:
+		if ((pfres.nadd = pf_add_addresses(pffd, cmd.tblname, pfaddr,
+		    cmd.addrcnt)) == -1)
 			FATAL("pf_add_addresses");
-		if ((cmd = shift(table, buf, buflen)) == NULL)
-			goto end;
-
-		if (acnt > 1)
+		if (cmd.addrcnt > 1 && cmd.flags)
 			FATALX("kill option on address array");
-		if (*cmd == 's') {
-			DPRINTF("received option:'%s'", cmd);
+		if (cmd.flags & FLAG_TABLE_KILL_STATES) {
+			DPRINTF("received kill states flag");
 			if ((pfres.nkill = pf_kill_states(pffd, pfaddr)) == -1)
 				FATAL("pf_kill_states");
-			if ((cmd = shift(cmd, buf, buflen)) == NULL)
-				goto end;
 		}
-		if (*cmd != 'n')
-			FATALX("invalid kill option '%s'", cmd);
-		DPRINTF("received option:'%s'", cmd);
-		if ((pfres.snkill = pf_kill_nodes(pffd, pfaddr)) == -1)
-			FATAL("pf_kill_nodes");
-	} else if (!strcmp("delete", cmd)) {
-		if ((pfres.ndel = pf_delete_addresses(pffd, table, pfaddr,
-		    acnt)) == -1)
+		if (cmd.flags & FLAG_TABLE_KILL_NODES) {
+			DPRINTF("received kill nodes flag");
+			if ((pfres.snkill = pf_kill_nodes(pffd, pfaddr)) == -1)
+				FATAL("pf_kill_nodes");
+		}
+		break;
+	case PFCMD_DELETE:
+		if ((pfres.ndel = pf_delete_addresses(pffd, cmd.tblname,
+		    pfaddr, cmd.addrcnt)) == -1)
 			FATAL("pf_delete_addresses");
-		cmd = table;
-	} else
-		FATALX("invalid command '%s'", cmd);
+		break;
+	default:
+		FATALX("invalid command id (%d)", cmd.id);
+	}
 
-	if ((cmd = shift(cmd, buf, buflen)) != NULL)
-		FATALX("invalid command extension '%s'", cmd);
-
-end:
 	close(pffd);
 	free(pfaddr);
 	/* send reply */
@@ -356,17 +349,16 @@ end:
 }
 
 void
-fork_tinypfctl(struct pfresult *pfres, char *cmd, struct caddrq *caq,
-    size_t acnt)
+fork_tinypfctl(struct pfresult *pfres, struct pfcmd *cmd)
 {
 	extern const struct procfunc	 process[];
 	extern char			*__progname;
 
 	int		 ctrlfd[2], pid;
-	char		*argv[4];
+	char		*argv[7];
 	struct caddr	*ca;
 
-	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, ctrlfd) == -1)
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, ctrlfd) == -1)
 		FATAL("socketpair");
 
 	if ((pid = fork()) == -1)
@@ -378,8 +370,11 @@ fork_tinypfctl(struct pfresult *pfres, char *cmd, struct caddrq *caq,
 
 		argv[0] = process[PROC_TINYPFCTL].name;
 		argv[1] = __progname;
-		argv[2] = cmd;
-		argv[3] = NULL;
+		ITOS(argv[2], cmd->id);
+		argv[3] = cmd->tblname;
+		ITOS(argv[4], cmd->flags);
+		LLTOS(argv[5], (long long)cmd->addrcnt);
+		argv[6] = NULL;
 
 		execvp(__progname, argv);
 		FATAL("execvp");
@@ -387,14 +382,14 @@ fork_tinypfctl(struct pfresult *pfres, char *cmd, struct caddrq *caq,
 	/* parent */
 	close(ctrlfd[1]);
 
-	WRITE(ctrlfd[0], &acnt, sizeof(acnt));
-	while ((ca = SIMPLEQ_FIRST(caq)) != NULL) {
+	while ((ca = SIMPLEQ_FIRST(&cmd->addrq)) != NULL) {
 		WRITE(ctrlfd[0], ca, sizeof(*ca));
-		SIMPLEQ_REMOVE_HEAD(caq, caddrs);
+		SIMPLEQ_REMOVE_HEAD(&cmd->addrq, caddrs);
 		free(ca);
 	}
 	/* wait for reply */
 	READ(ctrlfd[0], pfres, sizeof(*pfres));
+	free(cmd->tblname);
 	DPRINTF("received pfresult (nadd:%d, ndel:%d, nkill:%d, snkill:%d)",
 	    pfres->nadd, pfres->ndel, pfres->nkill, pfres->snkill);
 
