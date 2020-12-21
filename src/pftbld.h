@@ -54,8 +54,8 @@
 #define	NANONAP	nanosleep(&(const struct timespec){ 0, 500000L }, NULL)
 
 #define TIMESPEC_SEC_ROUND(t)	((t)->tv_sec + (t)->tv_nsec / 1000000000L + \
-				    ((t)->tv_nsec % 500000000L < 500000000L ? \
-				    0 : 1))
+				    ((t)->tv_nsec % 1000000000L < 500000000L \
+				    ? 0 : 1))
 
 #define TIMESPEC_INFINITE	(const struct timespec){ LLONG_MAX, LONG_MAX }
 #define timespec_isinfinite(t)	timespeccmp(t, &TIMESPEC_INFINITE, ==)
