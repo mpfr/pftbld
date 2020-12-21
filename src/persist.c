@@ -25,15 +25,15 @@
 int
 load(struct target *tgt)
 {
-	const char		*file = tgt->persist, *errstr;
-	FILE			*fp;
-	char			*line, *arg;
-	int			 cnt;
-	struct client		*clt;
-	size_t			 len;
-	ssize_t			 llen;
-	struct pfaddrlistq	 addq, delq;
-	struct clientq		 dcq;
+	const char	*file = tgt->persist, *errstr;
+	FILE		*fp;
+	char		*line, *arg;
+	int		 cnt;
+	struct client	*clt;
+	size_t		 len;
+	ssize_t		 llen;
+	struct pfcmdq	 cmdq;
+	struct clientq	 dcq;
 
 	if (*file == '\0')
 		return (-1);
@@ -48,8 +48,7 @@ load(struct target *tgt)
 	len = 0;
 	cnt = 0;
 
-	SIMPLEQ_INIT(&addq);
-	SIMPLEQ_INIT(&delq);
+	SIMPLEQ_INIT(&cmdq);
 	TAILQ_INIT(&dcq);
 
 	while ((llen = getline(&line, &len, fp)) != -1) {
@@ -92,7 +91,7 @@ load(struct target *tgt)
 		}
 
 end:
-		if (bind_table(clt, &addq, &delq)) {
+		if (bind_table(clt, &cmdq)) {
 			sort_client_desc(clt);
 			cnt++;
 			DPRINTF("client-%d (%s, cnt:%d, ts:%lld, exp:%d, "
@@ -107,7 +106,7 @@ end:
 	}
 	free(line);
 
-	apply_pfaddrlists(&addq, &delq);
+	apply_pfcmds(&cmdq);
 
 	while ((clt = TAILQ_FIRST(&dcq)) != NULL) {
 		TAILQ_REMOVE(&dcq, clt, clients);

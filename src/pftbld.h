@@ -42,8 +42,8 @@
 
 #define TS_FMT		"%d/%b/%Y:%H:%M:%S %z"
 #define TS_SIZE		27
-#define ACK_ACK		"ACK\n"
-#define ACK_NAK		"NAK\n"
+#define REPLY_ACK	"ACK\n"
+#define REPLY_NAK	"NAK\n"
 
 #define FLAG_GLOBAL_NOLOG		0x01
 #define FLAG_GLOBAL_UNLOAD		0x02
@@ -53,11 +53,11 @@
 
 #define	NANONAP	nanosleep(&(const struct timespec){ 0, 500000L }, NULL)
 
-#define TIMESPEC_TO_MSEC(t)	((t)->tv_sec * 1000 + (t)->tv_nsec / 1000000L)
-#define TIMESPEC_SEC_ROUND(t)	((t)->tv_nsec < 500000000L ? \
-				    (t)->tv_sec : (t)->tv_sec + 1)
-#define TIMESPEC_INFINITE	(const struct timespec){ LLONG_MAX, LONG_MAX }
+#define TIMESPEC_SEC_ROUND(t)	((t)->tv_sec + (t)->tv_nsec / 1000000000L + \
+				    ((t)->tv_nsec % 500000000L < 500000000L ? \
+				    0 : 1))
 
+#define TIMESPEC_INFINITE	(const struct timespec){ LLONG_MAX, LONG_MAX }
 #define timespec_isinfinite(t)	timespeccmp(t, &TIMESPEC_INFINITE, ==)
 
 #define CONF_NO_BACKLOG	INT_MAX
@@ -210,6 +210,12 @@
 			FATAL("calloc");	\
 	} while (0)
 
+#define STRLCPY(d, s, l, e)						\
+	do {								\
+		if (strlcpy(d, s, l) >= l)				\
+			FATALX("strlcpy: "e" (%s) truncated", s);	\
+	} while (0)
+
 #define KEVENT_HANDLE(e)						\
 	do {								\
 		EV_DPRINTF(e, 0);					\
@@ -222,6 +228,14 @@
 		} else							\
 			FATALX("unknown event (%lu, %hd)", (e)->ident,	\
 			    (e)->filter);				\
+	} while (0)
+
+#define PFCMD_INIT(c, i, t, f)			\
+	do {					\
+		(c)->id = i;			\
+		(c)->tblname = t;		\
+		(c)->flags = f;			\
+		SIMPLEQ_INIT(&(c)->addrq);	\
 	} while (0)
 
 union addrvalue {
@@ -348,13 +362,18 @@ struct pfresult {
 	int	 snkill;
 };
 
-struct pfaddrlist {
-	char		 tblname[NAME_MAX];
+enum pfcmdid { PFCMD_ADD = 1, PFCMD_DELETE };
+
+struct pfcmd {
+	enum pfcmdid	 id;
+	char		*tblname;
+	uint8_t		 flags;
+	size_t		 addrcnt;
 	struct caddrq	 addrq;
 
-	SIMPLEQ_ENTRY(pfaddrlist) pfaddrlists;
+	SIMPLEQ_ENTRY(pfcmd) pfcmds;
 };
-SIMPLEQ_HEAD(pfaddrlistq, pfaddrlist);
+SIMPLEQ_HEAD(pfcmdq, pfcmd);
 
 enum msgtype {
 	NAK = -1,
@@ -374,7 +393,7 @@ enum msgtype {
 };
 
 enum pathres {
-	PATH_OK,
+	PATH_OK = 0,
 	PATH_EMPTY,
 	PATH_RELATIVE,
 	PATH_INVALID,
@@ -402,8 +421,7 @@ struct statfd {
 };
 
 /* pftbld.c */
-void		 pfexec(struct caddrq *, struct pfresult *, const char *, ...)
-		    __attribute__((__format__ (printf, 3, 4)));
+void		 pfexec(struct pfresult *, struct pfcmd *);
 __dead void	 pftbld(int, char **);
 
 /* config.c */
@@ -443,18 +461,15 @@ int		 expire_clients(struct crangeq *, struct ptrq *);
 int		 expire_clients_r(struct crangeq *, struct ptrq *);
 __dead void	 scheduler(int, char **);
 void		 fork_scheduler(void);
-int		 bind_table(struct client *, struct pfaddrlistq *,
-		    struct pfaddrlistq *);
-void		 append_client(struct pfaddrlistq *, struct client *);
-void		 apply_pfaddrlists(struct pfaddrlistq *, struct pfaddrlistq *);
+int		 bind_table(struct client *, struct pfcmdq *);
+void		 apply_pfcmds(struct pfcmdq *);
 
 /* sockpipe.c */
 __dead void	 sockpipe(const char *, int);
 
 /* tinypfctl.c */
 __dead void	 tinypfctl(int, char **);
-void		 fork_tinypfctl(struct pfresult *, char *, struct caddrq *,
-		    size_t);
+void		 fork_tinypfctl(struct pfresult *, struct pfcmd *);
 
 /* util.c */
 void		 drop_priv(void);

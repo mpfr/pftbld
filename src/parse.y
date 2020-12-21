@@ -261,7 +261,8 @@ targetoptsl	: CASCADE			{
 					    nt->hits > 1 ? "s" : "", n);
 					continue;
 				}
-				strcpy(nt->name, t->name); /* len ok */
+				STRLCPY(nt->name, t->name, sizeof(nt->name),
+				    "table name");
 				DPRINTF("step %u inherited table name <%s>", n,
 				    nt->name);
 				t = nt;
