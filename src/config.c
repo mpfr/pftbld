@@ -324,6 +324,7 @@ reload_conf(void)
 		goto fail;
 	}
 
+	conf->flags = confbak->flags;
 	memcpy(&conf->ctrlsock, &confbak->ctrlsock, sizeof(struct socket));
 
 	SIMPLEQ_FOREACH(oldtgt, &confbak->ctargets, targets)
