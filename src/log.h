@@ -23,8 +23,8 @@
 #define FATALX(x, ...)	LOGFMT(fatalx, x, ##__VA_ARGS__)
 #define DPRINTF(x, ...)	LOGFMT(log_debug, x, ##__VA_ARGS__)
 #else
-#define FATAL(x, ...)	fatal("%s"x, __func__, ##__VA_ARGS__)
-#define FATALX(x, ...)	fatalx("%s"x, __func__, ##__VA_ARGS__)
+#define FATAL(x, ...)	fatal("%s: "x, __func__, ##__VA_ARGS__)
+#define FATALX(x, ...)	fatalx("%s: "x, __func__, ##__VA_ARGS__)
 #define DPRINTF(...)	do {} while(0)
 #endif
 
