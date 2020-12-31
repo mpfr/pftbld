@@ -73,7 +73,7 @@ load(struct target *tgt)
 			goto end;
 		}
 
-		clt->cnt = strtonum(arg, 0, INT_MAX, &errstr);
+		clt->cnt = strtonum(arg, 0, UINT_MAX, &errstr);
 		if (errstr != NULL) {
 			log_warn("ignored %s line %d: invalid count '%s'",
 			    file, cnt + 1, arg);
