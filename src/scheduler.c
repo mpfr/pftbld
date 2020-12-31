@@ -953,7 +953,7 @@ bind_table(struct client *clt, struct pfcmdq *cmdq)
 	if (tbl == NULL)
 		FATALX("open cascade");
 
-	if (clt->tbl != NULL && tbl->name != clt->tbl->name) /* ptrcmp ok */
+	if (clt->tbl != NULL && strcmp(tbl->name, clt->tbl->name))
 		append_client(cmdq, clt, PFCMD_DELETE);
 
 	clt->tbl = tbl;
@@ -987,7 +987,7 @@ append_client(struct pfcmdq *cmdq, struct client *clt, enum pfcmdid cmdid)
 	struct pfcmd	*cmd = SIMPLEQ_FIRST(cmdq);
 
 	while (cmd != NULL && (cmd->id != cmdid ||
-	    cmd->tblname != clt->tbl->name)) /* ptrcmp ok */
+	    strcmp(cmd->tblname, clt->tbl->name)))
 		cmd = SIMPLEQ_NEXT(cmd, pfcmds);
 	if (cmd == NULL) {
 		MALLOC(cmd, sizeof(*cmd));
