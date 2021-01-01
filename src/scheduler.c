@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -94,7 +94,7 @@ update_conf(struct config *nc)
 		EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER, EV_DELETE,
 		    0, 0, NULL);
 
-	SIMPLEQ_INIT(&cmdq);
+	STAILQ_INIT(&cmdq);
 	TAILQ_INIT(&cqc);
 	TAILQ_INIT(&dcq);
 
@@ -120,13 +120,13 @@ update_conf(struct config *nc)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
 
 	close(conf->ctrlsock.ctrlfd);
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
-		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets)
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
+		STAILQ_FOREACH(sock, &tgt->datasocks, sockets)
 			close(sock->ctrlfd);
 
-	self = SIMPLEQ_FIRST(&conf->exclcranges);
-	SIMPLEQ_REMOVE_HEAD(&conf->exclcranges, cranges);
-	SIMPLEQ_INSERT_HEAD(&nc->exclcranges, self, cranges);
+	self = STAILQ_FIRST(&conf->exclcranges);
+	STAILQ_REMOVE_HEAD(&conf->exclcranges, cranges);
+	STAILQ_INSERT_HEAD(&nc->exclcranges, self, cranges);
 
 	free_conf(conf);
 	conf = nc;
@@ -183,13 +183,13 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
-		if (!SIMPLEQ_EMPTY(tpq)) {
-			SIMPLEQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+		if (!STAILQ_EMPTY(tpq)) {
+			STAILQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
-		if (!SIMPLEQ_EMPTY(crq)) {
-			SIMPLEQ_MATCH(crq, cr, cranges,
+		if (!STAILQ_EMPTY(crq)) {
+			STAILQ_MATCH(crq, cr, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -202,7 +202,7 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 		}
 
 		cmd.tblname = clt->tbl->name;
-		SIMPLEQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
+		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
 		pfexec(&pfres, &cmd);
 
 		GET_TIME(&ts);
@@ -239,20 +239,20 @@ drop_clients_r(struct crangeq *crq, struct ptrq *tpq)
 	struct crange	*cr;
 	struct kevent	 kev;
 
-	SIMPLEQ_INIT(&cmdq);
+	STAILQ_INIT(&cmdq);
 	TAILQ_INIT(&dcq);
 	cnt = 0;
 
 	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
-		if (!SIMPLEQ_EMPTY(tpq)) {
-			SIMPLEQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+		if (!STAILQ_EMPTY(tpq)) {
+			STAILQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
-		if (!SIMPLEQ_EMPTY(crq)) {
-			SIMPLEQ_MATCH(crq, cr, cranges,
+		if (!STAILQ_EMPTY(crq)) {
+			STAILQ_MATCH(crq, cr, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -308,13 +308,13 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if (clt->exp)
 			continue;
-		if (!SIMPLEQ_EMPTY(tpq)) {
-			SIMPLEQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+		if (!STAILQ_EMPTY(tpq)) {
+			STAILQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
-		if (!SIMPLEQ_EMPTY(crq)) {
-			SIMPLEQ_MATCH(crq, cr, cranges,
+		if (!STAILQ_EMPTY(crq)) {
+			STAILQ_MATCH(crq, cr, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -327,7 +327,7 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 		}
 
 		cmd.tblname = clt->tbl->name;
-		SIMPLEQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
+		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
 		pfexec(&pfres, &cmd);
 
 		GET_TIME(&ts);
@@ -375,7 +375,7 @@ expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 	struct kevent	 kev;
 	struct timespec	 ts;
 
-	SIMPLEQ_INIT(&cmdq);
+	STAILQ_INIT(&cmdq);
 	TAILQ_INIT(&dcq);
 	cnt = 0;
 
@@ -384,13 +384,13 @@ expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if (clt->exp )
 			continue;
-		if (!SIMPLEQ_EMPTY(tpq)) {
-			SIMPLEQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+		if (!STAILQ_EMPTY(tpq)) {
+			STAILQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
-		if (!SIMPLEQ_EMPTY(crq)) {
-			SIMPLEQ_MATCH(crq, cr, cranges,
+		if (!STAILQ_EMPTY(crq)) {
+			STAILQ_MATCH(crq, cr, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -481,16 +481,16 @@ recv_conf(void)
 	    sched_cfd)) == -1)
 		NANONAP;
 
-	SIMPLEQ_INIT(&nc->ctargets);
+	STAILQ_INIT(&nc->ctargets);
 
 	while (1) {
 		CHECK_NEXTITEM;
 
 		MALLOC(tgt, sizeof(*tgt));
 		READ(sched_cfd, tgt, sizeof(*tgt));
-		SIMPLEQ_INSERT_TAIL(&nc->ctargets, tgt, targets);
+		STAILQ_INSERT_TAIL(&nc->ctargets, tgt, targets);
 
-		SIMPLEQ_INIT(&tgt->datasocks);
+		STAILQ_INIT(&tgt->datasocks);
 
 		while (1) {
 			CHECK_NEXTITEM;
@@ -499,20 +499,20 @@ recv_conf(void)
 			while ((sock->ctrlfd = recv_fd(sock, sizeof(*sock),
 			    sched_cfd)) == -1)
 				NANONAP;
-			SIMPLEQ_INSERT_TAIL(&tgt->datasocks, sock, sockets);
+			STAILQ_INSERT_TAIL(&tgt->datasocks, sock, sockets);
 		}
 
-		SIMPLEQ_INIT(&tgt->exclcranges);
+		STAILQ_INIT(&tgt->exclcranges);
 
 		while (1) {
 			CHECK_NEXTITEM;
 
 			MALLOC(cr, sizeof(*cr));
 			READ(sched_cfd, cr, sizeof(*cr));
-			SIMPLEQ_INSERT_TAIL(&tgt->exclcranges, cr, cranges);
+			STAILQ_INSERT_TAIL(&tgt->exclcranges, cr, cranges);
 		}
 
-		SIMPLEQ_INIT(&tgt->exclkeyterms);
+		STAILQ_INIT(&tgt->exclkeyterms);
 
 		while (1) {
 			CHECK_NEXTITEM;
@@ -521,31 +521,31 @@ recv_conf(void)
 			READ2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
 			MALLOC(kt->p, n);
 			READ(sched_cfd, kt->p, n);
-			SIMPLEQ_INSERT_TAIL(&tgt->exclkeyterms, kt, ptrs);
+			STAILQ_INSERT_TAIL(&tgt->exclkeyterms, kt, ptrs);
 		}
 
-		SIMPLEQ_INIT(&tgt->cascade);
+		STAILQ_INIT(&tgt->cascade);
 
 		while (1) {
 			CHECK_NEXTITEM;
 
 			MALLOC(tbl, sizeof(*tbl));
 			READ(sched_cfd, tbl, sizeof(*tbl));
-			SIMPLEQ_INSERT_TAIL(&tgt->cascade, tbl, tables);
+			STAILQ_INSERT_TAIL(&tgt->cascade, tbl, tables);
 		}
 	}
 
-	SIMPLEQ_INIT(&nc->exclcranges);
+	STAILQ_INIT(&nc->exclcranges);
 
 	while (1) {
 		CHECK_NEXTITEM;
 
 		MALLOC(cr, sizeof(*cr));
 		READ(sched_cfd, cr, sizeof(*cr));
-		SIMPLEQ_INSERT_TAIL(&nc->exclcranges, cr, cranges);
+		STAILQ_INSERT_TAIL(&nc->exclcranges, cr, cranges);
 	}
 
-	SIMPLEQ_INIT(&nc->exclkeyterms);
+	STAILQ_INIT(&nc->exclkeyterms);
 
 	while (1) {
 		CHECK_NEXTITEM;
@@ -554,7 +554,7 @@ recv_conf(void)
 		READ2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
 		MALLOC(kt->p, n);
 		READ(sched_cfd, kt->p, n);
-		SIMPLEQ_INSERT_TAIL(&nc->exclkeyterms, kt, ptrs);
+		STAILQ_INSERT_TAIL(&nc->exclkeyterms, kt, ptrs);
 	}
 
 #undef CHECK_NEXTITEM
@@ -731,10 +731,10 @@ remove:
 		if ((tgt = find_target(&conf->ctargets,
 		    ibuf->tgtname)) == NULL)
 			FATALX("could find target [%s]", ibuf->tgtname);
-		sock = SIMPLEQ_FIRST(&tgt->datasocks);
+		sock = STAILQ_FIRST(&tgt->datasocks);
 		while (sock != NULL && strncmp(sock->id, ibuf->sockid,
 		    sizeof(sock->id)))
-			sock = SIMPLEQ_NEXT(sock, sockets);
+			sock = STAILQ_NEXT(sock, sockets);
 		if (sock == NULL)
 			FATALX("could not find socket [%s]", ibuf->sockid);
 	} else
@@ -776,7 +776,7 @@ handle_expire(struct kevent *kev)
 
 	if (exp) {
 		PFCMD_INIT(&cmd, PFCMD_DELETE, tbl->name, 0);
-		SIMPLEQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
+		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
 		cmd.addrcnt = 1;
 		pfexec(&pfres, &cmd);
 
@@ -852,7 +852,7 @@ scheduler(int argc, char *argv[])
 	TAILQ_INIT(&cltq);
 	TAILQ_INIT(&inbq);
 
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		if (*tgt->persist == '\0') {
 			log_debug("no persist file for target [%s]",
 			    tgt->name);
@@ -947,9 +947,9 @@ bind_table(struct client *clt, struct pfcmdq *cmdq)
 	struct table	*tbl;
 	struct timespec	 ts;
 
-	tbl = SIMPLEQ_FIRST(&clt->tgt->cascade);
+	tbl = STAILQ_FIRST(&clt->tgt->cascade);
 	while (tbl != NULL && tbl->hits > 0 && tbl->hits < clt->cnt)
-		tbl = SIMPLEQ_NEXT(tbl, tables);
+		tbl = STAILQ_NEXT(tbl, tables);
 	if (tbl == NULL)
 		FATALX("open cascade");
 
@@ -984,18 +984,18 @@ bind_table(struct client *clt, struct pfcmdq *cmdq)
 static void
 append_client(struct pfcmdq *cmdq, struct client *clt, enum pfcmdid cmdid)
 {
-	struct pfcmd	*cmd = SIMPLEQ_FIRST(cmdq);
+	struct pfcmd	*cmd = STAILQ_FIRST(cmdq);
 
 	while (cmd != NULL && (cmd->id != cmdid ||
 	    strcmp(cmd->tblname, clt->tbl->name)))
-		cmd = SIMPLEQ_NEXT(cmd, pfcmds);
+		cmd = STAILQ_NEXT(cmd, pfcmds);
 	if (cmd == NULL) {
 		MALLOC(cmd, sizeof(*cmd));
 		PFCMD_INIT(cmd, cmdid, clt->tbl->name, 0);
-		SIMPLEQ_INSERT_TAIL(cmdq, cmd, pfcmds);
+		STAILQ_INSERT_TAIL(cmdq, cmd, pfcmds);
 		cmd->addrcnt = 0;
 	}
-	SIMPLEQ_INSERT_TAIL(&cmd->addrq, &clt->addr, caddrs);
+	STAILQ_INSERT_TAIL(&cmd->addrq, &clt->addr, caddrs);
 	cmd->addrcnt++;
 }
 
@@ -1005,7 +1005,7 @@ apply_pfcmds(struct pfcmdq *cmdq)
 	struct pfcmd	*cmd;
 	struct pfresult	 pfres;
 
-	while ((cmd = SIMPLEQ_FIRST(cmdq)) != NULL) {
+	while ((cmd = STAILQ_FIRST(cmdq)) != NULL) {
 		if (cmd->addrcnt > 0) {
 			pfexec(&pfres, cmd);
 			switch (cmd->id) {
@@ -1027,7 +1027,7 @@ apply_pfcmds(struct pfcmdq *cmdq)
 				FATAL("invalid cmd id (%d)", cmd->id);
 			}
 		}
-		SIMPLEQ_REMOVE_HEAD(cmdq, pfcmds);
+		STAILQ_REMOVE_HEAD(cmdq, pfcmds);
 		free(cmd);
 	}
 }
@@ -1043,10 +1043,10 @@ shutdown_scheduler(void)
 	struct client	*clt;
 	enum msgtype	 mt;
 
-	if (conf == NULL || SIMPLEQ_EMPTY(&conf->ctargets))
+	if (conf == NULL || STAILQ_EMPTY(&conf->ctargets))
 		goto end;
 
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		if (*tgt->persist == '\0')
 			log_debug("no persist file for target [%s]",
 			    tgt->name);
@@ -1059,11 +1059,11 @@ shutdown_scheduler(void)
 	}
 
 	if (conf->flags & FLAG_GLOBAL_UNLOAD) {
-		SIMPLEQ_INIT(&cmdq);
+		STAILQ_INIT(&cmdq);
 		TAILQ_FOREACH(clt, &cltq, clients)
 			if (!clt->exp)
 				append_client(&cmdq, clt, PFCMD_DELETE);
-		if (!SIMPLEQ_EMPTY(&cmdq)) {
+		if (!STAILQ_EMPTY(&cmdq)) {
 			print_ts_log("Unloading client addresses ...\n");
 			apply_pfcmds(&cmdq);
 		}

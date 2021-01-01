@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -382,9 +382,9 @@ fork_tinypfctl(struct pfresult *pfres, struct pfcmd *cmd)
 	/* parent */
 	close(ctrlfd[1]);
 
-	while ((ca = SIMPLEQ_FIRST(&cmd->addrq)) != NULL) {
+	while ((ca = STAILQ_FIRST(&cmd->addrq)) != NULL) {
 		WRITE(ctrlfd[0], ca, sizeof(*ca));
-		SIMPLEQ_REMOVE_HEAD(&cmd->addrq, caddrs);
+		STAILQ_REMOVE_HEAD(&cmd->addrq, caddrs);
 		free(ca);
 	}
 	/* wait for reply */

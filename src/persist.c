@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,7 +48,7 @@ load(struct target *tgt)
 	len = 0;
 	cnt = 0;
 
-	SIMPLEQ_INIT(&cmdq);
+	STAILQ_INIT(&cmdq);
 	TAILQ_INIT(&dcq);
 
 	while ((llen = getline(&line, &len, fp)) != -1) {

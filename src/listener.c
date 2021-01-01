@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -283,7 +283,7 @@ check_exclkeyterms(struct ptrq *ktq, char *buf)
 {
 	struct ptr	*exclk;
 
-	SIMPLEQ_FOREACH(exclk, ktq, ptrs)
+	STAILQ_FOREACH(exclk, ktq, ptrs)
 		if (strstr(buf, exclk->p) != NULL)
 			return (exclk);
 
@@ -295,7 +295,7 @@ check_exclcranges(struct crangeq *crq, struct caddr *addr)
 {
 	struct crange	*exclr;
 
-	SIMPLEQ_FOREACH(exclr, crq, cranges)
+	STAILQ_FOREACH(exclr, crq, cranges)
 		if (addr_inrange(exclr, addr))
 			return (exclr);
 
@@ -394,14 +394,14 @@ proc_data(struct inbuf *ibuf, int kqfd)
 
 	clt->cnt++;
 
-	tbl = SIMPLEQ_FIRST(&clt->tgt->cascade);
+	tbl = STAILQ_FIRST(&clt->tgt->cascade);
 	while (tbl != NULL && tbl->hits > 0 && clt->cnt > tbl->hits)
-		tbl = SIMPLEQ_NEXT(tbl, tables);
+		tbl = STAILQ_NEXT(tbl, tables);
 	if (tbl == NULL)
 		FATALX("open cascade");
 
 	PFCMD_INIT(&cmd, PFCMD_ADD, tbl->name, tbl->flags);
-	SIMPLEQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
+	STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
 	cmd.addrcnt = 1;
 
 	pfexec(&pfres, &cmd);
@@ -487,9 +487,9 @@ enq_target_address_params(char *arg, char *data, size_t datalen,
 		if ((tgt = find_target(&conf->ctargets, arg)) != NULL) {
 			MALLOC(tp, sizeof(*tp));
 			tp->p = tgt;
-			SIMPLEQ_INSERT_TAIL(tpq, tp, ptrs);
+			STAILQ_INSERT_TAIL(tpq, tp, ptrs);
 		} else if (crq != NULL && (cr = parse_crange(arg)) != NULL)
-			SIMPLEQ_INSERT_TAIL(crq, cr, cranges);
+			STAILQ_INSERT_TAIL(crq, cr, cranges);
 		else
 			break;
 	} while ((arg = shift(arg, data, datalen)) != NULL);
@@ -503,15 +503,15 @@ free_target_address_queues(struct ptrq *tpq, struct crangeq *crq)
 	struct ptr	*tp;
 	struct crange	*cr;
 
-	while ((tp = SIMPLEQ_FIRST(tpq)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(tpq, ptrs);
+	while ((tp = STAILQ_FIRST(tpq)) != NULL) {
+		STAILQ_REMOVE_HEAD(tpq, ptrs);
 		free(tp);
 	}
 	if (crq == NULL)
 		return;
 
-	while ((cr = SIMPLEQ_FIRST(crq)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(crq, cranges);
+	while ((cr = STAILQ_FIRST(crq)) != NULL) {
+		STAILQ_REMOVE_HEAD(crq, cranges);
 		free(cr);
 	}
 }
@@ -611,8 +611,8 @@ perform_ctrl_delete(struct statfd *sfd, char *arg, char *data, size_t datalen,
 	} else
 		recap = 0;
 
-	SIMPLEQ_INIT(&tpq);
-	SIMPLEQ_INIT(&crq);
+	STAILQ_INIT(&tpq);
+	STAILQ_INIT(&crq);
 
 	if ((arg = enq_target_address_params(arg, data, datalen, &tpq,
 	    &crq)) != NULL) {
@@ -645,7 +645,7 @@ perform_ctrl_dump(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	struct ptr	*tp;
 	struct client	*clt;
 
-	SIMPLEQ_INIT(&tpq);
+	STAILQ_INIT(&tpq);
 
 	if (arg != NULL && (arg = enq_target_address_params(arg, data, datalen,
 	    &tpq, NULL)) != NULL) {
@@ -654,8 +654,8 @@ perform_ctrl_dump(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	}
 
 	TAILQ_FOREACH(clt, &cltq, clients) {
-		if (!SIMPLEQ_EMPTY(&tpq)) {
-			SIMPLEQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
+		if (!STAILQ_EMPTY(&tpq)) {
+			STAILQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
@@ -702,8 +702,8 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 
 	} while ((arg = shift(arg, data, datalen)) != NULL);
 
-	SIMPLEQ_INIT(&tpq);
-	SIMPLEQ_INIT(&crq);
+	STAILQ_INIT(&tpq);
+	STAILQ_INIT(&crq);
 
 	if (arg != NULL && (arg = enq_target_address_params(arg, data, datalen,
 	    &tpq, &crq)) != NULL) {
@@ -720,13 +720,13 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	TAILQ_FOREACH_REVERSE(clt, &cltq, clientq, clients) {
 		if (act && clt->exp)
 			continue;
-		if (!SIMPLEQ_EMPTY(&tpq)) {
-			SIMPLEQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
+		if (!STAILQ_EMPTY(&tpq)) {
+			STAILQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
-		if (!SIMPLEQ_EMPTY(&crq)) {
-			SIMPLEQ_MATCH(&crq, cr, cranges,
+		if (!STAILQ_EMPTY(&crq)) {
+			STAILQ_MATCH(&crq, cr, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -785,13 +785,13 @@ perform_ctrl_save(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	struct ptr	*tp;
 	int		 cnt;
 
-	SIMPLEQ_INIT(&tpq);
+	STAILQ_INIT(&tpq);
 
 	if (arg == NULL)
-		SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+		STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 			MALLOC(tp, sizeof(*tp));
 			tp->p = tgt;
-			SIMPLEQ_INSERT_TAIL(&tpq, tp, ptrs);
+			STAILQ_INSERT_TAIL(&tpq, tp, ptrs);
 		}
 	else if ((arg = enq_target_address_params(arg, data, datalen, &tpq,
 	    NULL)) != NULL) {
@@ -800,7 +800,7 @@ perform_ctrl_save(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	}
 
 	cnt = 0;
-	SIMPLEQ_FOREACH(tp, &tpq, ptrs) {
+	STAILQ_FOREACH(tp, &tpq, ptrs) {
 		tgt = tp->p;
 		if (*tgt->persist == '\0')
 			msg_send(sfd, "No persist file specified for [%s].\n",
@@ -828,7 +828,7 @@ perform_ctrl_selfexclude(struct statfd *sfd, char *arg, char *data,
 	if (shift(arg, data, datalen) != NULL)
 		return (1);
 
-	r = SIMPLEQ_FIRST(&conf->exclcranges);
+	r = STAILQ_FIRST(&conf->exclcranges);
 	if (arg == NULL) {
 		if (*r->str != '\0')
 			msg_send(sfd, "[%s]\n", r->str);
@@ -837,9 +837,9 @@ perform_ctrl_selfexclude(struct statfd *sfd, char *arg, char *data,
 		return (0);
 	}
 	if (!strcmp("remove", arg)) {
-		SIMPLEQ_REMOVE_HEAD(&conf->exclcranges, cranges);
+		STAILQ_REMOVE_HEAD(&conf->exclcranges, cranges);
 		memset(r, 0, sizeof(*r));
-		SIMPLEQ_INSERT_HEAD(&conf->exclcranges, r, cranges);
+		STAILQ_INSERT_HEAD(&conf->exclcranges, r, cranges);
 		print_ts_log("Removed self exclude.\n");
 		msg_send(sfd, "Done.\n");
 		return (0);
@@ -853,9 +853,9 @@ perform_ctrl_selfexclude(struct statfd *sfd, char *arg, char *data,
 		msg_send(sfd, "Ditto.\n");
 		return (0);
 	}
-	SIMPLEQ_REMOVE_HEAD(&conf->exclcranges, cranges);
+	STAILQ_REMOVE_HEAD(&conf->exclcranges, cranges);
 	free(r);
-	SIMPLEQ_INSERT_HEAD(&conf->exclcranges, r2, cranges);
+	STAILQ_INSERT_HEAD(&conf->exclcranges, r2, cranges);
 	print_ts_log("Updated self exclude to [%s].\n", r2->str);
 	msg_send(sfd, "Done.\n");
 
@@ -875,17 +875,17 @@ perform_ctrl_status(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	if (arg != NULL)
 		return (1);
 
-	r = SIMPLEQ_FIRST(&conf->exclcranges);
+	r = STAILQ_FIRST(&conf->exclcranges);
 	msg_send(sfd, "Self-exclude: [%s]\nVerbosity level: %d\n",
 	    *r->str != '\0' ? r->str : "N/A", log_getverbose());
 	c = 0;
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
 		c++;
 	CALLOC(cnt[0], c, sizeof(int));
 	CALLOC(cnt[1], c, sizeof(int));
 	TAILQ_FOREACH(clt, &cltq, clients) {
 		c = 0;
-		SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
+		STAILQ_FOREACH(tgt, &conf->ctargets, targets)
 			if (clt->tgt == tgt) {
 				cnt[0][c]++;
 				if (!clt->exp)
@@ -896,7 +896,7 @@ perform_ctrl_status(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	}
 	c = 0;
 	msg_send(sfd, "Client count:");
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		msg_send(sfd, "\n\ttarget [%s]: %d", tgt->name, cnt[0][c]);
 		if (cnt[1][c])
 			msg_send(sfd, " (%d active)", cnt[1][c]);

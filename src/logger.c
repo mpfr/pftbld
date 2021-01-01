@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -232,8 +232,8 @@ dispatch_logger(void)
 	sock = &conf->ctrlsock;
 	if (sock->pid)
 		send_logfd(sock->ctrlfd);
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
-		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets)
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
+		STAILQ_FOREACH(sock, &tgt->datasocks, sockets)
 			if (sock->pid)
 				send_logfd(sock->ctrlfd);
 	if (sched_pid)

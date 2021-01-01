@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  * Copyright (c) 2015 Ted Unangst <tedu@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -168,7 +168,7 @@ main		: BACKLOG NUMBER		{
 			DPRINTF("global timeout: %lld", conf->timeout);
 		}
 		| TARGET STRING			{
-			SIMPLEQ_FOREACH(target, &conf->ctargets, targets)
+			STAILQ_FOREACH(target, &conf->ctargets, targets)
 				if (!strncmp(target->name, $2,
 				    sizeof(target->name))) {
 					free($2);
@@ -176,7 +176,7 @@ main		: BACKLOG NUMBER		{
 					YYERROR;
 				}
 			CALLOC(target, 1, sizeof(*target));
-			SIMPLEQ_INSERT_TAIL(&conf->ctargets, target, targets);
+			STAILQ_INSERT_TAIL(&conf->ctargets, target, targets);
 			if (strlcpy(target->name, $2,
 			    sizeof(target->name)) >= sizeof(target->name)) {
 				free($2);
@@ -184,20 +184,20 @@ main		: BACKLOG NUMBER		{
 				YYERROR;
 			}
 			free($2);
-			SIMPLEQ_INIT(&target->datasocks);
-			SIMPLEQ_INIT(&target->exclcranges);
-			SIMPLEQ_INIT(&target->exclkeyterms);
-			SIMPLEQ_INIT(&target->cascade);
+			STAILQ_INIT(&target->datasocks);
+			STAILQ_INIT(&target->exclcranges);
+			STAILQ_INIT(&target->exclkeyterms);
+			STAILQ_INIT(&target->cascade);
 			DPRINTF("current target is [%s]", target->name);
 			curr_exclcrangeq = &target->exclcranges;
 			curr_exclkeytermq = &target->exclkeyterms;
 		} '{' optnl targetopts_l '}'	{
-			if (SIMPLEQ_EMPTY(&target->datasocks)) {
+			if (STAILQ_EMPTY(&target->datasocks)) {
 				yyerror("no sockets defined for target [%s]",
 				    target->name);
 				YYERROR;
 			}
-			if (SIMPLEQ_EMPTY(&target->cascade)) {
+			if (STAILQ_EMPTY(&target->cascade)) {
 				yyerror("no cascade defined for target [%s]",
 				    target->name);
 				YYERROR;
@@ -212,12 +212,12 @@ targetopts_l	: targetopts_l targetoptsl nl
 		;
 
 targetoptsl	: CASCADE			{
-			if (!SIMPLEQ_EMPTY(&target->cascade)) {
+			if (!STAILQ_EMPTY(&target->cascade)) {
 				yyerror("second cascade not permitted");
 				YYERROR;
 			}
 			CALLOC(table, 1, sizeof(*table));
-			SIMPLEQ_INSERT_HEAD(&target->cascade, table, tables);
+			STAILQ_INSERT_HEAD(&target->cascade, table, tables);
 			DPRINTF("top cascade table enqueued");
 			ptable = table;
 			table->flags = DEFAULT_TABLE_KILL_FLAGS;
@@ -225,13 +225,13 @@ targetoptsl	: CASCADE			{
 			struct table	*t, *nt;
 			unsigned int	 n;
 
-			t = SIMPLEQ_FIRST(&target->cascade);
+			t = STAILQ_FIRST(&target->cascade);
 			if (*t->name == '\0') {
 				yyerror("missing cascade head table");
 				YYERROR;
 			}
 			for (n = 1;
-			    (nt = SIMPLEQ_NEXT(t, tables)) != NULL; n++) {
+			    (nt = STAILQ_NEXT(t, tables)) != NULL; n++) {
 				if (t->hits == 0) {
 					yyerror("cascade step %u unreachable",
 					    n);
@@ -253,7 +253,7 @@ targetoptsl	: CASCADE			{
 				    timespeccmp(&nt->drop, &t->drop, ==) &&
 				    timespeccmp(&nt->expire, &t->expire, ==)) {
 					t->hits = nt->hits;
-					SIMPLEQ_REMOVE_AFTER(&target->cascade,
+					STAILQ_REMOVE_AFTER(&target->cascade,
 					    t, tables);
 					free(nt);
 					DPRINTF("merged upwards %u hit%s from "
@@ -301,7 +301,7 @@ targetoptsl	: CASCADE			{
 			CANONICAL_PATH_SET($2, sock->path, "socket",
 			    free($2); free(sock), YYERROR);
 			free($2);
-			if ((s = SIMPLEQ_FIRST(&target->datasocks)) != NULL &&
+			if ((s = STAILQ_FIRST(&target->datasocks)) != NULL &&
 			    *s->id == '\0') {
 				free(sock);
 				yyerror("no more sockets allowed as first "
@@ -313,8 +313,8 @@ targetoptsl	: CASCADE			{
 				yyerror("attempt to overwrite control socket");
 				YYERROR;
 			}
-			SIMPLEQ_FOREACH(t, &conf->ctargets, targets)
-				SIMPLEQ_FOREACH(s, &t->datasocks, sockets) {
+			STAILQ_FOREACH(t, &conf->ctargets, targets)
+				STAILQ_FOREACH(s, &t->datasocks, sockets) {
 					if (strcmp(s->path, sock->path))
 						continue;
 					free(sock);
@@ -326,7 +326,7 @@ targetoptsl	: CASCADE			{
 				yyerror("prefill socket options failed");
 				YYERROR;
 			}
-			SIMPLEQ_INSERT_TAIL(&target->datasocks, sock, sockets);
+			STAILQ_INSERT_TAIL(&target->datasocks, sock, sockets);
 			DPRINTF("current data socket at %s", sock->path);
 		} sockopts			{
 			struct target	*t;
@@ -334,15 +334,15 @@ targetoptsl	: CASCADE			{
 			char		*i0, *i1;
 
 			if (*sock->id == '\0' &&
-			    sock != SIMPLEQ_FIRST(&target->datasocks)) {
+			    sock != STAILQ_FIRST(&target->datasocks)) {
 				yyerror("socket requires id");
 				YYERROR;
 			}
 			if (asprintf(&i0, "%s%s", target->name,
 			    sock->id) == -1)
 				FATAL("asprintf");
-			SIMPLEQ_FOREACH(t, &conf->ctargets, targets)
-				SIMPLEQ_FOREACH(s, &t->datasocks, sockets) {
+			STAILQ_FOREACH(t, &conf->ctargets, targets)
+				STAILQ_FOREACH(s, &t->datasocks, sockets) {
 					if (s == sock)
 						continue;
 					if (asprintf(&i1, "%s%s", t->name,
@@ -368,13 +368,13 @@ cascadeopts_l	: cascadeoptsl optcommanl cascadeopts_l
 
 cascadeoptsl	: STEP		{
 			CALLOC(table, 1, sizeof(*table));
-			SIMPLEQ_INSERT_TAIL(&target->cascade, table, tables);
+			STAILQ_INSERT_TAIL(&target->cascade, table, tables);
 			DPRINTF("next cascade step (flags <- %02X) enqueued",
 			    table->flags);
 			table->flags = ptable->flags;
 		} stepopts	{
 			ptable = table;
-			table = SIMPLEQ_FIRST(&target->cascade);
+			table = STAILQ_FIRST(&target->cascade);
 		}
 		| tableoptsl
 		;
@@ -434,7 +434,7 @@ sockoptsl	: BACKLOG NUMBER	{
 		| ID STRING		{
 			struct socket	*s;
 
-			SIMPLEQ_FOREACH(s, &target->datasocks, sockets)
+			STAILQ_FOREACH(s, &target->datasocks, sockets)
 				if (!strncmp(s->id, $2, sizeof(s->id))) {
 					free($2);
 					yyerror("socket id defined twice "
@@ -527,7 +527,7 @@ excludeoptsl	: LOCALHOSTS		{
 				DPRINTF("range [%s] already enqueued", r->str);
 				free(r);
 			} else {
-				SIMPLEQ_INSERT_TAIL(curr_exclcrangeq, r,
+				STAILQ_INSERT_TAIL(curr_exclcrangeq, r,
 				    cranges);
 				DPRINTF("enqueued range [%s]", r->str);
 			}
@@ -551,8 +551,7 @@ excludeoptsl	: LOCALHOSTS		{
 				free(k->p);
 				free(k);
 			} else
-				SIMPLEQ_INSERT_TAIL(curr_exclkeytermq, k,
-				    ptrs);
+				STAILQ_INSERT_TAIL(curr_exclkeytermq, k, ptrs);
 		}
 		| KEYTERMFILE STRING	{
 			if (load_exclude_keyterms($2) == -1) {
@@ -704,7 +703,7 @@ crange_inq(struct crangeq *q, struct crange *r)
 {
 	struct crange	*r2;
 
-	SIMPLEQ_FOREACH(r2, q, cranges)
+	STAILQ_FOREACH(r2, q, cranges)
 		if (cranges_eq(r, r2))
 			return (1);
 
@@ -716,7 +715,7 @@ keyterm_inq(struct ptrq *q, struct ptr *k)
 {
 	struct ptr	*k2;
 
-	SIMPLEQ_FOREACH(k2, q, ptrs)
+	STAILQ_FOREACH(k2, q, ptrs)
 		if (!strcmp(k->p, k2->p))
 			return (1);
 
@@ -758,7 +757,7 @@ load_exclude_keyterms(const char *file)
 			continue;
 		}
 
-		SIMPLEQ_INSERT_TAIL(curr_exclkeytermq, k, ptrs);
+		STAILQ_INSERT_TAIL(curr_exclkeytermq, k, ptrs);
 		DPRINTF("enqueued keyterm '%s'", k->p);
 		cnt++;
 	}
@@ -808,7 +807,7 @@ load_exclude_cranges(const char *file)
 			DPRINTF("range [%s] already enqueued", r->str);
 			free(r);
 		} else {
-			SIMPLEQ_INSERT_TAIL(curr_exclcrangeq, r, cranges);
+			STAILQ_INSERT_TAIL(curr_exclcrangeq, r, cranges);
 			DPRINTF("enqueued range [%s]", r->str);
 			cnt++;
 		}

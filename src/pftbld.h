@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -75,11 +75,11 @@
 	    (e)->flags & EV_DELETE ? "/DELETE" : "/???" : "",	\
 	    (e)->data)
 
-#define SIMPLEQ_MATCH(q, e, t, m)		\
-	do {					\
-		SIMPLEQ_FOREACH(e, q, t)	\
-			if (m)			\
-				break;		\
+#define STAILQ_MATCH(q, e, t, m)	\
+	do {				\
+		STAILQ_FOREACH(e, q, t)	\
+			if (m)		\
+				break;	\
 	} while (0)
 
 #define READ(d, b, n)				\
@@ -235,7 +235,7 @@
 		(c)->id = i;			\
 		(c)->tblname = t;		\
 		(c)->flags = f;			\
-		SIMPLEQ_INIT(&(c)->addrq);	\
+		STAILQ_INIT(&(c)->addrq);	\
 	} while (0)
 
 union addrvalue {
@@ -248,9 +248,9 @@ struct caddr {
 	union addrvalue	 value;
 	enum addrtype	 type;
 
-	SIMPLEQ_ENTRY(caddr) caddrs;
+	STAILQ_ENTRY(caddr) caddrs;
 };
-SIMPLEQ_HEAD(caddrq, caddr);
+STAILQ_HEAD(caddrq, caddr);
 
 struct crange {
 	union addrvalue	 first;
@@ -258,16 +258,16 @@ struct crange {
 	enum addrtype	 type;
 	char		 str[INET6_ADDRSTRLEN + 4];
 
-	SIMPLEQ_ENTRY(crange) cranges;
+	STAILQ_ENTRY(crange) cranges;
 };
-SIMPLEQ_HEAD(crangeq, crange);
+STAILQ_HEAD(crangeq, crange);
 
 struct ptr {
 	void	*p;
 
-	SIMPLEQ_ENTRY(ptr) ptrs;
+	STAILQ_ENTRY(ptr) ptrs;
 };
-SIMPLEQ_HEAD(ptrq, ptr);
+STAILQ_HEAD(ptrq, ptr);
 
 struct client {
 	struct caddr	 addr;
@@ -309,9 +309,9 @@ struct table {
 	struct timespec	 drop;
 	uint8_t		 flags;
 
-	SIMPLEQ_ENTRY(table) tables;
+	STAILQ_ENTRY(table) tables;
 };
-SIMPLEQ_HEAD(tableq, table);
+STAILQ_HEAD(tableq, table);
 
 struct socket {
 	char	 path[sizeof(((struct sockaddr_un *)0)->sun_path)];
@@ -325,9 +325,9 @@ struct socket {
 	pid_t	 pid;
 	int	 ctrlfd;
 
-	SIMPLEQ_ENTRY(socket) sockets;
+	STAILQ_ENTRY(socket) sockets;
 };
-SIMPLEQ_HEAD(socketq, socket);
+STAILQ_HEAD(socketq, socket);
 
 struct target {
 	char		 name[NAME_MAX];
@@ -338,9 +338,9 @@ struct target {
 	struct ptrq	 exclkeyterms;
 	struct tableq	 cascade;
 
-	SIMPLEQ_ENTRY(target) targets;
+	STAILQ_ENTRY(target) targets;
 };
-SIMPLEQ_HEAD(targetq, target);
+STAILQ_HEAD(targetq, target);
 
 struct config {
 	struct socket	 ctrlsock;
@@ -371,9 +371,9 @@ struct pfcmd {
 	size_t		 addrcnt;
 	struct caddrq	 addrq;
 
-	SIMPLEQ_ENTRY(pfcmd) pfcmds;
+	STAILQ_ENTRY(pfcmd) pfcmds;
 };
-SIMPLEQ_HEAD(pfcmdq, pfcmd);
+STAILQ_HEAD(pfcmdq, pfcmd);
 
 enum msgtype {
 	NAK = -1,

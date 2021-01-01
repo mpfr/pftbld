@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -143,9 +143,9 @@ pfexec(struct pfresult *pfres, struct pfcmd *cmd)
 	WRITE2(privfd, &mt, sizeof(mt), cmd, sizeof(*cmd));
 	len = strlen(cmd->tblname) + 1;
 	WRITE2(privfd, &len, sizeof(len), cmd->tblname, len);
-	while ((ca = SIMPLEQ_FIRST(&cmd->addrq)) != NULL) {
+	while ((ca = STAILQ_FIRST(&cmd->addrq)) != NULL) {
 		WRITE(privfd, ca, sizeof(*ca));
-		SIMPLEQ_REMOVE_HEAD(&cmd->addrq, caddrs);
+		STAILQ_REMOVE_HEAD(&cmd->addrq, caddrs);
 	}
 	/* wait for reply */
 	READ(privfd, pfres, sizeof(*pfres));
@@ -283,8 +283,8 @@ pftbld(int argc, char *argv[])
 
 	fork_scheduler();
 
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
-		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets)
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
+		STAILQ_FOREACH(sock, &tgt->datasocks, sockets)
 			fork_listener(sock, tgt->name);
 
 	fork_listener(&conf->ctrlsock, "");
@@ -328,11 +328,11 @@ exec_pfcmd(int pfd)
 	READ2(pfd, &cmd, sizeof(cmd), &c, sizeof(c));
 	MALLOC(cmd.tblname, c);
 	READ(pfd, cmd.tblname, c);
-	SIMPLEQ_INIT(&cmd.addrq);
+	STAILQ_INIT(&cmd.addrq);
 	for (c = 0; c < cmd.addrcnt; c++) {
 		MALLOC(ca, sizeof(*ca));
 		READ(pfd, ca, sizeof(*ca));
-		SIMPLEQ_INSERT_TAIL(&cmd.addrq, ca, caddrs);
+		STAILQ_INSERT_TAIL(&cmd.addrq, ca, caddrs);
 	}
 	fork_tinypfctl(&pfres, &cmd);
 	/* wait for reply */
@@ -410,8 +410,8 @@ set_verbose(int pfd)
 	ITOE(ENV_VERBOSE, v);
 	if (logger_pid)
 		send_verbose(logger_cfd);
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
-		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets)
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
+		STAILQ_FOREACH(sock, &tgt->datasocks, sockets)
 			send_verbose(sock->ctrlfd);
 	mt = ACK;
 	WRITE(pfd, &mt, sizeof(mt));
@@ -449,8 +449,8 @@ shutdown_main(void)
 	struct socket	*sock;
 	struct target	*tgt;
 
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
-		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets)
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
+		STAILQ_FOREACH(sock, &tgt->datasocks, sockets)
 			if (sock->pid)
 				kill(sock->pid, SIGUSR2);
 
@@ -462,8 +462,8 @@ shutdown_main(void)
 	if (unlink(sock->path) == -1)
 		log_warn("failed deleting control socket %s", sock->path);
 
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
-		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets) {
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
+		STAILQ_FOREACH(sock, &tgt->datasocks, sockets) {
 			if (unlink(sock->path) != -1)
 				continue;
 			log_warn("failed deleting data socket %s", sock->path);
@@ -497,10 +497,10 @@ send_conf(int fd)
 	while (send_fd(conf->ctrlsock.ctrlfd, conf, sizeof(*conf), fd) == -1)
 		NANONAP;
 
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		WRITE2(fd, &inext, sizeof(inext), tgt, sizeof(*tgt));
 
-		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets) {
+		STAILQ_FOREACH(sock, &tgt->datasocks, sockets) {
 			WRITE(fd, &inext, sizeof(inext));
 			while (send_fd(sock->ctrlfd, sock, sizeof(*sock),
 			    fd) == -1)
@@ -508,28 +508,28 @@ send_conf(int fd)
 		}
 		WRITE(fd, &iend, sizeof(iend));
 
-		SIMPLEQ_FOREACH(cr, &tgt->exclcranges, cranges)
+		STAILQ_FOREACH(cr, &tgt->exclcranges, cranges)
 			WRITE2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
 		WRITE(fd, &iend, sizeof(iend));
 
-		SIMPLEQ_FOREACH(kt, &tgt->exclkeyterms, ptrs) {
+		STAILQ_FOREACH(kt, &tgt->exclkeyterms, ptrs) {
 			WRITE2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
 			n = strlen(kt->p) + 1;
 			WRITE2(fd, &n, sizeof(n), kt->p, n);
 		}
 		WRITE(fd, &iend, sizeof(iend));
 
-		SIMPLEQ_FOREACH(tab, &tgt->cascade, tables)
+		STAILQ_FOREACH(tab, &tgt->cascade, tables)
 			WRITE2(fd, &inext, sizeof(inext), tab, sizeof(*tab));
 		WRITE(fd, &iend, sizeof(iend));
 	}
 	WRITE(fd, &iend, sizeof(iend));
 
-	SIMPLEQ_FOREACH(cr, &conf->exclcranges, cranges)
+	STAILQ_FOREACH(cr, &conf->exclcranges, cranges)
 		WRITE2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
 	WRITE(fd, &iend, sizeof(iend));
 
-	SIMPLEQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
+	STAILQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
 		WRITE2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
 		n = strlen(kt->p) + 1;
 		WRITE2(fd, &n, sizeof(n), kt->p, n);

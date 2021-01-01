@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -50,7 +50,7 @@ find_socket(struct socketq *sockq, struct socket *sock)
 {
 	struct socket	*s;
 
-	SIMPLEQ_FOREACH(s, sockq, sockets)
+	STAILQ_FOREACH(s, sockq, sockets)
 		if (sockets_eq(s, sock))
 			return (s);
 
@@ -65,7 +65,7 @@ find_target(struct targetq *tgtq, const char *name)
 	if (name == NULL || *name == '\0')
 		return (NULL);
 
-	SIMPLEQ_FOREACH(t, tgtq, targets)
+	STAILQ_FOREACH(t, tgtq, targets)
 		if (!strncmp(t->name, name, sizeof(t->name)))
 			return (t);
 
@@ -92,12 +92,12 @@ parse_conf(void)
 		return (1);
 	}
 
-	SIMPLEQ_INIT(&conf->ctargets);
-	SIMPLEQ_INIT(&conf->exclcranges);
-	SIMPLEQ_INIT(&conf->exclkeyterms);
+	STAILQ_INIT(&conf->ctargets);
+	STAILQ_INIT(&conf->exclcranges);
+	STAILQ_INIT(&conf->exclkeyterms);
 
 	CALLOC(self, 1, sizeof(*self));
-	SIMPLEQ_INSERT_HEAD(&conf->exclcranges, self, cranges);
+	STAILQ_INSERT_HEAD(&conf->exclcranges, self, cranges);
 
 	curr_exclcrangeq = &conf->exclcranges;
 	curr_exclkeytermq = &conf->exclkeyterms;
@@ -115,7 +115,7 @@ parse_conf(void)
 	if (errors)
 		return (errors);
 
-	if (SIMPLEQ_EMPTY(&conf->ctargets)) {
+	if (STAILQ_EMPTY(&conf->ctargets)) {
 		log_warnx("no targets defined in configuration file %s",
 			conffile);
 		errors++;
@@ -150,7 +150,7 @@ parse_conf(void)
 		errors++;
 	}
 
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		if (!timespecisset(&tgt->drop)) {
 			tgt->drop = conf->drop;
 #if DEBUG
@@ -164,7 +164,7 @@ parse_conf(void)
 #endif
 		}
 
-		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets) {
+		STAILQ_FOREACH(sock, &tgt->datasocks, sockets) {
 			if (!sock->backlog) {
 				sock->backlog = conf->backlog;
 #if DEBUG
@@ -203,7 +203,7 @@ parse_conf(void)
 			}
 		}
 
-		SIMPLEQ_FOREACH(tbl, &tgt->cascade, tables) {
+		STAILQ_FOREACH(tbl, &tgt->cascade, tables) {
 			if (!timespecisset(&tbl->expire)) {
 				tbl->expire = TIMESPEC_INFINITE;
 				DPRINTF("assuming no expire for table <%s>",
@@ -241,7 +241,7 @@ update_sockets(struct socketq *new, struct socketq *old, struct target *tgt)
 	if (old == NULL)
 		goto new;
 
-	SIMPLEQ_FOREACH(s, old, sockets) {
+	STAILQ_FOREACH(s, old, sockets) {
 		st = new == NULL ? NULL : find_socket(new, s);
 		if (st == NULL) {
 			kill(s->pid, SIGUSR2);
@@ -260,7 +260,7 @@ new:
 	if (new == NULL)
 		return;
 
-	SIMPLEQ_FOREACH(s, new, sockets) {
+	STAILQ_FOREACH(s, new, sockets) {
 		st = old == NULL ? NULL : find_socket(old, s);
 		if (st == NULL) {
 			fork_listener(s, tgt ? tgt->name : "");
@@ -287,7 +287,7 @@ check_targets(void)
 
 	WRITE(sched_cfd, &mt, sizeof(mt));
 	CALLOC(buf, 1, 1);
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		buf2 = buf;
 		if (asprintf(&buf, "%s%s%s", buf2,
 		    strlen(buf2) > 0 ? "\n" : "", tgt->name) == -1)
@@ -327,7 +327,7 @@ reload_conf(void)
 	conf->flags = confbak->flags;
 	memcpy(&conf->ctrlsock, &confbak->ctrlsock, sizeof(struct socket));
 
-	SIMPLEQ_FOREACH(oldtgt, &confbak->ctargets, targets)
+	STAILQ_FOREACH(oldtgt, &confbak->ctargets, targets)
 		if (find_target(&conf->ctargets, oldtgt->name) == NULL) {
 			DPRINTF("starting delete on target [%s]",
 			    oldtgt->name);
@@ -335,7 +335,7 @@ reload_conf(void)
 			DPRINTF("finished deleting on target [%s]",
 			    oldtgt->name);
 		}
-	SIMPLEQ_FOREACH(newtgt, &conf->ctargets, targets) {
+	STAILQ_FOREACH(newtgt, &conf->ctargets, targets) {
 		DPRINTF("starting update of target [%s]", newtgt->name);
 		oldtgt = find_target(&confbak->ctargets, newtgt->name);
 		update_sockets(&newtgt->datasocks,
@@ -379,33 +379,33 @@ free_conf(struct config *c)
 	struct crange	*cr;
 	struct ptr	*kt;
 
-	while ((tgt = SIMPLEQ_FIRST(&c->ctargets)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&c->ctargets, targets);
-		while ((sock = SIMPLEQ_FIRST(&tgt->datasocks)) != NULL) {
-			SIMPLEQ_REMOVE_HEAD(&tgt->datasocks, sockets);
+	while ((tgt = STAILQ_FIRST(&c->ctargets)) != NULL) {
+		STAILQ_REMOVE_HEAD(&c->ctargets, targets);
+		while ((sock = STAILQ_FIRST(&tgt->datasocks)) != NULL) {
+			STAILQ_REMOVE_HEAD(&tgt->datasocks, sockets);
 			free(sock);
 		}
-		while ((tbl = SIMPLEQ_FIRST(&tgt->cascade)) != NULL) {
-			SIMPLEQ_REMOVE_HEAD(&tgt->cascade, tables);
+		while ((tbl = STAILQ_FIRST(&tgt->cascade)) != NULL) {
+			STAILQ_REMOVE_HEAD(&tgt->cascade, tables);
 			free(tbl);
 		}
-		while ((cr = SIMPLEQ_FIRST(&tgt->exclcranges)) != NULL) {
-			SIMPLEQ_REMOVE_HEAD(&tgt->exclcranges, cranges);
+		while ((cr = STAILQ_FIRST(&tgt->exclcranges)) != NULL) {
+			STAILQ_REMOVE_HEAD(&tgt->exclcranges, cranges);
 			free(cr);
 		}
-		while ((kt = SIMPLEQ_FIRST(&tgt->exclkeyterms)) != NULL) {
-			SIMPLEQ_REMOVE_HEAD(&tgt->exclkeyterms, ptrs);
+		while ((kt = STAILQ_FIRST(&tgt->exclkeyterms)) != NULL) {
+			STAILQ_REMOVE_HEAD(&tgt->exclkeyterms, ptrs);
 			free(kt->p);
 			free(kt);
 		}
 		free(tgt);
 	}
-	while ((cr = SIMPLEQ_FIRST(&c->exclcranges)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&c->exclcranges, cranges);
+	while ((cr = STAILQ_FIRST(&c->exclcranges)) != NULL) {
+		STAILQ_REMOVE_HEAD(&c->exclcranges, cranges);
 		free(cr);
 	}
-	while ((kt = SIMPLEQ_FIRST(&c->exclkeyterms)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&c->exclkeyterms, ptrs);
+	while ((kt = STAILQ_FIRST(&c->exclkeyterms)) != NULL) {
+		STAILQ_REMOVE_HEAD(&c->exclkeyterms, ptrs);
 		free(kt->p);
 		free(kt);
 	}
@@ -466,16 +466,16 @@ print_conf(struct statfd *sfd)
 		free(age);
 	}
 
-	cr = SIMPLEQ_FIRST(&conf->exclcranges);
+	cr = STAILQ_FIRST(&conf->exclcranges);
 	if ((cr != NULL && *cr->str != '\0') ||
-	    !SIMPLEQ_EMPTY(&conf->exclkeyterms)) {
+	    !STAILQ_EMPTY(&conf->exclkeyterms)) {
 		msg_send(sfd, "exclude {\n");
 
 		if (cr != NULL)
-			while ((cr = SIMPLEQ_NEXT(cr, cranges)) != NULL)
+			while ((cr = STAILQ_NEXT(cr, cranges)) != NULL)
 				msg_send(sfd, "\tnet \"%s\"\n", cr->str);
 
-		SIMPLEQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
+		STAILQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
 			estr = esc(kt->p);
 			msg_send(sfd, "\tkeyterm \"%s\"\n", estr);
 			free(estr);
@@ -497,7 +497,7 @@ print_conf(struct statfd *sfd)
 	else
 		msg_send(sfd, "timeout %lld\n", conf->timeout);
 
-	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		estr = esc(tgt->name);
 		msg_send(sfd, "target \"%s\" {\n\tcascade {\n", estr);
 		free(estr);
@@ -507,7 +507,7 @@ print_conf(struct statfd *sfd)
 		pflgs = DEFAULT_TABLE_KILL_FLAGS;
 		ptbl = NULL;
 
-		SIMPLEQ_FOREACH(tbl, &tgt->cascade, tables) {
+		STAILQ_FOREACH(tbl, &tgt->cascade, tables) {
 			if (timespeccmp(&tgt->drop, &tbl->drop, !=)) {
 				if (timespeccmp(&tbl->drop, &CONF_NO_DROP, ==))
 					msg_send(sfd, SMSG("\t\tno drop\n"));
@@ -550,7 +550,7 @@ print_conf(struct statfd *sfd)
 
 			if (step)
 				msg_send(sfd, "\t\t}\n");
-			if (SIMPLEQ_NEXT(tbl, tables) != NULL) {
+			if (STAILQ_NEXT(tbl, tables) != NULL) {
 				msg_send(sfd, "\t\tstep {\n");
 				step = 1;
 			}
@@ -572,14 +572,14 @@ print_conf(struct statfd *sfd)
 			}
 		}
 
-		if (!SIMPLEQ_EMPTY(&tgt->exclcranges) ||
-		    !SIMPLEQ_EMPTY(&tgt->exclkeyterms)) {
+		if (!STAILQ_EMPTY(&tgt->exclcranges) ||
+		    !STAILQ_EMPTY(&tgt->exclkeyterms)) {
 			msg_send(sfd, "\texclude {\n");
 
-			SIMPLEQ_FOREACH(cr, &tgt->exclcranges, cranges)
+			STAILQ_FOREACH(cr, &tgt->exclcranges, cranges)
 				msg_send(sfd, "\t\tnet \"%s\"\n", cr->str);
 
-			SIMPLEQ_FOREACH(kt, &tgt->exclkeyterms, ptrs) {
+			STAILQ_FOREACH(kt, &tgt->exclkeyterms, ptrs) {
 				estr = esc(kt->p);
 				msg_send(sfd, "\t\tkeyterm \"%s\"\n", estr);
 				free(estr);
@@ -594,7 +594,7 @@ print_conf(struct statfd *sfd)
 			free(estr);
 		}
 
-		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets) {
+		STAILQ_FOREACH(sock, &tgt->datasocks, sockets) {
 			estr = esc(sock->path);
 			msg_send(sfd, "\tsocket \"%s\" {\n", estr);
 			free(estr);
