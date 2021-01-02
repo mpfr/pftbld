@@ -54,8 +54,7 @@
 #define	NANONAP	nanosleep(&(const struct timespec){ 0, 500000L }, NULL)
 
 #define TIMESPEC_SEC_ROUND(t)	((t)->tv_sec + (t)->tv_nsec / 1000000000L + \
-				    ((t)->tv_nsec % 1000000000L < 500000000L \
-				    ? 0 : 1))
+				    ((t)->tv_nsec % 1000000000L >= 500000000L))
 
 #define TIMESPEC_INFINITE	(const struct timespec){ LLONG_MAX, LONG_MAX }
 #define timespec_isinfinite(t)	timespeccmp(t, &TIMESPEC_INFINITE, ==)
@@ -221,13 +220,12 @@
 		EV_DPRINTF(e, 0);					\
 		if ((e)->flags & EV_ERROR)				\
 			FATALX("event error (%lld)", (e)->data);	\
-		if ((e)->udata != NULL) {				\
-			struct kevcb *_h = (struct kevcb *)(e)->udata;	\
-			(e)->udata = _h->args;				\
-			_h->func(e);					\
-		} else							\
+		if ((e)->udata == NULL)					\
 			FATALX("unknown event (%lu, %hd)", (e)->ident,	\
 			    (e)->filter);				\
+		struct kevcb *_h = (struct kevcb *)(e)->udata;		\
+		(e)->udata = _h->args;					\
+		_h->func(e);						\
 	} while (0)
 
 #define PFCMD_INIT(c, i, t, f)			\
