@@ -68,14 +68,14 @@ handle_ctrl(struct kevent *kev)
 
 	READ(logger_cfd, &mt, sizeof(mt));
 	switch (mt) {
-	case SET_VERBOSE:
+	case MSG_SET_VERBOSE:
 		READ(logger_cfd, &v, sizeof(v));
 		log_setverbose(v);
 		break;
 	default:
 		FATALX("invalid ipc message type (%d)", mt);
 	}
-	mt = ACK;
+	mt = MSG_ACK;
 	WRITE(logger_cfd, &mt, sizeof(mt));
 }
 
@@ -243,15 +243,17 @@ dispatch_logger(void)
 static void
 send_logfd(int ctrlfd)
 {
-	enum msgtype	 mt = logfd != -1 ? UPDATE_LOGFD : DELETE_LOGFD;
+	enum msgtype	 mt;
+
+	mt = logfd != -1 ? MSG_UPDATE_LOGFD : MSG_DELETE_LOGFD;
 
 	WRITE(ctrlfd, &mt, sizeof(mt));
-	if (mt == UPDATE_LOGFD)
+	if (mt == MSG_UPDATE_LOGFD)
 		while (send_fd(logfd, &mt, sizeof(mt), ctrlfd) == -1)
 			NANONAP;
 	/* wait for reply */
 	READ(ctrlfd, &mt, sizeof(mt));
-	if (mt != ACK)
+	if (mt != MSG_ACK)
 		FATALX("logfd update failed (%d)", mt);
 }
 

@@ -139,13 +139,13 @@ save(struct target *tgt)
 	if (*file == '\0')
 		return (-1);
 
-	mt = HANDLE_PERSIST;
+	mt = MSG_HANDLE_PERSIST;
 	WRITE(privfd, &mt, sizeof(mt));
 	len = strlen(file) + 1;
 	WRITE2(privfd, &len, sizeof(len), file, len);
 	/* wait for reply */
 	READ(privfd, &mt, sizeof(mt));
-	if (mt != ACK)
+	if (mt != MSG_ACK)
 		return (-1);
 
 	while ((fd = recv_fd(&mt, sizeof(mt), privfd)) == -1)
@@ -153,7 +153,7 @@ save(struct target *tgt)
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		close(fd);
 		log_warn("failed opening persist file %s", file);
-		mt = NAK;
+		mt = MSG_NAK;
 		WRITE(privfd, &mt, sizeof(mt));
 		return (-1);
 	}
@@ -169,7 +169,7 @@ save(struct target *tgt)
 		log_warn("persist file %s error", file);
 	close(fd);
 
-	mt = ACK;
+	mt = MSG_ACK;
 	WRITE(privfd, &mt, sizeof(mt));
 
 	return (cnt);

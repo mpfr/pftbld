@@ -240,7 +240,7 @@ union addrvalue {
 	struct in_addr	 ipv4;
 	struct in6_addr	 ipv6;
 };
-enum addrtype { IPv4 = 1, IPv6 };
+enum addrtype { ADDR_IPV4 = 1, ADDR_IPV6 };
 
 struct caddr {
 	union addrvalue	 value;
@@ -374,20 +374,20 @@ struct pfcmd {
 STAILQ_HEAD(pfcmdq, pfcmd);
 
 enum msgtype {
-	NAK = -1,
-	ACK,
-	UPDATE_LOGFD,
-	DELETE_LOGFD,
-	CHECK_TARGETS,
-	UPDATE_CONFIG,
-	EXEC_PFCMD,
-	HANDLE_PERSIST,
-	SET_VERBOSE,
-	CONF_RELOAD,
-	QUEUE_NEXTITEM,
-	QUEUE_ENDITEMS,
-	INBUF_DONE,
-	SHUTDOWN_MAIN
+	MSG_NAK = -1,
+	MSG_ACK,
+	MSG_UPDATE_LOGFD,
+	MSG_DELETE_LOGFD,
+	MSG_CHECK_TARGETS,
+	MSG_UPDATE_CONFIG,
+	MSG_EXEC_PFCMD,
+	MSG_HANDLE_PERSIST,
+	MSG_SET_VERBOSE,
+	MSG_CONF_RELOAD,
+	MSG_QUEUE_NEXTITEM,
+	MSG_QUEUE_ENDITEMS,
+	MSG_INBUF_DONE,
+	MSG_SHUTDOWN_MAIN
 };
 
 enum pathres {

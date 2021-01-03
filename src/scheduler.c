@@ -462,9 +462,9 @@ recv_conf(void)
 
 #define CHECK_NEXTITEM					\
 	READ(sched_cfd, &mt, sizeof(mt));		\
-	if (mt == QUEUE_ENDITEMS)			\
+	if (mt == MSG_QUEUE_ENDITEMS)			\
 		break;					\
-	if (mt != QUEUE_NEXTITEM)			\
+	if (mt != MSG_QUEUE_NEXTITEM)			\
 		FATALX("invalid message type (%d)", mt)
 
 	struct config	*nc;
@@ -604,29 +604,29 @@ handle_ctrl(struct kevent *kev)
 
 	READ(sched_cfd, &mt, sizeof(mt));
 	switch (mt) {
-	case UPDATE_LOGFD:
+	case MSG_UPDATE_LOGFD:
 		recv_logfd(sched_cfd);
 		break;
-	case DELETE_LOGFD:
+	case MSG_DELETE_LOGFD:
 		if (logfd != -1) {
 			close(logfd);
 			logfd = -1;
 		}
 		break;
-	case CHECK_TARGETS:
+	case MSG_CHECK_TARGETS:
 		check_targets();
 		break;
-	case UPDATE_CONFIG:
+	case MSG_UPDATE_CONFIG:
 		nconf = recv_conf();
 		break;
-	case SET_VERBOSE:
+	case MSG_SET_VERBOSE:
 		READ(sched_cfd, &v, sizeof(v));
 		log_setverbose(v);
 		break;
 	default:
 		FATALX("invalid message type (%d)", mt);
 	}
-	mt = ACK;
+	mt = MSG_ACK;
 	WRITE(sched_cfd, &mt, sizeof(mt));
 }
 
@@ -740,11 +740,11 @@ remove:
 	} else
 		sock = &conf->ctrlsock;
 
-	mt = INBUF_DONE;
+	mt = MSG_INBUF_DONE;
 	WRITE(sock->ctrlfd, &mt, sizeof(mt));
 	/* wait for reply */
 	READ(sock->ctrlfd, &mt, sizeof(mt));
-	if (mt != ACK)
+	if (mt != MSG_ACK)
 		FATALX("invalid message type (%d)", mt);
 
 	free(ibuf->data);
@@ -842,11 +842,11 @@ scheduler(int argc, char *argv[])
 	ETOI(sched_ifd, ENV_INBFD);
 
 	READ(sched_cfd, &mt, sizeof(mt));
-	if (mt == UPDATE_CONFIG) {
+	if (mt == MSG_UPDATE_CONFIG) {
 		conf = recv_conf();
-		mt = ACK;
+		mt = MSG_ACK;
 	} else
-		mt = NAK;
+		mt = MSG_NAK;
 	WRITE(sched_cfd, &mt, sizeof(mt));
 
 	TAILQ_INIT(&cltq);
@@ -1070,7 +1070,7 @@ shutdown_scheduler(void)
 	}
 
 end:
-	mt = SHUTDOWN_MAIN;
+	mt = MSG_SHUTDOWN_MAIN;
 	WRITE(privfd, &mt, sizeof(mt));
 	exit(0);
 }

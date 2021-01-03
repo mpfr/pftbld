@@ -70,26 +70,26 @@ handle_ctrl(struct kevent *kev)
 	ctrlfd = kev->ident;
 	READ(ctrlfd, &mt, sizeof(mt));
 	switch (mt) {
-	case UPDATE_LOGFD:
+	case MSG_UPDATE_LOGFD:
 		recv_logfd(ctrlfd);
 		break;
-	case DELETE_LOGFD:
+	case MSG_DELETE_LOGFD:
 		if (logfd != -1) {
 			close(logfd);
 			logfd = -1;
 		}
 		break;
-	case SET_VERBOSE:
+	case MSG_SET_VERBOSE:
 		READ(ctrlfd, &v, sizeof(v));
 		log_setverbose(v);
 		break;
-	case INBUF_DONE:
+	case MSG_INBUF_DONE:
 		ccnt--;
 		break;
 	default:
 		FATALX("invalid message type (%d)", mt);
 	}
-	mt = ACK;
+	mt = MSG_ACK;
 	WRITE(ctrlfd, &mt, sizeof(mt));
 }
 
@@ -580,11 +580,11 @@ perform_ctrl_config(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	if (!strcmp("print", arg))
 		print_conf(sfd);
 	else if (!strcmp("reload", arg)) {
-		mt = CONF_RELOAD;
+		mt = MSG_CONF_RELOAD;
 		WRITE(privfd, &mt, sizeof(mt));
 		/* wait for reply */
 		READ(privfd, &mt, sizeof(mt));
-		msg_send(sfd, mt == ACK ? "Initiated.\n" : "Failed.\n");
+		msg_send(sfd, mt == MSG_ACK ? "Initiated.\n" : "Failed.\n");
 	} else
 		return (1);
 
@@ -952,11 +952,11 @@ perform_ctrl_verbose(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	log_setverbose(v);
 	ITOE(ENV_VERBOSE, v);
 
-	mt = SET_VERBOSE;
+	mt = MSG_SET_VERBOSE;
 	WRITE2(privfd, &mt, sizeof(mt), &v, sizeof(v));
 	/* wait for reply */
 	READ(privfd, &mt, sizeof(mt));
-	msg_send(sfd, mt == ACK ? "Done.\n" : "Failed.\n");
+	msg_send(sfd, mt == MSG_ACK ? "Done.\n" : "Failed.\n");
 
 	return (0);
 }

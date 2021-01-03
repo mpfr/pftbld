@@ -294,12 +294,12 @@ tinypfctl(int argc, char *argv[])
 	for (c = 0; c < cmd.addrcnt; c++) {
 		READ(ctrlfd, &addr, sizeof(addr));
 		switch (addr.type) {
-		case IPv4:
+		case ADDR_IPV4:
 			pfaddr[c].pfra_af = AF_INET;
 			pfaddr[c].pfra_ip4addr = addr.value.ipv4;
 			pfaddr[c].pfra_net = 32;
 			break;
-		case IPv6:
+		case ADDR_IPV6:
 			pfaddr[c].pfra_af = AF_INET6;
 			pfaddr[c].pfra_ip6addr = addr.value.ipv6;
 			pfaddr[c].pfra_net = 128;

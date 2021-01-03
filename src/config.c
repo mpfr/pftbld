@@ -279,7 +279,7 @@ check_targets(void)
 	extern pid_t	 sched_pid;
 	extern int	 sched_cfd;
 
-	enum msgtype	 mt = CHECK_TARGETS;
+	enum msgtype	 mt = MSG_CHECK_TARGETS;
 	size_t		 len;
 	int		 n;
 	char		*buf, *buf2;
@@ -299,7 +299,7 @@ check_targets(void)
 	free(buf);
 	/* wait for reply */
 	READ2(sched_cfd, &n, sizeof(n), &mt, sizeof(mt));
-	if (mt != ACK)
+	if (mt != MSG_ACK)
 		FATALX("invalid message type (%d)", mt);
 	if (n > 0)
 		log_warnx("%d client entr%s would be orphaned", n,
