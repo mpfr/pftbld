@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  * Copyright (c) 2014 Reyk Floeter <reyk@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -146,7 +146,7 @@ parse_crange(const char *str)
 		if (inet_net_ntop(AF_INET, &r->first.ipv4, bits, r->str,
 		    sizeof(r->str)) == NULL)
 			FATAL("inet_net_ntop");
-		r->type = IPv4;
+		r->type = ADDR_IPV4;
 		r->last = r->first;
 		first = (unsigned char *)&r->first.ipv4.s_addr;
 		last = (unsigned char *)&r->last.ipv4.s_addr;
@@ -157,7 +157,7 @@ parse_crange(const char *str)
 		if (inet_net_ntop(AF_INET6, &r->first.ipv6, bits, r->str,
 		    sizeof(r->str)) == NULL)
 			FATAL("inet_net_ntop");
-		r->type = IPv6;
+		r->type = ADDR_IPV6;
 		r->last = r->first;
 		first = (unsigned char *)&r->first.ipv6.s6_addr;
 		last = (unsigned char *)&r->last.ipv6.s6_addr;
@@ -176,7 +176,7 @@ parse_crange(const char *str)
 		}
 	}
 #if DEBUG
-	if (r->type == IPv4)
+	if (r->type == ADDR_IPV4)
 		DPRINTF("\"%s\" bits:%d range:%08X...%08X", r->str, bits,
 		    be32toh(r->first.ipv4.s_addr),
 		    be32toh(r->last.ipv4.s_addr));
@@ -196,9 +196,9 @@ parse_addr(struct caddr *addr, const char *str)
 {
 	memset(addr, 0, sizeof(*addr));
 	if (inet_pton(AF_INET, str, &addr->value.ipv4) == 1)
-		addr->type = IPv4;
+		addr->type = ADDR_IPV4;
 	else if (inet_pton(AF_INET6, str, &addr->value.ipv6) == 1)
-		addr->type = IPv6;
+		addr->type = ADDR_IPV6;
 	else {
 		errno = EINVAL;
 		return (-1);
@@ -229,10 +229,10 @@ addrs_cmp(struct caddr *a1, struct caddr *a2)
 int
 addrvals_cmp(union addrvalue *a1, union addrvalue *a2, enum addrtype t)
 {
-	if (t == IPv4)
+	if (t == ADDR_IPV4)
 		return (memcmp(&a1->ipv4, &a2->ipv4, sizeof(struct in_addr)));
 
-	if (t == IPv6)
+	if (t == ADDR_IPV6)
 		return (memcmp(&a1->ipv6, &a2->ipv6, sizeof(struct in6_addr)));
 
 	return (a1 != a2);
@@ -350,14 +350,14 @@ addrstr(char *str, size_t size, struct caddr *addr)
 {
 	char	 buf[INET6_ADDRSTRLEN];
 
-	if (addr->type != IPv4 && addr->type != IPv6) {
+	if (addr->type != ADDR_IPV4 && addr->type != ADDR_IPV6) {
 		errno = EINVAL;
 		return (NULL);
 	}
-	if ((addr->type == IPv4 && inet_ntop(AF_INET, &addr->value.ipv4, buf,
-	    sizeof(buf)) == NULL) ||
-	    (addr->type == IPv6 && inet_ntop(AF_INET6, &addr->value.ipv6, buf,
-	    sizeof(buf)) == NULL))
+	if ((addr->type == ADDR_IPV4 && inet_ntop(AF_INET, &addr->value.ipv4,
+	    buf, sizeof(buf)) == NULL) ||
+	    (addr->type == ADDR_IPV6 && inet_ntop(AF_INET6, &addr->value.ipv6,
+	    buf, sizeof(buf)) == NULL))
 		return (NULL);
 
 	if (strlcpy(str, buf, size) >= size) {
