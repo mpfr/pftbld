@@ -112,19 +112,19 @@ handle_privreq(struct kevent *kev)
 	pfd = kev->ident;
 	READ(pfd, &mt, sizeof(mt));
 	switch (mt) {
-	case EXEC_PFCMD:
+	case MSG_EXEC_PFCMD:
 		exec_pfcmd(pfd);
 		break;
-	case HANDLE_PERSIST:
+	case MSG_HANDLE_PERSIST:
 		handle_persist(pfd);
 		break;
-	case SET_VERBOSE:
+	case MSG_SET_VERBOSE:
 		set_verbose(pfd);
 		break;
-	case CONF_RELOAD:
+	case MSG_CONF_RELOAD:
 		conf_reload(pfd);
 		break;
-	case SHUTDOWN_MAIN:
+	case MSG_SHUTDOWN_MAIN:
 		shutdown_main();
 		/* NOTREACHED */
 	default:
@@ -139,7 +139,7 @@ pfexec(struct pfresult *pfres, struct pfcmd *cmd)
 	size_t		 len;
 	struct caddr	*ca;
 
-	mt = EXEC_PFCMD;
+	mt = MSG_EXEC_PFCMD;
 	WRITE2(privfd, &mt, sizeof(mt), cmd, sizeof(*cmd));
 	len = strlen(cmd->tblname) + 1;
 	WRITE2(privfd, &len, sizeof(len), cmd->tblname, len);
@@ -375,13 +375,13 @@ handle_persist(int pfd)
 	    MODE_FILE_WRONLY)) == -1)
 		FATAL("open");
 
-	mt = ACK;
+	mt = MSG_ACK;
 	WRITE(pfd, &mt, sizeof(mt));
 	while (send_fd(fd, &mt, sizeof(mt), pfd) == -1)
 		NANONAP;
 	/* wait for reply */
 	READ(pfd, &mt, sizeof(mt));
-	if (mt == ACK &&
+	if (mt == MSG_ACK &&
 	    (fchown(fd, dstat.st_uid, dstat.st_gid) == -1 ||
 	    fchmod(fd, MODE_FILE_RDWR & dstat.st_mode) == -1))
 		log_warn("failed setting permissions on persist file %s",
@@ -390,7 +390,7 @@ handle_persist(int pfd)
 	return;
 
 fail:
-	mt = NAK;
+	mt = MSG_NAK;
 	WRITE(pfd, &mt, sizeof(mt));
 }
 
@@ -413,27 +413,27 @@ set_verbose(int pfd)
 	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets)
 		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets)
 			send_verbose(sock->ctrlfd);
-	mt = ACK;
+	mt = MSG_ACK;
 	WRITE(pfd, &mt, sizeof(mt));
 }
 
 static void
 send_verbose(int ctrlfd)
 {
-	enum msgtype	 mt = SET_VERBOSE;
+	enum msgtype	 mt = MSG_SET_VERBOSE;
 	int		 v = log_getverbose();
 
 	WRITE2(ctrlfd, &mt, sizeof(mt), &v, sizeof(v));
 	/* wait for reply */
 	READ(ctrlfd, &mt, sizeof(mt));
-	if (mt != ACK)
+	if (mt != MSG_ACK)
 		FATALX("verbose level update failed (%d)", mt);
 }
 
 static void
 conf_reload(int pfd)
 {
-	enum msgtype	 mt = ACK;
+	enum msgtype	 mt = MSG_ACK;
 
 	WRITE(pfd, &mt, sizeof(mt));
 
@@ -483,9 +483,9 @@ end:
 static void
 send_conf(int fd)
 {
-	enum msgtype	 mt = UPDATE_CONFIG;
-	enum msgtype	 inext = QUEUE_NEXTITEM;
-	enum msgtype	 iend = QUEUE_ENDITEMS;
+	enum msgtype	 mt = MSG_UPDATE_CONFIG;
+	enum msgtype	 inext = MSG_QUEUE_NEXTITEM;
+	enum msgtype	 iend = MSG_QUEUE_ENDITEMS;
 	size_t		 n;
 	struct socket	*sock;
 	struct target	*tgt;
@@ -537,7 +537,7 @@ send_conf(int fd)
 	WRITE(fd, &iend, sizeof(iend));
 
 	READ(fd, &mt, sizeof(mt));
-	if (mt != ACK)
+	if (mt != MSG_ACK)
 		FATALX("config update failed (%d)", mt);
 }
 
