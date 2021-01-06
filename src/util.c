@@ -133,8 +133,8 @@ struct crange *
 parse_crange(const char *str)
 {
 	struct crange	*r;
-	int		 bits, j, k, b;
-	unsigned char	*first, *last;
+	int		 bits, c, nbyte;
+	unsigned char	*first, *last, b;
 
 	if (str == NULL || *str == '\0')
 		return (NULL);
@@ -142,37 +142,35 @@ parse_crange(const char *str)
 	CALLOC(r, 1, sizeof(*r));
 
 	if ((bits = inet_net_pton(AF_INET, str, &r->first.ipv4,
-	    sizeof(struct in_addr))) != -1) {
+	    sizeof(r->first.ipv4))) != -1) {
 		if (inet_net_ntop(AF_INET, &r->first.ipv4, bits, r->str,
 		    sizeof(r->str)) == NULL)
 			FATAL("inet_net_ntop");
 		r->type = ADDR_IPV4;
-		r->last = r->first;
 		first = (unsigned char *)&r->first.ipv4.s_addr;
 		last = (unsigned char *)&r->last.ipv4.s_addr;
-		j = 32 - bits;
-		k = 3;
+		nbyte = sizeof(struct in_addr);
 	} else if ((bits = inet_net_pton(AF_INET6, str, &r->first.ipv6,
-	    sizeof(struct in6_addr))) != -1) {
+	    sizeof(r->first.ipv6))) != -1) {
 		if (inet_net_ntop(AF_INET6, &r->first.ipv6, bits, r->str,
 		    sizeof(r->str)) == NULL)
 			FATAL("inet_net_ntop");
 		r->type = ADDR_IPV6;
-		r->last = r->first;
 		first = (unsigned char *)&r->first.ipv6.s6_addr;
 		last = (unsigned char *)&r->last.ipv6.s6_addr;
-		j = 128 - bits;
-		k = 15;
+		nbyte = sizeof(struct in6_addr);
 	} else {
 		free(r);
 		return (NULL);
 	}
-	for (b = 0; j > 0; j -= 1) {
-		first[k] &= ~(1 << b);
-		last[k] |= 1 << b;
-		if (++b > 7) {
-			b = 0;
-			k -= 1;
+	r->last = r->first;
+	for (c = (nbyte-- << 3) - bits, b = 1; c > 0; c--) {
+		first[nbyte] &= ~b;
+		last[nbyte] |= b;
+		b <<= 1;
+		if (b == 0) {
+			b = 1;
+			nbyte--;
 		}
 	}
 #if DEBUG
