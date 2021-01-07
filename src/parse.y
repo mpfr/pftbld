@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  * Copyright (c) 2015 Ted Unangst <tedu@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -107,7 +107,7 @@ grammar		: /* empty */
 		;
 
 main		: BACKLOG NUMBER		{
-			if ($2 <= 0 || $2 >= CONF_NO_BACKLOG) {
+			if ($2 <= 0 || $2 > CONF_BACKLOG_MAX) {
 				yyerror("backlog out of bounds");
 				YYERROR;
 			}
@@ -115,15 +115,15 @@ main		: BACKLOG NUMBER		{
 			DPRINTF("global backlog: %d", conf->backlog);
 		}
 		| DATAMAX NUMBER		{
-			if ($2 <= 0 || $2 >= CONF_NO_DATAMAX) {
+			if ($2 <= 0 || $2 > CONF_DATAMAX_MAX) {
 				yyerror("datamax out of bounds");
 				YYERROR;
 			}
 			conf->datamax = $2;
-			DPRINTF("global datamax: %zu", conf->datamax);
+			DPRINTF("global datamax: %lld", conf->datamax);
 		}
 		| DROP TIME			{
-			if ($2 <= 0 || $2 >= CONF_NO_DROP.tv_sec) {
+			if ($2 <= 0 || $2 > CONF_DROP_MAX) {
 				yyerror("drop time out of bounds");
 				YYERROR;
 			}
@@ -160,7 +160,7 @@ main		: BACKLOG NUMBER		{
 			DPRINTF("no global timeout");
 		}
 		| TIMEOUT NUMBER		{
-			if ($2 <= 0 || $2 >= CONF_NO_TIMEOUT) {
+			if ($2 <= 0 || $2 > CONF_TIMEOUT_MAX) {
 				yyerror("timeout out of bounds");
 				YYERROR;
 			}
@@ -274,7 +274,7 @@ targetoptsl	: CASCADE			{
 			}
 		}
 		| DROP TIME			{
-			if ($2 <= 0 || $2 >= CONF_NO_DROP.tv_sec) {
+			if ($2 <= 0 || $2 > CONF_DROP_MAX) {
 				yyerror("drop time out of bounds");
 				YYERROR;
 			}
@@ -393,7 +393,7 @@ sockopts_l	: sockoptsl optcommanl sockopts_l
 		;
 
 sockoptsl	: BACKLOG NUMBER	{
-			if ($2 <= 0 || $2 >= CONF_NO_BACKLOG) {
+			if ($2 <= 0 || $2 > CONF_BACKLOG_MAX) {
 				yyerror("backlog out of bounds");
 				YYERROR;
 			}
@@ -401,12 +401,12 @@ sockoptsl	: BACKLOG NUMBER	{
 			DPRINTF("backlog: %d", conf->backlog);
 		}
 		| DATAMAX NUMBER	{
-			if ($2 <= 0 || $2 >= CONF_NO_DATAMAX) {
+			if ($2 <= 0 || $2 > CONF_DATAMAX_MAX) {
 				yyerror("datamax out of bounds");
 				YYERROR;
 			}
 			sock->datamax = $2;
-			DPRINTF("datamax: %zu", sock->datamax);
+			DPRINTF("datamax: %lld", sock->datamax);
 		}
 		| GROUP NUMBER		{
 			struct group	*grp;
@@ -493,7 +493,7 @@ sockoptsl	: BACKLOG NUMBER	{
 			free($2);
 		}
 		| TIMEOUT NUMBER	{
-			if ($2 <= 0 || $2 >= CONF_NO_TIMEOUT) {
+			if ($2 <= 0 || $2 > CONF_TIMEOUT_MAX) {
 				yyerror("timeout out of bounds");
 				YYERROR;
 			}
@@ -568,7 +568,7 @@ tableopts_l	: tableoptsl optcommanl tableopts_l
 		;
 
 tableoptsl	: DROP TIME		{
-			if ($2 <= 0 || $2 >= CONF_NO_DROP.tv_sec) {
+			if ($2 <= 0 || $2 > CONF_DROP_MAX) {
 				yyerror("drop time out of bounds");
 				YYERROR;
 			}
