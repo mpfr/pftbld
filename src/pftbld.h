@@ -59,10 +59,14 @@
 #define TIMESPEC_INFINITE	(const struct timespec){ LLONG_MAX, LONG_MAX }
 #define timespec_isinfinite(t)	timespeccmp(t, &TIMESPEC_INFINITE, ==)
 
-#define CONF_NO_BACKLOG	INT_MAX
-#define CONF_NO_DATAMAX	LLONG_MAX
-#define CONF_NO_TIMEOUT	LLONG_MAX
-#define CONF_NO_DROP	TIMESPEC_INFINITE
+#define CONF_NO_BACKLOG		-1
+#define CONF_BACKLOG_MAX	INT_MAX
+#define CONF_NO_DATAMAX		-1
+#define CONF_DATAMAX_MAX	LLONG_MAX
+#define CONF_NO_TIMEOUT		-1
+#define CONF_TIMEOUT_MAX	LLONG_MAX
+#define CONF_NO_DROP		TIMESPEC_INFINITE
+#define CONF_DROP_MAX		TIMESPEC_INFINITE.tv_sec
 
 #define EV_DPRINTF(e, s)					\
 	DPRINTF("KEVENT%s(id:%lu, EVFILT_%s%s, data:%lld)",	\
@@ -291,8 +295,8 @@ struct inbuf {
 	char		 tgtname[NAME_MAX];
 	char		 sockid[NAME_MAX];
 	char		*data;
-	size_t		 nr;
-	size_t		 datamax;
+	long long	 nr;
+	long long	 datamax;
 	time_t		 timeout;
 	struct kevcb	 handler;
 
@@ -312,16 +316,16 @@ struct table {
 STAILQ_HEAD(tableq, table);
 
 struct socket {
-	char	 path[sizeof(((struct sockaddr_un *)0)->sun_path)];
-	char	 id[NAME_MAX];
-	uid_t	 owner;
-	gid_t	 group;
-	mode_t	 mode;
-	int	 backlog;
-	size_t	 datamax;
-	time_t	 timeout;
-	pid_t	 pid;
-	int	 ctrlfd;
+	char		 path[sizeof(((struct sockaddr_un *)0)->sun_path)];
+	char		 id[NAME_MAX];
+	uid_t		 owner;
+	gid_t		 group;
+	mode_t		 mode;
+	int		 backlog;
+	long long	 datamax;
+	time_t		 timeout;
+	pid_t		 pid;
+	int		 ctrlfd;
 
 	STAILQ_ENTRY(socket) sockets;
 };
@@ -344,7 +348,7 @@ struct config {
 	struct socket	 ctrlsock;
 	char		 log[PATH_MAX];
 	int		 backlog;
-	size_t		 datamax;
+	long long	 datamax;
 	time_t		 timeout;
 	struct timespec	 drop;
 	struct targetq	 ctargets;
