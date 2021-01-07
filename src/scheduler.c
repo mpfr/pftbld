@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,8 +26,8 @@
 #include "log.h"
 #include "pftbld.h"
 
-#define HAS_DATAMAX(ibuf)	(ibuf->datamax < CONF_NO_DATAMAX)
-#define HAS_TIMEOUT(ibuf)	(ibuf->timeout < CONF_NO_TIMEOUT)
+#define HAS_DATAMAX(ibuf)	(ibuf->datamax != CONF_NO_DATAMAX)
+#define HAS_TIMEOUT(ibuf)	(ibuf->timeout != CONF_NO_TIMEOUT)
 
 static struct client
 		*evtimer_client(void);
@@ -696,7 +696,7 @@ handle_inbuf(struct kevent *kev)
 	buf[nr--] = '\0';
 	ibuf->nr += nr;
 	if (HAS_DATAMAX(ibuf) && ibuf->nr > ibuf->datamax) {
-		log_warnx("read on target [%s%s] exceeded size limit (%zu)",
+		log_warnx("read on target [%s%s] exceeded size limit (%lld)",
 		    ibuf->tgtname, ibuf->sockid, ibuf->datamax);
 		EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0, NULL);
 		if (HAS_TIMEOUT(ibuf))
