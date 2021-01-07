@@ -56,7 +56,7 @@ drop_priv(void)
 int
 send_fd(int fd, void *data, size_t len, int cfd)
 {
-	size_t		 ns;
+	ssize_t		 ns;
 	struct iovec	 iov[1];
 	struct msghdr	 msg;
 	struct cmsghdr	*cmsg;
@@ -79,12 +79,12 @@ send_fd(int fd, void *data, size_t len, int cfd)
 
 	*(int *)CMSG_DATA(cmsg) = fd;
 
-	if ((ns = sendmsg(cfd, &msg, 0)) == -1UL) {
+	if ((ns = sendmsg(cfd, &msg, 0)) == -1) {
 		if (errno != EAGAIN && errno != EMFILE)
 			FATAL("sendmsg");
 		return (-1);
 	}
-	if (ns != len)
+	if (len - ns != 0)
 		FATALX("invalid message length");
 
 	return (0);
@@ -93,7 +93,7 @@ send_fd(int fd, void *data, size_t len, int cfd)
 int
 recv_fd(void *data, size_t maxlen, int cfd)
 {
-	size_t		 nr;
+	ssize_t		 nr;
 	struct iovec	 iov[1];
 	struct msghdr	 msg;
 	struct cmsghdr	*cmsg;
@@ -108,7 +108,7 @@ recv_fd(void *data, size_t maxlen, int cfd)
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 1;
 
-	if ((nr = recvmsg(cfd, &msg, 0)) == -1UL) {
+	if ((nr = recvmsg(cfd, &msg, 0)) == -1) {
 		if (errno != EAGAIN && errno != EMSGSIZE)
 			FATAL("recvmsg");
 		return (-1);
