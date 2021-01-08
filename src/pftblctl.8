@@ -159,10 +159,14 @@ i.e. not present in any
 table.
 .It Ic addresses
 Reduces client information to the IP address and omits any further output.
-.It Ic next Ar limit
-Outputs clients only until a maximum
+.It Ic next | last Ar limit
+Outputs a maximum
 .Ar limit
-of upcoming events.
+of clients relative to either the
+.Ic next
+(i.e. first) or the
+.Ic last
+entry in the list.
 .El
 .It Ic save Oo Ar target ... Oc
 Writes managed addresses and meta-data (number of hits and timestamp of last

@@ -675,7 +675,7 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	struct crangeq	 crq;
 	struct ptr	*tp, *cp;
 	struct crange	*cr;
-	int		 act = 0, addrs = 0, lim = 0, cnt;
+	int		 act = 0, addrs = 0, lim = 0, cnt = 0;
 	const char	*err;
 	struct timespec	 now, tsdiff;
 	struct client	*clt;
@@ -704,18 +704,29 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 
 				addrs = 1;
 			} else if (!strcmp("next", arg)) {
-				if (lim ||
-				    (arg = shift(arg, data, datalen)) == NULL)
+				if (lim)
 					return (1);
 
-				lim = strtonum(arg, 1, INT_MAX, &err);
+				lim = 1;
+			} else if (!strcmp("last", arg)) {
+				if (lim)
+					return (1);
+
+				lim = -1;
+			} else
+				return (1);
+
+			if (lim && !cnt) {
+				if ((arg = shift(arg, data, datalen)) == NULL)
+					return (1);
+
+				cnt = strtonum(arg, 1, INT_MAX, &err);
 				if (err != NULL) {
 					msg_send(sfd, "limit %s.\n", err);
 					return (0);
 				}
-			} else
-				return (1);
-
+				lim *= cnt;
+			}
 		} while ((arg = shift(arg, data, datalen)) != NULL);
 
 	STAILQ_INIT(&tpq);
@@ -752,7 +763,8 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		MALLOC(cp, sizeof(*cp));
 		cp->p = clt;
 		STAILQ_INSERT_TAIL(&cpq, cp, ptrs);
-		cnt++;
+		if (lim >= 0)
+			cnt++;
 	}
 
 	while ((cp = STAILQ_FIRST(&cpq)) != NULL) {
@@ -760,9 +772,15 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		STAILQ_REMOVE_HEAD(&cpq, ptrs);
 		free(cp);
 
-		if (lim && cnt > lim) {
+		if (lim > 0 && cnt > lim) {
 			cnt--;
 			continue;
+		}
+		if (lim < 0) {
+			if (cnt < -lim)
+				cnt++;
+			else
+				continue;
 		}
 
 		if (addrs) {
