@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -671,36 +671,52 @@ end:
 static int
 perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 {
-	struct ptrq	 tpq;
+	struct ptrq	 tpq, cpq;
 	struct crangeq	 crq;
-	struct ptr	*tp;
+	struct ptr	*tp, *cp;
 	struct crange	*cr;
-	int		 act = 0, addrs = 0, cnt;
+	int		 act = 0, addrs = 0, lim = 0, cnt;
+	const char	*err;
 	struct timespec	 now, tsdiff;
 	struct client	*clt;
 	char		*age, tstr[TS_SIZE];
 
-	if (arg == NULL)
-		return (1);
+	if (arg != NULL)
+		do {
+			if (!strcmp("from", arg)) {
+				if ((arg = shift(arg, data, datalen)) != NULL)
+					break;
+				return (1);
+			}
+			if (!strcmp("active", arg)) {
+				if (act)
+					return (1);
 
-	do {
-		if (!strcmp("from", arg)) {
-			if ((arg = shift(arg, data, datalen)) != NULL)
-				break;
-			return (1);
-		}
-		if (!strcmp("active", arg)) {
-			if (act++)
+				act = 1;
+			} else if (!strcmp("inactive", arg)) {
+				if (act)
+					return (1);
+
+				act = -1;
+			} else if (!strcmp("addresses", arg)) {
+				if (addrs)
+					return (1);
+
+				addrs = 1;
+			} else if (!strcmp("next", arg)) {
+				if (lim ||
+				    (arg = shift(arg, data, datalen)) == NULL)
+					return (1);
+
+				lim = strtonum(arg, 1, INT_MAX, &err);
+				if (err != NULL) {
+					msg_send(sfd, "limit %s.\n", err);
+					return (0);
+				}
+			} else
 				return (1);
 
-		} else if (!strcmp("addresses", arg)) {
-			if (addrs++)
-				return (1);
-
-		} else
-			return (1);
-
-	} while ((arg = shift(arg, data, datalen)) != NULL);
+		} while ((arg = shift(arg, data, datalen)) != NULL);
 
 	SIMPLEQ_INIT(&tpq);
 	SIMPLEQ_INIT(&crq);
@@ -712,13 +728,14 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		goto end;
 	}
 
-	if (!addrs) {
-		cnt = 0;
+	if (!addrs)
 		GET_TIME(&now);
-	}
+
+	SIMPLEQ_INIT(&cpq);
+	cnt = 0;
 
 	TAILQ_FOREACH_REVERSE(clt, &cltq, clientq, clients) {
-		if (act && clt->exp)
+		if ((act == 1 && clt->exp) || (act == -1 && !clt->exp))
 			continue;
 		if (!SIMPLEQ_EMPTY(&tpq)) {
 			SIMPLEQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
@@ -730,6 +747,22 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
+		}
+
+		MALLOC(cp, sizeof(*cp));
+		cp->p = clt;
+		SIMPLEQ_INSERT_TAIL(&cpq, cp, ptrs);
+		cnt++;
+	}
+
+	while ((cp = SIMPLEQ_FIRST(&cpq)) != NULL) {
+		clt = cp->p;
+		SIMPLEQ_REMOVE_HEAD(&cpq, ptrs);
+		free(cp);
+
+		if (lim && cnt > lim) {
+			cnt--;
+			continue;
 		}
 
 		if (addrs) {
@@ -761,7 +794,6 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 				    "[%s]\n", age, clt->tbl->name, tstr);
 			free(age);
 		}
-		cnt++;
 	}
 
 	if (!addrs) {
