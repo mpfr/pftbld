@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <!-- This is an automatically generated file.  Do not edit.
-   Copyright (c) 2020 Matthias Pressfreund
+   Copyright (c) 2020, 2021 Matthias Pressfreund
   
    Permission to use, copy, modify, and distribute this software for any
    purpose with or without fee is hereby granted, provided that the above
@@ -146,12 +146,20 @@
       Beyond that, one or more <var class="Ar">option</var> may be specified to
       further narrow down the result of the query. Valid options are:
     <dl class="Bl-tag">
-      <dt id="active"><a class="permalink" href="#active"><code class="Ic">active</code></a></dt>
-      <dd>Matches only clients currently present in a
+      <dt id="active"><a class="permalink" href="#active"><code class="Ic">active</code></a>
+        |
+        <a class="permalink" href="#inactive"><code class="Ic" id="inactive">inactive</code></a></dt>
+      <dd>Matches only clients currently either <code class="Ic">active</code>,
+          i.e. present in at least one, or <code class="Ic">inactive</code>,
+          i.e. not present in any
           <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table.</dd>
       <dt id="addresses"><a class="permalink" href="#addresses"><code class="Ic">addresses</code></a></dt>
       <dd>Reduces client information to the IP address and omits any further
           output.</dd>
+      <dt id="next"><a class="permalink" href="#next"><code class="Ic">next</code></a>
+        <var class="Ar">limit</var></dt>
+      <dd>Outputs clients only until a maximum <var class="Ar">limit</var> of
+          upcoming events.</dd>
     </dl>
   </dd>
   <dt id="save"><a class="permalink" href="#save"><code class="Ic">save</code></a>
@@ -276,7 +284,7 @@ ACK
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">December 15, 2020</td>
+    <td class="foot-date">January 8, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

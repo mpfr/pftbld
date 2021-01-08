@@ -1,5 +1,5 @@
 .\"
-.\" Copyright (c) 2020 Matthias Pressfreund
+.\" Copyright (c) 2020, 2021 Matthias Pressfreund
 .\"
 .\" Permission to use, copy, modify, and distribute this software for any
 .\" purpose with or without fee is hereby granted, provided that the above
@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 15 2020 $
+.Dd $Mdocdate: January 8 2021 $
 .Dt PFTBLCTL 8
 .Os
 .Sh NAME
@@ -149,12 +149,20 @@ Beyond that, one or more
 may be specified to further narrow down the result of the query.
 Valid options are:
 .Bl -tag -width Ds
-.It Ic active
-Matches only clients currently present in a
+.It Ic active | inactive
+Matches only clients currently either
+.Ic active ,
+i.e. present in at least one, or
+.Ic inactive ,
+i.e. not present in any
 .Xr pf 4
 table.
 .It Ic addresses
 Reduces client information to the IP address and omits any further output.
+.It Ic next Ar limit
+Outputs clients only until a maximum
+.Ar limit
+of upcoming events.
 .El
 .It Ic save Oo Ar target ... Oc
 Writes managed addresses and meta-data (number of hits and timestamp of last
