@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: January 8 2021 $
+.Dd $Mdocdate: January 10 2021 $
 .Dt PFTBLCTL 8
 .Os
 .Sh NAME
@@ -159,6 +159,31 @@ i.e. not present in any
 table.
 .It Ic addresses
 Reduces client information to the IP address and omits any further output.
+.It Ic hits Ar number | range
+Filters clients by a
+.Ar number
+or
+.Ar range
+of occurrences, whereby ranges may be specified in the form of either
+.Pa min\(enmax
+(i.e. between
+.Pa min
+and
+.Pa max ,
+e.g.
+.Sq 1\(en2 )
+or
+.Pa \(enmax
+(i.e. up to
+.Pa max ,
+e.g.
+.Sq \(en3 )
+or
+.Pa min\(en
+(i.e. at least
+.Pa min ,
+e.g.
+.Sq 2\(en ) .
 .It Ic next | last Ar limit
 Outputs a maximum
 .Ar limit
@@ -245,13 +270,13 @@ Next scheduled event:
 .Pp
 Figuring out how many managed clients from the
 .Pa 192/8
-network received on the
+network received at least 2 times on the
 .Pa www
 target are currently present in a
 .Xr pf 4
 table may be accomplished like this:
 .Bd -literal -offset indent
-# pftblctl list active addresses from www 192/8 | wc -l
+# pftblctl list active addresses hits 2- from www 192/8 | wc -l
        3
 .Ed
 .Pp
