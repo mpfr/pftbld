@@ -156,6 +156,17 @@
       <dt id="addresses"><a class="permalink" href="#addresses"><code class="Ic">addresses</code></a></dt>
       <dd>Reduces client information to the IP address and omits any further
           output.</dd>
+      <dt id="hits"><a class="permalink" href="#hits"><code class="Ic">hits</code></a>
+        <var class="Ar">number</var> | <var class="Ar">range</var></dt>
+      <dd>Filters clients by a <var class="Ar">number</var> or
+          <var class="Ar">range</var> of occurrences, whereby ranges may be
+          specified in the form of either <span class="Pa">min&#x2013;max</span>
+          (i.e. between <span class="Pa">min</span> and
+          <span class="Pa">max</span>, e.g. &#x2018;1&#x2013;2&#x2019;) or
+          <span class="Pa">&#x2013;max</span> (i.e. up to
+          <span class="Pa">max</span>, e.g. &#x2018;&#x2013;3&#x2019;) or
+          <span class="Pa">min&#x2013;</span> (i.e. at least
+          <span class="Pa">min</span>, e.g. &#x2018;2&#x2013;&#x2019;).</dd>
       <dt id="next"><a class="permalink" href="#next"><code class="Ic">next</code></a>
         |
         <a class="permalink" href="#last"><code class="Ic" id="last">last</code></a>
@@ -235,13 +246,13 @@ Next scheduled event:
 </pre>
 </div>
 <p class="Pp">Figuring out how many managed clients from the
-    <span class="Pa">192/8</span> network received on the
+    <span class="Pa">192/8</span> network received at least 2 times on the
     <span class="Pa">www</span> target are currently present in a
     <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table may be
     accomplished like this:</p>
 <div class="Bd Pp Bd-indent">
 <pre>
-# pftblctl list active addresses from www 192/8 | wc -l
+# pftblctl list active addresses hits 2- from www 192/8 | wc -l
        3
 </pre>
 </div>
@@ -287,7 +298,7 @@ ACK
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">January 8, 2021</td>
+    <td class="foot-date">January 10, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

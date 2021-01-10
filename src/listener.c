@@ -676,10 +676,11 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	struct ptr	*tp, *cp;
 	struct crange	*cr;
 	int		 act = 0, addrs = 0, lim = 0, cnt = 0;
+	unsigned int	 hits[2] = { 0 };
 	const char	*err;
 	struct timespec	 now, tsdiff;
 	struct client	*clt;
-	char		*age, tstr[TS_SIZE];
+	char		*age, tstr[TS_SIZE], *d;
 
 	if (arg != NULL)
 		do {
@@ -703,6 +704,38 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 					return (1);
 
 				addrs = 1;
+			} else if (!strcmp("hits", arg)) {
+				if (hits[0] || hits[1] ||
+				    (arg = shift(arg, data, datalen)) == NULL)
+					return (1);
+
+				if ((d = strchr(arg, '-')) == NULL)
+					hits[0] = hits[1] = strtonum(arg, 1,
+					    UINT_MAX, &err);
+				else if (d == arg) {
+					hits[0] = 1;
+					hits[1] = strtonum(d + 1, 1, UINT_MAX,
+					    &err);
+				} else if (d == arg + strlen(arg) - 1) {
+					hits[1] = UINT_MAX;
+					*d = '\0';
+					hits[0] = strtonum(arg, 1, UINT_MAX,
+					    &err);
+					*d = '-';
+				} else {
+					*d = '\0';
+					hits[0] = strtonum(arg, 1, UINT_MAX,
+					    &err);
+					*d = '-';
+					if (err == NULL)
+						hits[1] = strtonum(d + 1, 1,
+						    UINT_MAX, &err);
+				}
+				if (err != NULL || hits[0] > hits[1]) {
+					msg_send(sfd, "hits %s.\n",
+					    err ? err : "range invalid");
+					return (0);
+				}
 			} else if (!strcmp("next", arg)) {
 				if (lim)
 					return (1);
@@ -747,6 +780,9 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 
 	TAILQ_FOREACH_REVERSE(clt, &cltq, clientq, clients) {
 		if ((act == 1 && clt->exp) || (act == -1 && !clt->exp))
+			continue;
+		if (hits[0] && hits[1] &&
+		    (clt->cnt < hits[0] || clt->cnt > hits[1]))
 			continue;
 		if (!SIMPLEQ_EMPTY(&tpq)) {
 			SIMPLEQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
