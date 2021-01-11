@@ -712,25 +712,19 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 				if ((d = strchr(arg, '-')) == NULL)
 					hits[0] = hits[1] = strtonum(arg, 1,
 					    UINT_MAX, &err);
-				else if (d == arg) {
-					hits[0] = 1;
-					hits[1] = strtonum(d + 1, 1, UINT_MAX,
-					    &err);
-				} else if (d == arg + strlen(arg) - 1) {
-					hits[1] = UINT_MAX;
+				else if (strlen(arg) > 1) {
 					*d = '\0';
-					hits[0] = strtonum(arg, 1, UINT_MAX,
-					    &err);
-					*d = '-';
-				} else {
-					*d = '\0';
-					hits[0] = strtonum(arg, 1, UINT_MAX,
-					    &err);
-					*d = '-';
+					err = NULL;
+					hits[0] = *arg == '\0' ? 1 :
+					    strtonum(arg, 1, UINT_MAX, &err);
 					if (err == NULL)
-						hits[1] = strtonum(d + 1, 1,
-						    UINT_MAX, &err);
-				}
+						hits[1] = *(d + 1) == '\0' ?
+						    UINT_MAX : strtonum(d + 1,
+						    1, UINT_MAX, &err);
+					*d = '-';
+				} else
+					return (1);
+
 				if (err != NULL || hits[0] > hits[1]) {
 					msg_send(sfd, "hits %s.\n",
 					    err ? err : "range invalid");
