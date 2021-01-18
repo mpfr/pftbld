@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -354,8 +354,7 @@ handle_persist(int pfd)
 	READ(pfd, &len, sizeof(len));
 	MALLOC(path, len);
 	READ(pfd, path, len);
-	if ((dpath = strdup(path)) == NULL)
-		FATAL("strdup");
+	STRDUP(dpath, path);
 	if ((dir = dirname(dpath)) == NULL) {
 		log_warn("persist directory");
 		free(dpath);

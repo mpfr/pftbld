@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,13 +25,44 @@
 
 #include "pftbld.h"
 
+static ssize_t	 do_pipe(int, int, char *, const char *, const char *);
+
+static ssize_t
+do_pipe(int from, int to, char *buf, const char *errfrom, const char *errto)
+{
+	ssize_t	 nr, nw, n;
+
+	do {
+		while ((nr = read(from, buf, sizeof(buf))) == -1) {
+			if (errno != EAGAIN)
+				err(1, "%s", errfrom);
+
+			NANONAP;
+		}
+		nw = 0;
+		while (nw < nr) {
+			while ((n = write(to, &buf[nw], nr - nw)) == -1) {
+				if (errno != EAGAIN)
+					err(1, "%s", errto);
+
+				NANONAP;
+			}
+			if (n == 0)
+				break;
+			nw += n;
+		}
+	} while (nr);
+
+	return (nw);
+}
+
 __dead void
 sockpipe(const char *path, int verbose)
 {
 	int			 fd;
 	struct sockaddr_un	 ssa_un;
 	char			 buf[BUFSIZ];
-	ssize_t			 nr, nw, n;
+	ssize_t			 nw;
 
 	if (path == NULL || *path == '\0' || strlen(path) >= PATH_MAX)
 		errx(1, "invalid path");
@@ -54,51 +85,22 @@ sockpipe(const char *path, int verbose)
 	if (connect(fd, (struct sockaddr *)&ssa_un, sizeof(ssa_un)) == -1)
 		err(1, "connect (%s) failed", path);
 
-	nw = 0;
-	do {
-		while ((nr = read(STDIN_FILENO, buf, sizeof(buf))) == -1) {
-			if (errno != EAGAIN)
-				err(1, "stdin read failed");
-			NANONAP;
-		}
-		n = 0;
-		while (n < nr) {
-			while ((nw = write(fd, &buf[n], nr - n)) == -1) {
-				if (errno != EAGAIN)
-					err(1, "socket write failed");
-				NANONAP;
-			}
-			n += nw;
-		}
-	} while (nr);
+	nw = do_pipe(STDIN_FILENO, fd, buf,
+	    "stdin read failed", "socket write failed");
 
-	if (nw < 1 || buf[nw - 1] != '\0')
+	if (nw < 1 || buf[--nw] != '\0')
 		while (write(fd, "", 1) == -1) {
 			if (errno != EAGAIN)
 				err(1, "socket write failed");
+
 			NANONAP;
 		}
 
 	if (!verbose)
 		exit(0);
 
-	do {
-		while ((nr = read(fd, buf, sizeof(buf))) == -1) {
-			if (errno != EAGAIN)
-				err(1, "socket read failed");
-			NANONAP;
-		}
-		n = 0;
-		while (n < nr) {
-			while ((nw = write(STDOUT_FILENO, &buf[n],
-			    nr - n)) == -1) {
-				if (errno != EAGAIN)
-					err(1, "stdout write failed");
-				NANONAP;
-			}
-			n += nw;
-		}
-	} while (nr);
+	(void)do_pipe(fd, STDOUT_FILENO, buf,
+	    "socket read failed", "stdout write failed");
 
 	exit(0);
 }

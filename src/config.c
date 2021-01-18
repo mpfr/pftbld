@@ -289,9 +289,8 @@ check_targets(void)
 	CALLOC(buf, 1, 1);
 	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
 		buf2 = buf;
-		if (asprintf(&buf, "%s%s%s", buf2,
-		    strlen(buf2) > 0 ? "\n" : "", tgt->name) == -1)
-			FATAL("asprintf");
+		ASPRINTF(&buf, "%s%s%s", buf2, strlen(buf2) > 0 ? "\n" : "",
+		    tgt->name);
 		free(buf2);
 	}
 	len = strlen(buf) + 1;

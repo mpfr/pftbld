@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <!-- This is an automatically generated file.  Do not edit.
-   Copyright (c) 2020 Matthias Pressfreund
+   Copyright (c) 2020, 2021 Matthias Pressfreund
   
    Permission to use, copy, modify, and distribute this software for any
    purpose with or without fee is hereby granted, provided that the above
@@ -70,11 +70,13 @@
   <dt>[<code class="Ic">no</code>] <code class="Ic">datamax</code>
     <var class="Ar">bytes</var></dt>
   <dd>This will limit the number of <var class="Ar">bytes</var> allowed to be
-      transmitted per connection. In case a client exceeds this limit, the
-      connection will be closed and all transmitted data will be discarded. If
-      the <code class="Ic">no</code> keyword is specified instead of the number
-      of <var class="Ar">bytes</var>, no limit will be applied to the amount of
-      data accepted by a connection. Defaults to 2048 bytes per connection.</dd>
+      transmitted per connection, the terminating
+      &#x2018;<code class="Li">\0</code>&#x2019; character included. In case a
+      client exceeds this limit, the connection will be closed and all
+      transmitted data will be discarded. If the <code class="Ic">no</code>
+      keyword is specified instead of the number of <var class="Ar">bytes</var>,
+      no limit will be applied to the amount of data accepted by a connection.
+      Defaults to 2048 bytes per connection.</dd>
   <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
     <var class="Ar">time</var></dt>
   <dd>The period of time (starting at the moment of reception) after which a
@@ -441,7 +443,7 @@ function pftbld_feed() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">December 17, 2020</td>
+    <td class="foot-date">January 16, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

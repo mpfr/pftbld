@@ -1,5 +1,5 @@
 .\"
-.\" Copyright (c) 2020 Matthias Pressfreund
+.\" Copyright (c) 2020, 2021 Matthias Pressfreund
 .\"
 .\" Permission to use, copy, modify, and distribute this software for any
 .\" purpose with or without fee is hereby granted, provided that the above
@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 17 2020 $
+.Dd $Mdocdate: January 16 2021 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -71,7 +71,9 @@ utility.
 .It Oo Ic no Oc Ic datamax Ar bytes
 This will limit the number of
 .Ar bytes
-allowed to be transmitted per connection.
+allowed to be transmitted per connection, the terminating
+.Sq Li \e0
+character included.
 In case a client exceeds this limit, the connection will be closed and all
 transmitted data will be discarded.
 If the
