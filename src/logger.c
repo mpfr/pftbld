@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Matthias Pressfreund
+ * Copyright (c) 2020, 2021 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -318,5 +318,5 @@ append_data_log(char *buf, size_t size)
 	while ((ptr = shift(ptr, buf, size)) != NULL)
 		print_log("[%s]", ptr);
 
-	print_log("\n");
+	print_log(".\n");
 }

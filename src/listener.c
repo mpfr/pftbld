@@ -176,12 +176,10 @@ listener(int argc, char *argv[])
 	STOLL(datamax, argv[9]);
 	STOLL(timeout, argv[10]);
 
-	if (*tgtname != '\0') {
-		if (asprintf(&ptitle, "data-listener[%s%s]", tgtname,
-		    sockid) == -1)
-			FATAL("asprintf");
-	} else if ((ptitle = strdup("control-listener")) == NULL)
-		FATAL("strdup");
+	if (*tgtname != '\0')
+		ASPRINTF(&ptitle, "data-listener[%s%s]", tgtname, sockid);
+	else
+		STRDUP(ptitle, "control-listener");
 	setproctitle("%s", ptitle);
 	free(ptitle);
 
@@ -193,8 +191,7 @@ listener(int argc, char *argv[])
 
 	memset(&ssa_un, 0, sizeof(ssa_un));
 	ssa_un.sun_family = AF_UNIX;
-	STRLCPY(ssa_un.sun_path, sockpath, sizeof(ssa_un.sun_path),
-	    "socket path");
+	(void)strlcpy(ssa_un.sun_path, sockpath, sizeof(ssa_un.sun_path));
 	if (bind(srvsockfd, (struct sockaddr *)&ssa_un, sizeof(ssa_un)) == -1)
 		FATAL("bind(%s)", sockpath);
 	if (chown(sockpath, owner, group) == -1)
@@ -210,9 +207,8 @@ listener(int argc, char *argv[])
 	ccnt = 0;
 	flags = 0;
 	memset(&ibuftmpl, 0, sizeof(ibuftmpl));
-	STRLCPY(ibuftmpl.tgtname, tgtname, sizeof(ibuftmpl.tgtname),
-	    "target name");
-	STRLCPY(ibuftmpl.sockid, sockid, sizeof(ibuftmpl.sockid), "socket id");
+	(void)strlcpy(ibuftmpl.tgtname, tgtname, sizeof(ibuftmpl.tgtname));
+	(void)strlcpy(ibuftmpl.sockid, sockid, sizeof(ibuftmpl.sockid));
 	ibuftmpl.datamax = datamax;
 	ibuftmpl.timeout = timeout;
 
@@ -308,10 +304,12 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	static const char	 ack[] = REPLY_ACK,
 				 nak[] = REPLY_NAK;
 
+	int		 datafd = ibuf->datafd;
 	struct target	*tgt;
 	char		*tgtname, *sockid, *data, *age;
 	struct caddr	 addr;
 	struct ptr	*exclk;
+	struct ignore	*ign;
 	struct crange	*exclr;
 	struct client	*clt, *first;
 	struct timespec	 now, tsdiff;
@@ -320,6 +318,18 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	struct pfcmd	 cmd;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
+
+	if ((data = strchr(ibuf->data, '\n')) != NULL)
+		*data = '\0';
+	memset(&addr, 0, sizeof(addr));
+	if (parse_addr(&addr, ibuf->data) == -1) {
+		log_warnx("ignored invalid address (%s)", ibuf->data);
+		send(datafd, nak, sizeof(nak), MSG_NOSIGNAL);
+		close(datafd);
+		return;
+	}
+	if (data != NULL)
+		*data = '\n';
 
 	tgtname = ibuf->tgtname;
 	sockid = ibuf->sockid;
@@ -331,31 +341,34 @@ proc_data(struct inbuf *ibuf, int kqfd)
 
 	if ((exclk = check_exclkeyterms(&tgt->exclkeyterms, data)) != NULL ||
 	    (exclk = check_exclkeyterms(&conf->exclkeyterms, data)) != NULL) {
-		data = replace(data, "\n", '\0');
-		print_ts_log("Ignored excluded keyterm '%s' :: [%s] <- [%s]",
-		    exclk->p, tgtname, data);
-		append_data_log(data, datalen);
+		ign = request_ignore(&addr, tgtname, sockid, exclk);
+		if (ign->cnt == 0) {
+			ASPRINTF(&ign->data, "keyterm '%s'", exclk->p);
+			print_ts_log("Ignored excluded %s :: [%s%s] <- [%s]",
+			    ign->data, tgtname, sockid,
+			    replace(data, "\n", '\0'));
+			append_data_log(data, datalen);
+			GET_TIME(&ign->ts);
+		}
 		goto end;
-	}
-
-	data = replace(data, "\n", '\0');
-	memset(&addr, 0, sizeof(addr));
-	if (parse_addr(&addr, data) == -1) {
-		log_warnx("ignored invalid address (%s)", data);
-		send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
-		close(ibuf->datafd);
-		return;
 	}
 
 	if ((exclr = check_exclcranges(&tgt->exclcranges, &addr)) != NULL ||
 	    (exclr = check_exclcranges(&conf->exclcranges, &addr)) != NULL) {
-		print_ts_log("Ignored excluded ");
-		if (addrvals_cmp(&exclr->first, &exclr->last, exclr->type))
-			print_log("network <%s>", exclr->str);
-		else
-			print_log("address");
-		print_log(" :: [%s%s] <- [%s]", tgtname, sockid, data);
-		append_data_log(data, datalen);
+		ign = request_ignore(&addr, tgtname, sockid, exclr);
+		if (ign->cnt == 0) {
+			(void)replace(data, "\n", '\0');
+			if (addrvals_cmp(&exclr->first, &exclr->last,
+			    exclr->type))
+				ASPRINTF(&ign->data, "network <%s>",
+				    exclr->str);
+			else
+				ASPRINTF(&ign->data, "address");
+			print_ts_log("Ignored excluded %s :: [%s%s] <- [%s]",
+			    ign->data, tgtname, sockid, data);
+			append_data_log(data, datalen);
+			GET_TIME(&ign->ts);
+		}
 		goto end;
 	}
 
@@ -368,28 +381,25 @@ proc_data(struct inbuf *ibuf, int kqfd)
 				break;
 	}
 
+	ign = request_ignore(&addr, tgtname, sockid, NULL);
+
 	if (clt == NULL) {
 		CALLOC(clt, 1, sizeof(*clt));
-		if (addrstr(clt->astr, sizeof(clt->astr), &addr) == NULL)
-			FATALX("invalid address '%s'", clt->astr);
 		clt->addr = addr;
 		clt->tgt = tgt;
-		DPRINTF("new client (%s, %s) created", clt->astr, tgtname);
+		DPRINTF("new client (%s, %s) created", clt->addr.str, tgtname);
 	} else {
-		DPRINTF("found enqueued client (%s, %s, %d)", clt->astr,
+		DPRINTF("found enqueued client (%s, %s, %d)", clt->addr.str,
 		    tgtname, clt->cnt);
-		GET_TIME(&now);
-		timespecsub(&now, &clt->ts, &tsdiff);
-		if (tsdiff.tv_sec <= 1) {
-			print_ts_log("Ignored [%s]:[%s%s] duplicate hit.\n",
-			    clt->astr, tgtname, sockid);
+		if (ign->cnt > 0)
 			goto end;
-		}
+
 		clt->exp = 0;
 		TAILQ_REMOVE(&cltq, clt, clients);
 	}
 
-	print_ts_log("Hit :: [%s%s] <- [%s]", tgtname, sockid, data);
+	print_ts_log("Hit :: [%s%s] <- [%s]", tgtname, sockid,
+	    replace(data, "\n", '\0'));
 	append_data_log(data, datalen);
 
 	clt->cnt++;
@@ -408,7 +418,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 
 	print_ts_log("%s [%s]:[%s]:(%dx",
 	    pfres.nadd > 0 ? ">>> Added" : "Aquired",
-	    clt->astr, tgtname, clt->cnt);
+	    clt->addr.str, tgtname, clt->cnt);
 
 	GET_TIME(&now);
 
@@ -460,9 +470,12 @@ proc_data(struct inbuf *ibuf, int kqfd)
 			    &expire_handler);
 	}
 
+	GET_TIME(&ign->ts);
+
 end:
-	send(ibuf->datafd, ack, sizeof(ack), MSG_NOSIGNAL);
-	close(ibuf->datafd);
+	start_ignore(ign);
+	send(datafd, ack, sizeof(ack), MSG_NOSIGNAL);
+	close(datafd);
 }
 
 #define TIME_TO_STR(str, ts)						\
@@ -526,8 +539,7 @@ proc_ctrl(struct inbuf *ibuf)
 #if DEBUG
 	char		*buf;
 
-	if ((buf = strdup(data)) == NULL)
-		FATAL("strdup");
+	STRDUP(buf, data);
 	DPRINTF("received control command: '%s'", replace(buf, "\n", ','));
 	free(buf);
 #endif
@@ -659,7 +671,7 @@ perform_ctrl_dump(struct statfd *sfd, char *arg, char *data, size_t datalen)
 			if (tp == NULL)
 				continue;
 		}
-		msg_send(sfd, "%s %u %lld\n", clt->astr, clt->cnt,
+		msg_send(sfd, "%s %u %lld\n", clt->addr.str, clt->cnt,
 		    TIMESPEC_SEC_ROUND(&clt->ts));
 	}
 
@@ -814,13 +826,13 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		}
 
 		if (addrs) {
-			msg_send(sfd, "%s\n", clt->astr);
+			msg_send(sfd, "%s\n", clt->addr.str);
 			continue;
 		}
 
 		timespecsub(&now, &clt->ts, &tsdiff);
 		age = hrage(&tsdiff);
-		msg_send(sfd, "[%s]:[%s]:(%dx:%s)\n\t", clt->astr,
+		msg_send(sfd, "[%s]:[%s]:(%dx:%s)\n\t", clt->addr.str,
 		    clt->tgt->name, clt->cnt, age);
 		free(age);
 
@@ -994,7 +1006,7 @@ perform_ctrl_status(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	timespecsub(&now, &clt->ts, &tsdiff);
 	age = hrage(&tsdiff);
 	msg_send(sfd, "\nNext scheduled event:\n\t[%s]:[%s]:(%dx:%s)\n\t\t",
-	    clt->astr, clt->tgt->name, clt->cnt, age);
+	    clt->addr.str, clt->tgt->name, clt->cnt, age);
 	free(age);
 	if (clt->exp)
 		msg_send(sfd, "getting dropped");

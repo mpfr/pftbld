@@ -56,11 +56,11 @@ drop_priv(void)
 int
 send_fd(int fd, void *data, size_t len, int cfd)
 {
-	ssize_t		 ns;
 	struct iovec	 iov[1];
 	struct msghdr	 msg;
-	struct cmsghdr	*cmsg;
 	char		 buf[CMSG_SPACE(sizeof(int))];
+	struct cmsghdr	*cmsg;
+	ssize_t		 ns;
 
 	iov[0].iov_base = data;
 	iov[0].iov_len = len;
@@ -93,11 +93,11 @@ send_fd(int fd, void *data, size_t len, int cfd)
 int
 recv_fd(void *data, size_t maxlen, int cfd)
 {
-	ssize_t		 nr;
 	struct iovec	 iov[1];
 	struct msghdr	 msg;
-	struct cmsghdr	*cmsg;
 	char		 buf[CMSG_SPACE(sizeof(int))];
+	ssize_t		 nr;
+	struct cmsghdr	*cmsg;
 
 	iov[0].iov_base = data;
 	iov[0].iov_len = maxlen;
@@ -192,10 +192,14 @@ parse_crange(const char *str)
 int
 parse_addr(struct caddr *addr, const char *str)
 {
-	memset(addr, 0, sizeof(*addr));
-	if (inet_pton(AF_INET, str, &addr->value.ipv4) == 1)
+	/* addr must be zeroed */
+	if (inet_pton(AF_INET, str, &addr->value.ipv4) == 1 &&
+	    inet_ntop(AF_INET, &addr->value.ipv4, addr->str,
+	    sizeof(addr->str)) != NULL)
 		addr->type = ADDR_IPV4;
-	else if (inet_pton(AF_INET6, str, &addr->value.ipv6) == 1)
+	else if (inet_pton(AF_INET6, str, &addr->value.ipv6) == 1 &&
+	    inet_ntop(AF_INET6, &addr->value.ipv6, addr->str,
+	    sizeof(addr->str)) != NULL)
 		addr->type = ADDR_IPV6;
 	else {
 		errno = EINVAL;
@@ -267,6 +271,12 @@ replace(char *str, const char *old, const char new)
 {
 	int	 i;
 
+	if (str == NULL)
+		return (NULL);
+
+	if (old == NULL)
+		return (str);
+
 	for (i = 0; str[i] != '\0'; i++)
 		if (strchr(old, str[i]) != NULL)
 			str[i] = new;
@@ -301,14 +311,12 @@ hrage(struct timespec *ts)
 	time_t	 unit, age;
 
 	if (timespec_isinfinite(ts)) {
-		if ((str = strdup("infinite")) == NULL)
-			FATAL("strdup");
+		STRDUP(str, "infinite");
 		return (str);
 	}
 
 	if ((age = TIMESPEC_SEC_ROUND(ts)) < 0) {
-		if ((str = strdup("-")) == NULL)
-			FATAL("strdup");
+		STRDUP(str, "-");
 		age = -age;
 	} else
 		CALLOC(str, 1, 1);
@@ -343,37 +351,13 @@ last:
 	return (append_age_unit(str, &age, unit, "%llds"));
 }
 
-char *
-addrstr(char *str, size_t size, struct caddr *addr)
-{
-	char	 buf[INET6_ADDRSTRLEN];
-
-	if (addr->type != ADDR_IPV4 && addr->type != ADDR_IPV6) {
-		errno = EINVAL;
-		return (NULL);
-	}
-	if ((addr->type == ADDR_IPV4 && inet_ntop(AF_INET, &addr->value.ipv4,
-	    buf, sizeof(buf)) == NULL) ||
-	    (addr->type == ADDR_IPV6 && inet_ntop(AF_INET6, &addr->value.ipv6,
-	    buf, sizeof(buf)) == NULL))
-		return (NULL);
-
-	if (strlcpy(str, buf, size) >= size) {
-		log_debug("address truncated (%s -> %s)", buf, str);
-		errno = EINVAL;
-		return (NULL);
-	}
-	return (str);
-}
-
 int
 prefill_socketopts(struct socket *s)
 {
 	char		*dir, *dpath;
 	struct stat	 sb;
 
-	if ((dpath = strdup(s->path)) == NULL)
-		FATAL("strdup");
+	STRDUP(dpath, s->path);
 	if ((dir = dirname(dpath)) == NULL) {
 		free(dpath);
 		return (-1);
@@ -457,13 +441,11 @@ check_path(const char *path, char *cpath, size_t cpathsize)
 	if (*path == '\0')
 		return (PATH_EMPTY);
 
-	if (*path == '/') {
-		if ((apath = strdup(path)) == NULL)
-			FATAL("strdup");
-	} else if (basepath != NULL) {
-		if (asprintf(&apath, "%s/%s", basepath, path) == -1)
-			FATAL("asprintf");
-	} else
+	if (*path == '/')
+		STRDUP(apath, path);
+	else if (basepath != NULL)
+		ASPRINTF(&apath, "%s/%s", basepath, path);
+	else
 		return (PATH_RELATIVE);
 
 	if (canonicalize_path(apath, cpath, cpathsize) == NULL) {
@@ -474,8 +456,7 @@ check_path(const char *path, char *cpath, size_t cpathsize)
 	if (cpath[strlen(cpath) - 1] == '/')
 		return (PATH_DIRECTORY);
 
-	if ((dpath = strdup(cpath)) == NULL)
-		FATAL("strdup");
+	STRDUP(dpath, cpath);
 	if ((file = basename(dpath)) == NULL || *file == '/' || *file == '.') {
 		free(dpath);
 		return (PATH_FILENAME);

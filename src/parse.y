@@ -261,8 +261,8 @@ targetoptsl	: CASCADE			{
 					    nt->hits > 1 ? "s" : "", n);
 					continue;
 				}
-				STRLCPY(nt->name, t->name, sizeof(nt->name),
-				    "table name");
+				(void)strlcpy(nt->name, t->name,
+				    sizeof(nt->name));
 				DPRINTF("step %u inherited table name <%s>", n,
 				    nt->name);
 				t = nt;
@@ -338,16 +338,12 @@ targetoptsl	: CASCADE			{
 				yyerror("socket requires id");
 				YYERROR;
 			}
-			if (asprintf(&i0, "%s%s", target->name,
-			    sock->id) == -1)
-				FATAL("asprintf");
+			ASPRINTF(&i0, "%s%s", target->name, sock->id);
 			SIMPLEQ_FOREACH(t, &conf->ctargets, targets)
 				SIMPLEQ_FOREACH(s, &t->datasocks, sockets) {
 					if (s == sock)
 						continue;
-					if (asprintf(&i1, "%s%s", t->name,
-					    s->id) == -1)
-						FATAL("asprintf");
+					ASPRINTF(&i1, "%s%s", t->name, s->id);
 					if (strcmp(i0, i1)) {
 						free(i1);
 						continue;
@@ -543,8 +539,7 @@ excludeoptsl	: LOCALHOSTS		{
 			struct ptr	*k;
 
 			MALLOC(k, sizeof(*k));
-			if ((k->p = strdup($2)) == NULL)
-				FATAL("strdup(%s)", $2);
+			STRDUP(k->p, $2);
 			free($2);
 			if (keyterm_inq(curr_exclkeytermq, k)) {
 				DPRINTF("keyterm '%s' already enqueued", k->p);
@@ -797,9 +792,7 @@ load_exclude_cranges(const char *file)
 		if (n == 1 || *line == '#')
 			continue;
 
-		line = replace(line, " \t\n", '\0');
-
-		if ((r = parse_crange(line)) == NULL) {
+		if ((r = parse_crange(replace(line, " \t\n", '\0'))) == NULL) {
 			yyerror("invalid net '%s' in '%s'", line, file);
 			cnt = -1;
 			break;
@@ -989,8 +982,7 @@ eow:
 			yyerror("negativ value");
 		return (0);
 	}
-	if ((yylval.v.string = strdup(buf)) == NULL)
-		FATAL("strdup(%s)", buf);
+	STRDUP(yylval.v.string, buf);
 
 	return (STRING);
 
