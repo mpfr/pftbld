@@ -42,6 +42,7 @@ static void	 handle_ctrl(struct kevent *);
 static void	 handle_inbfd(struct kevent *);
 static void	 handle_inbuf(struct kevent *);
 static void	 handle_expire(struct kevent *);
+static void	 handle_ignore(struct kevent *);
 static void	 append_client(struct pfcmdq *, struct client *, enum pfcmdid);
 static __dead void
 		 shutdown_scheduler(void);
@@ -52,10 +53,11 @@ int		 sched_cfd, sched_ifd;
 pid_t		 sched_pid;
 struct clientq	 cltq;
 struct config	*nconf = NULL;
-struct kevcb	 expire_handler;
+struct kevcb	 expire_handler, ignore_handler;
 
 static struct inbufq	 inbq;
 static int		 kqfd;
+static struct ignoreq	 ignq;
 
 static struct client *
 evtimer_client(void)
@@ -76,7 +78,7 @@ evtimer_start(int fd, struct kevent *kev, struct client *clt,
 	if (ts.tv_sec < 0 || ts.tv_nsec < 0)
 		timespecclear(&ts);
 	EV_MOD(fd, kev, (unsigned long)clt, EVFILT_TIMER, EV_ADD, 0,
-	    ts.tv_sec * 1000 + ts.tv_nsec / 1000000L, handler);
+	    TIMESPEC_TO_MSEC(&ts), handler);
 }
 
 static void
@@ -210,7 +212,7 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 		age = hrage(&ts);
 		print_ts_log("%s[%s]:[%s]:(%dx:%s) ",
 		    pfres.ndel > 0 ? ">>> Deleted " : "",
-		    clt->astr, clt->tgt->name, clt->cnt, age);
+		    clt->addr.str, clt->tgt->name, clt->cnt, age);
 		free(age);
 
 		if (pfres.ndel > 0)
@@ -340,7 +342,7 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 		age = hrage(&ts);
 		print_ts_log("%sDeleted [%s]:[%s]:(%dx:%s)",
 		    pfres.ndel > 0 ? ">>> " : "",
-		    clt->astr, clt->tgt->name, clt->cnt, age);
+		    clt->addr.str, clt->tgt->name, clt->cnt, age);
 		free(age);
 
 		if (pfres.ndel > 0)
@@ -441,7 +443,7 @@ check_targets(void)
 	MALLOC(buf, len);
 	READ(sched_cfd, buf, len);
 
-	replace(buf, "\n", '\0');
+	(void)replace(buf, "\n", '\0');
 	n = 0;
 	TAILQ_FOREACH(clt, &cltq, clients) {
 		tgt = buf;
@@ -640,7 +642,7 @@ handle_inbfd(struct kevent *kev)
 	while ((ibuf->datafd = recv_fd(ibuf, sizeof(*ibuf), sched_ifd)) == -1)
 		NANONAP;
 
-	CALLOC(ibuf->data, 1, 1);
+	ibuf->data = NULL;
 	ibuf->handler = (struct kevcb){ &handle_inbuf, ibuf };
 
 	TAILQ_INSERT_TAIL(&inbq, ibuf, inbufs);
@@ -660,7 +662,7 @@ handle_inbuf(struct kevent *kev)
 	unsigned long	 kevid = kev->ident;
 	struct inbuf	*ibuf = kev->udata;
 	char		 buf[BUFSIZ], *data;
-	ssize_t		 nr;
+	ssize_t		 nr, inr;
 	struct target	*tgt;
 	struct socket	*sock;
 	enum msgtype	 mt;
@@ -668,49 +670,34 @@ handle_inbuf(struct kevent *kev)
 	if (kev->filter == EVFILT_TIMER) {
 		log_warnx("read on target [%s%s] timed out", ibuf->tgtname,
 		    ibuf->sockid);
-		EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-		if (HAS_TIMEOUT(ibuf))
-			EV_MOD(kqfd, kev, kevid, EVFILT_TIMER, EV_DELETE, 0, 0,
-			    NULL);
-		send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
-		close(ibuf->datafd);
-		goto remove;
+		goto abort;
 	}
 	/* EVFILT_READ */
-	if ((nr = read(ibuf->datafd, buf, sizeof(buf) - 1)) == -1) {
+	/* ignore EV_EOF */
+	if ((nr = read(ibuf->datafd, buf, sizeof(buf))) == -1) {
 		if (errno != EIO && errno != ENOTCONN)
 			FATAL("read");
-		log_warn("read on target [%s%s] failed", ibuf->tgtname,
-		    ibuf->sockid);
-		EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-		if (HAS_TIMEOUT(ibuf))
-			EV_MOD(kqfd, kev, kevid, EVFILT_TIMER, EV_DELETE, 0, 0,
-			    NULL);
-		send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
-		close(ibuf->datafd);
-		goto remove;
+		log_warn("read on target [%s%s] failed (%d)", ibuf->tgtname,
+		    ibuf->sockid, errno);
+		goto abort;
 	}
-	if (nr <= 0)
+	if (nr == 0)
 		goto eof;
 
-	buf[nr--] = '\0';
-	ibuf->nr += nr;
-	if (HAS_DATAMAX(ibuf) && ibuf->nr > ibuf->datamax) {
+	inr = ibuf->nr + nr;
+	if (HAS_DATAMAX(ibuf) && inr > ibuf->datamax) {
 		log_warnx("read on target [%s%s] exceeded size limit (%lld)",
 		    ibuf->tgtname, ibuf->sockid, ibuf->datamax);
-		EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-		if (HAS_TIMEOUT(ibuf))
-			EV_MOD(kqfd, kev, kevid, EVFILT_TIMER, EV_DELETE, 0, 0,
-			    NULL);
-		send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
-		close(ibuf->datafd);
-		goto remove;
+		goto abort;
 	}
-	if (asprintf(&data, "%s%s", ibuf->data, buf) == -1)
-		FATAL("asprintf");
+	MALLOC(data, inr + 1);
+	(void)memcpy(data, ibuf->data, ibuf->nr);
 	free(ibuf->data);
+	(void)memcpy(&data[ibuf->nr], buf, nr);
+	data[inr] = '\0';
 	ibuf->data = data;
-	if (buf[nr] != '\0')
+	ibuf->nr = inr;
+	if (buf[--nr] != '\0')
 		return;
 
 eof:
@@ -723,6 +710,15 @@ eof:
 		proc_data(ibuf, kqfd);
 	else
 		proc_ctrl(ibuf);
+
+	goto remove;
+
+abort:
+	EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+	if (HAS_TIMEOUT(ibuf))
+		EV_MOD(kqfd, kev, kevid, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
+	send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
+	close(ibuf->datafd);
 
 remove:
 	TAILQ_REMOVE(&inbq, ibuf, inbufs);
@@ -754,17 +750,20 @@ remove:
 static void
 handle_expire(struct kevent *kev)
 {
-	struct client	*clt = (struct client *)kev->ident;
-	struct table	*tbl = clt->tbl;
+	struct client	*clt;
+	struct table	*tbl;
 	struct pfcmd	 cmd;
 	int		 exp, drop;
 	struct pfresult	 pfres;
 	char		*age;
 	struct timespec	 ts;
 
+	EV_MOD(kqfd, kev, kev->ident, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
+
 	GET_TIME(&ts);
 
-	EV_MOD(kqfd, kev, kev->ident, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
+	clt = (struct client *)kev->ident;
+	tbl = clt->tbl;
 
 	memset(&pfres, 0, sizeof(pfres));
 
@@ -790,7 +789,8 @@ handle_expire(struct kevent *kev)
 	timespecsub(&ts, &clt->ts, &ts);
 	age = hrage(&ts);
 	print_ts_log("%s%s[%s]:[%s]:(%dx:%s)", pfres.ndel > 0 ? ">>> " : "",
-	    exp ? "Deleted " : "", clt->astr, clt->tgt->name, clt->cnt, age);
+	    exp ? "Deleted " : "", clt->addr.str, clt->tgt->name, clt->cnt,
+	    age);
 	free(age);
 
 	if (exp) {
@@ -813,9 +813,81 @@ handle_expire(struct kevent *kev)
 		evtimer_start(kqfd, kev, clt, &expire_handler);
 }
 
+static void
+handle_ignore(struct kevent *kev)
+{
+	struct ignore	*ign;
+	struct timespec	 ts, *timeout = (struct timespec *)kev->udata;
+
+	EV_MOD(kqfd, kev, kev->ident, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
+
+	ign = (struct ignore *)kev->ident;
+	TAILQ_REMOVE(&ignq, ign, ignores);
+
+	if (--ign->cnt == 0)
+		goto end;
+
+	GET_TIME(&ts);
+	timespecsub(&ts, &ign->ts, &ts);
+	if (timeout != NULL)
+		timespecsub(&ts, timeout, &ts);
+	print_ts_log("[%lld ms] Ignored %u ", TIMESPEC_TO_MSEC(&ts), ign->cnt);
+	if (ign->data == NULL)
+		print_log("duplicate hit%s", ign->cnt == 1 ? "" : "s");
+	else
+		print_log("more time%s excluded %s", ign->cnt == 1 ? "" : "s",
+		    ign->data);
+	print_log(" :: [%s%s] <- [%s].\n", ign->tgtname, ign->sockid,
+	    ign->addr.str);
+
+end:
+	free(ign->tgtname);
+	free(ign->sockid);
+	free(ign->data);
+	free(ign);
+}
+
+struct ignore *
+request_ignore(struct caddr *addr, char *tgtname, char *sockid, void *ident)
+{
+	struct ignore	*ign;
+	struct kevent	 kev;
+
+	TAILQ_FOREACH(ign, &ignq, ignores)
+		if (ign->ident == ident && !addrs_cmp(&ign->addr, addr) &&
+		    !strcmp(ign->tgtname, tgtname) && !strcmp(ign->sockid,
+		    sockid)) {
+			EV_MOD(kqfd, &kev, (unsigned long)ign, EVFILT_TIMER,
+			    EV_DELETE, 0, 0, NULL);
+			return (ign);
+		}
+
+	MALLOC(ign, sizeof(*ign));
+	ign->ident = ident;
+	ign->addr = *addr;
+	STRDUP(ign->tgtname, tgtname);
+	STRDUP(ign->sockid, sockid);
+	ign->data = NULL;
+	ign->cnt = 0;
+	TAILQ_INSERT_TAIL(&ignq, ign, ignores);
+	return (ign);
+}
+
+void
+start_ignore(struct ignore *ign)
+{
+	struct kevent	 kev;
+
+	ign->cnt++;
+	EV_MOD(kqfd, &kev, (unsigned long)ign, EVFILT_TIMER, EV_ADD, 0,
+	    IGNORE_TIMEOUT, &ignore_handler);
+}
+
 __dead void
 scheduler(int argc, char *argv[])
 {
+	static struct timespec	 ign_to = { 0, IGNORE_TIMEOUT * 1000000L };
+
 	extern int	 privfd, logfd;
 
 	int		 debug, verbose, c;
@@ -851,6 +923,7 @@ scheduler(int argc, char *argv[])
 
 	TAILQ_INIT(&cltq);
 	TAILQ_INIT(&inbq);
+	TAILQ_INIT(&ignq);
 
 	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		if (*tgt->persist == '\0') {
@@ -872,9 +945,6 @@ scheduler(int argc, char *argv[])
 	if ((kqfd = kqueue()) == -1)
 		FATAL("kqueue");
 
-	expire_handler = (struct kevcb){ &handle_expire, NULL };
-	if ((clt = evtimer_client()) != NULL)
-		evtimer_start(kqfd, &kev, clt, &expire_handler);
 	signal_handler = (struct kevcb){ &handle_signal, NULL };
 	EV_MOD(kqfd, &kev, SIGTERM, EVFILT_SIGNAL, EV_ADD, 0, 0,
 	    &signal_handler);
@@ -884,6 +954,10 @@ scheduler(int argc, char *argv[])
 	inbfd_handler = (struct kevcb){ &handle_inbfd, NULL };
 	EV_MOD(kqfd, &kev, sched_ifd, EVFILT_READ, EV_ADD, 0, 0,
 	    &inbfd_handler);
+	expire_handler = (struct kevcb){ &handle_expire, NULL };
+	if ((clt = evtimer_client()) != NULL)
+		evtimer_start(kqfd, &kev, clt, &expire_handler);
+	ignore_handler = (struct kevcb){ &handle_ignore, &ign_to };
 	memset(&kev, 0, sizeof(kev));
 
 	if (pledge("recvfd sendfd unix stdio", NULL) == -1)
@@ -1037,6 +1111,8 @@ shutdown_scheduler(void)
 {
 	extern int	 privfd;
 
+	struct ignore	*ign;
+	struct kevent	 kev;
 	struct target	*tgt;
 	int		 c;
 	struct pfcmdq	 cmdq;
@@ -1045,6 +1121,12 @@ shutdown_scheduler(void)
 
 	if (conf == NULL || STAILQ_EMPTY(&conf->ctargets))
 		goto end;
+
+	kev.udata = NULL;
+	while ((ign = TAILQ_FIRST(&ignq)) != NULL) {
+		kev.ident = (unsigned long)ign;
+		handle_ignore(&kev);
+	}
 
 	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		if (*tgt->persist == '\0')

@@ -59,8 +59,7 @@ load(struct target *tgt)
 		clt->tgt = tgt;
 
 		arg = replace(line, " \n", '\0');
-		if (parse_addr(&clt->addr, arg) == -1 || addrstr(clt->astr,
-		    sizeof(clt->astr), &clt->addr) == NULL) {
+		if (parse_addr(&clt->addr, arg) == -1) {
 			log_warn("ignored %s line %d: invalid address '%s'",
 			    file, cnt + 1, arg);
 			free(clt);
@@ -160,7 +159,7 @@ save(struct target *tgt)
 	cnt = 0;
 	TAILQ_FOREACH(clt, &cltq, clients)
 		if (clt->tgt == tgt) {
-			fprintf(fp, "%s %u %lld\n", clt->astr, clt->cnt,
+			fprintf(fp, "%s %u %lld\n", clt->addr.str, clt->cnt,
 			    TIMESPEC_SEC_ROUND(&clt->ts));
 			cnt++;
 		}

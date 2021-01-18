@@ -132,11 +132,9 @@ log_mod_table(const char *tname, struct pfr_addr *addr, int n, const char *mod)
 {
 	char	*add;
 
-	if (--n) {
-		if (asprintf(&add, "(+%d more address%s) ", n,
-		    n != 1 ? "es" : "") == -1)
-			FATAL("asprintf");
-	} else
+	if (--n)
+		ASPRINTF(&add, "(+%d more address%s) ", n, n != 1 ? "es" : "");
+	else
 		CALLOC(add, 1, 1);
 	if (addr->pfra_af == AF_INET)
 		DPRINTF("%08X %s%s table <%s>",

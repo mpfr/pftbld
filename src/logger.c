@@ -318,5 +318,5 @@ append_data_log(char *buf, size_t size)
 	while ((ptr = shift(ptr, buf, size)) != NULL)
 		print_log("[%s]", ptr);
 
-	print_log("\n");
+	print_log(".\n");
 }

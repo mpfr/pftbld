@@ -44,6 +44,7 @@
 #define TS_SIZE		27
 #define REPLY_ACK	"ACK\n"
 #define REPLY_NAK	"NAK\n"
+#define IGNORE_TIMEOUT	250
 
 #define FLAG_GLOBAL_NOLOG		0x01
 #define FLAG_GLOBAL_UNLOAD		0x02
@@ -55,7 +56,7 @@
 
 #define TIMESPEC_SEC_ROUND(t)	((t)->tv_sec + (t)->tv_nsec / 1000000000L + \
 				    ((t)->tv_nsec % 1000000000L >= 500000000L))
-
+#define TIMESPEC_TO_MSEC(t)	((t)->tv_sec * 1000 + (t)->tv_nsec / 1000000L)
 #define TIMESPEC_INFINITE	(const struct timespec){ LLONG_MAX, LONG_MAX }
 #define timespec_isinfinite(t)	timespeccmp(t, &TIMESPEC_INFINITE, ==)
 
@@ -83,6 +84,18 @@
 		STAILQ_FOREACH(e, q, t)	\
 			if (m)		\
 				break;	\
+	} while (0)
+
+#define ASPRINTF(s, f, ...)					\
+	do {							\
+		if (asprintf(s, f, ##__VA_ARGS__) == -1)	\
+			FATAL("asprintf");			\
+	} while (0)
+
+#define STRDUP(d, s)				\
+	do {					\
+		if ((d = strdup(s)) == NULL)	\
+			FATAL("strdup");	\
 	} while (0)
 
 #define READ(d, b, n)				\
@@ -121,11 +134,7 @@
 			FATAL("setenv(%s, %s)", e, _s);	\
 	} while (0)
 
-#define LLTOS(s, n)					\
-	do {						\
-		if (asprintf(&s, "%lld", n) == -1)	\
-			FATAL("asprintf");		\
-	} while (0)
+#define LLTOS(s, n)	ASPRINTF(&s, "%lld", n)
 
 #define LLTOE(e, n)		\
 	do {			\
@@ -150,11 +159,7 @@
 		STOLL(n, _s);	\
 	} while (0)
 
-#define ITOS(s, n)					\
-	do {						\
-		if (asprintf(&s, "%d", n) == -1)	\
-			FATAL("asprintf");		\
-	} while (0)
+#define ITOS(s, n)	ASPRINTF(&s, "%d", n)
 
 #define ITOE(e, n)		\
 	do {			\
@@ -213,12 +218,6 @@
 			FATAL("calloc");	\
 	} while (0)
 
-#define STRLCPY(d, s, l, e)						\
-	do {								\
-		if (strlcpy(d, s, l) >= l)				\
-			FATALX("strlcpy: "e" (%s) truncated", s);	\
-	} while (0)
-
 #define KEVENT_HANDLE(e)						\
 	do {								\
 		EV_DPRINTF(e, 0);					\
@@ -249,6 +248,7 @@ enum addrtype { ADDR_IPV4 = 1, ADDR_IPV6 };
 struct caddr {
 	union addrvalue	 value;
 	enum addrtype	 type;
+	char		 str[INET6_ADDRSTRLEN];
 
 	STAILQ_ENTRY(caddr) caddrs;
 };
@@ -273,7 +273,6 @@ STAILQ_HEAD(ptrq, ptr);
 
 struct client {
 	struct caddr	 addr;
-	char		 astr[INET6_ADDRSTRLEN];
 	unsigned int	 cnt;
 	struct timespec	 ts;
 	struct timespec	 to;
@@ -422,6 +421,19 @@ struct statfd {
 	struct stat	 sb;
 };
 
+struct ignore {
+	struct caddr	 addr;
+	char		*tgtname;
+	char		*sockid;
+	void		*ident;
+	char		*data;
+	unsigned int	 cnt;
+	struct timespec	 ts;
+
+	TAILQ_ENTRY(ignore) ignores;
+};
+TAILQ_HEAD(ignoreq, ignore);
+
 /* pftbld.c */
 void		 pfexec(struct pfresult *, struct pfcmd *);
 __dead void	 pftbld(int, char **);
@@ -461,6 +473,8 @@ int		 drop_clients(struct crangeq *, struct ptrq *);
 int		 drop_clients_r(struct crangeq *, struct ptrq *);
 int		 expire_clients(struct crangeq *, struct ptrq *);
 int		 expire_clients_r(struct crangeq *, struct ptrq *);
+struct ignore	*request_ignore(struct caddr *, char *, char *, void *);
+void		 start_ignore(struct ignore *);
 __dead void	 scheduler(int, char **);
 void		 fork_scheduler(void);
 int		 bind_table(struct client *, struct pfcmdq *);
@@ -487,7 +501,6 @@ char		*shift(char *, char *, size_t);
 char		*replace(char *, const char *, const char);
 char		*hrage(struct timespec *);
 struct crange	*parse_crange(const char *);
-char		*addrstr(char *, size_t, struct caddr *);
 int		 prefill_socketopts(struct socket *);
 enum pathres	 check_path(const char *, char *, size_t);
 struct statfd	*create_statfd(int);
