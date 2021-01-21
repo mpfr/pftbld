@@ -642,7 +642,7 @@ handle_inbfd(struct kevent *kev)
 	while ((ibuf->datafd = recv_fd(ibuf, sizeof(*ibuf), sched_ifd)) == -1)
 		NANONAP;
 
-	ibuf->data = NULL;
+	CALLOC(ibuf->data, 1, 1);
 	ibuf->handler = (struct kevcb){ &handle_inbuf, ibuf };
 
 	TAILQ_INSERT_TAIL(&inbq, ibuf, inbufs);
@@ -690,13 +690,12 @@ handle_inbuf(struct kevent *kev)
 		    ibuf->tgtname, ibuf->sockid, ibuf->datamax);
 		goto abort;
 	}
-	MALLOC(data, inr + 1);
-	(void)memcpy(data, ibuf->data, ibuf->nr);
-	free(ibuf->data);
-	(void)memcpy(&data[ibuf->nr], buf, nr);
-	data[inr] = '\0';
-	ibuf->data = data;
 	ibuf->nr = inr;
+	MALLOC(data, ++inr);
+	(void)strlcpy(data, ibuf->data, inr);
+	free(ibuf->data);
+	(void)strlcat(data, buf, inr);
+	ibuf->data = data;
 	if (buf[--nr] != '\0')
 		return;
 
