@@ -690,12 +690,12 @@ handle_inbuf(struct kevent *kev)
 		    ibuf->tgtname, ibuf->sockid, ibuf->datamax);
 		goto abort;
 	}
-	ibuf->nr = inr;
-	MALLOC(data, ++inr);
-	(void)strlcpy(data, ibuf->data, inr);
-	free(ibuf->data);
-	(void)strlcat(data, buf, inr);
+	if ((data = realloc(ibuf->data, inr + 1)) == NULL)
+		FATAL("realloc");
+	(void)memcpy(&data[ibuf->nr], buf, nr);
+	data[inr] = '\0';
 	ibuf->data = data;
+	ibuf->nr = inr;
 	if (buf[--nr] != '\0')
 		return;
 
