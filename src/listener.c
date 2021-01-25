@@ -390,7 +390,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		DPRINTF("new client (%s, %s) created", clt->addr.str, tgtname);
 	} else {
 		DPRINTF("found enqueued client (%s, %s, %d)", clt->addr.str,
-		    tgtname, clt->cnt);
+		    tgtname, clt->hits);
 		if (ign->cnt > 0)
 			goto end;
 
@@ -402,10 +402,10 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	    replace(data, "\n", '\0'));
 	append_data_log(data, datalen);
 
-	clt->cnt++;
+	clt->hits++;
 
 	tbl = STAILQ_FIRST(&clt->tgt->cascade);
-	while (tbl != NULL && tbl->hits > 0 && clt->cnt > tbl->hits)
+	while (tbl != NULL && tbl->hits > 0 && clt->hits > tbl->hits)
 		tbl = STAILQ_NEXT(tbl, tables);
 	if (tbl == NULL)
 		FATALX("open cascade");
@@ -418,11 +418,11 @@ proc_data(struct inbuf *ibuf, int kqfd)
 
 	print_ts_log("%s [%s]:[%s]:(%dx",
 	    pfres.nadd > 0 ? ">>> Added" : "Aquired",
-	    clt->addr.str, tgtname, clt->cnt);
+	    clt->addr.str, tgtname, clt->hits);
 
 	GET_TIME(&now);
 
-	if (clt->cnt > 1) {
+	if (clt->hits > 1) {
 		timespecsub(&now, &clt->ts, &tsdiff);
 		age = hrage(&tsdiff);
 		print_log(":%s", age);
@@ -671,7 +671,7 @@ perform_ctrl_dump(struct statfd *sfd, char *arg, char *data, size_t datalen)
 			if (tp == NULL)
 				continue;
 		}
-		msg_send(sfd, "%s %u %lld\n", clt->addr.str, clt->cnt,
+		msg_send(sfd, "%s %u %lld\n", clt->addr.str, clt->hits,
 		    TIMESPEC_SEC_ROUND(&clt->ts));
 	}
 
@@ -788,7 +788,7 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		if ((act == 1 && clt->exp) || (act == -1 && !clt->exp))
 			continue;
 		if (hits[0] && hits[1] &&
-		    (clt->cnt < hits[0] || clt->cnt > hits[1]))
+		    (clt->hits < hits[0] || clt->hits > hits[1]))
 			continue;
 		if (!STAILQ_EMPTY(&tpq)) {
 			STAILQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
@@ -833,7 +833,7 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		timespecsub(&now, &clt->ts, &tsdiff);
 		age = hrage(&tsdiff);
 		msg_send(sfd, "[%s]:[%s]:(%dx:%s)\n\t", clt->addr.str,
-		    clt->tgt->name, clt->cnt, age);
+		    clt->tgt->name, clt->hits, age);
 		free(age);
 
 		if (timespec_isinfinite(&clt->to)) {
@@ -1006,7 +1006,7 @@ perform_ctrl_status(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	timespecsub(&now, &clt->ts, &tsdiff);
 	age = hrage(&tsdiff);
 	msg_send(sfd, "\nNext scheduled event:\n\t[%s]:[%s]:(%dx:%s)\n\t\t",
-	    clt->addr.str, clt->tgt->name, clt->cnt, age);
+	    clt->addr.str, clt->tgt->name, clt->hits, age);
 	free(age);
 	if (clt->exp)
 		msg_send(sfd, "getting dropped");
