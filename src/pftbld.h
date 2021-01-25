@@ -273,7 +273,7 @@ SIMPLEQ_HEAD(ptrq, ptr);
 
 struct client {
 	struct caddr	 addr;
-	unsigned int	 cnt;
+	unsigned int	 hits;
 	struct timespec	 ts;
 	struct timespec	 to;
 	struct table	*tbl;

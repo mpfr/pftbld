@@ -212,7 +212,7 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 		age = hrage(&ts);
 		print_ts_log("%s[%s]:[%s]:(%dx:%s) ",
 		    pfres.ndel > 0 ? ">>> Deleted " : "",
-		    clt->addr.str, clt->tgt->name, clt->cnt, age);
+		    clt->addr.str, clt->tgt->name, clt->hits, age);
 		free(age);
 
 		if (pfres.ndel > 0)
@@ -342,7 +342,7 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 		age = hrage(&ts);
 		print_ts_log("%sDeleted [%s]:[%s]:(%dx:%s)",
 		    pfres.ndel > 0 ? ">>> " : "",
-		    clt->addr.str, clt->tgt->name, clt->cnt, age);
+		    clt->addr.str, clt->tgt->name, clt->hits, age);
 		free(age);
 
 		if (pfres.ndel > 0)
@@ -788,7 +788,7 @@ handle_expire(struct kevent *kev)
 	timespecsub(&ts, &clt->ts, &ts);
 	age = hrage(&ts);
 	print_ts_log("%s%s[%s]:[%s]:(%dx:%s)", pfres.ndel > 0 ? ">>> " : "",
-	    exp ? "Deleted " : "", clt->addr.str, clt->tgt->name, clt->cnt,
+	    exp ? "Deleted " : "", clt->addr.str, clt->tgt->name, clt->hits,
 	    age);
 	free(age);
 
@@ -1021,7 +1021,7 @@ bind_table(struct client *clt, struct pfcmdq *cmdq)
 	struct timespec	 ts;
 
 	tbl = SIMPLEQ_FIRST(&clt->tgt->cascade);
-	while (tbl != NULL && tbl->hits > 0 && tbl->hits < clt->cnt)
+	while (tbl != NULL && tbl->hits > 0 && tbl->hits < clt->hits)
 		tbl = SIMPLEQ_NEXT(tbl, tables);
 	if (tbl == NULL)
 		FATALX("open cascade");

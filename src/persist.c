@@ -67,12 +67,12 @@ load(struct target *tgt)
 		}
 
 		if ((arg = shift(arg, line, --llen)) == NULL) {
-			clt->cnt = 1;
+			clt->hits = 1;
 			GET_TIME(&clt->ts);
 			goto end;
 		}
 
-		clt->cnt = strtonum(arg, 0, UINT_MAX, &errstr);
+		clt->hits = strtonum(arg, 0, UINT_MAX, &errstr);
 		if (errstr != NULL) {
 			log_warn("ignored %s line %d: invalid count '%s'",
 			    file, cnt + 1, arg);
@@ -93,14 +93,14 @@ end:
 		if (bind_table(clt, &cmdq)) {
 			sort_client_desc(clt);
 			cnt++;
-			DPRINTF("client-%d (%s, cnt:%d, ts:%lld, exp:%d, "
-			    "to:%lld) created", cnt, line, clt->cnt,
+			DPRINTF("client-%d (%s, hits:%d, ts:%lld, exp:%d, "
+			    "to:%lld) created", cnt, line, clt->hits,
 			    clt->ts.tv_sec, clt->exp, clt->to.tv_sec);
 		} else {
 			TAILQ_INSERT_TAIL(&dcq, clt, clients);
-			DPRINTF("client (%s, cnt:%d, ts:%lld, exp:%d, to:%lld)"
-			    " discarded", line, clt->cnt, clt->ts.tv_sec,
-			    clt->exp, clt->to.tv_sec);
+			DPRINTF("client (%s, hits:%d, ts:%lld, exp:%d, "
+			    "to:%lld discarded", line, clt->hits,
+			    clt->ts.tv_sec, clt->exp, clt->to.tv_sec);
 		}
 	}
 	free(line);
@@ -159,7 +159,7 @@ save(struct target *tgt)
 	cnt = 0;
 	TAILQ_FOREACH(clt, &cltq, clients)
 		if (clt->tgt == tgt) {
-			fprintf(fp, "%s %u %lld\n", clt->addr.str, clt->cnt,
+			fprintf(fp, "%s %u %lld\n", clt->addr.str, clt->hits,
 			    TIMESPEC_SEC_ROUND(&clt->ts));
 			cnt++;
 		}
