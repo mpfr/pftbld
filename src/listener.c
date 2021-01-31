@@ -265,7 +265,8 @@ fork_listener(struct socket *sockcfg, char *tgtname)
 	LLTOS(argv[5], (long long)sockcfg->owner);
 	LLTOS(argv[6], (long long)sockcfg->group);
 	ITOS(argv[7], sockcfg->mode);
-	ITOS(argv[8], sockcfg->backlog < INT_MAX ? sockcfg->backlog : 0);
+	ITOS(argv[8], sockcfg->backlog != CONF_NO_BACKLOG ?
+	    sockcfg->backlog : 0);
 	LLTOS(argv[9], (long long)sockcfg->datamax);
 	LLTOS(argv[10], sockcfg->timeout);
 	argv[11] = NULL;
