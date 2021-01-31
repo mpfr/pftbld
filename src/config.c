@@ -168,7 +168,7 @@ parse_conf(void)
 			if (!sock->backlog) {
 				sock->backlog = conf->backlog;
 #if DEBUG
-				if (sock->backlog == INT_MAX)
+				if (sock->backlog == CONF_NO_BACKLOG)
 					DPRINTF("assuming no backlog for "
 					    "socket %s", sock->path);
 				else
@@ -180,7 +180,7 @@ parse_conf(void)
 			if (!sock->datamax) {
 				sock->datamax = conf->datamax;
 #if DEBUG
-				if (sock->datamax == LONG_MAX)
+				if (sock->datamax == CONF_NO_DATAMAX)
 					DPRINTF("assuming no datamax for "
 					    "socket %s", sock->path);
 				else
@@ -192,7 +192,7 @@ parse_conf(void)
 			if (!sock->timeout) {
 				sock->timeout = conf->timeout;
 #if DEBUG
-				if (sock->timeout == LLONG_MAX)
+				if (sock->timeout == CONF_NO_TIMEOUT)
 					DPRINTF("assuming no timeout for "
 					    "socket %s", sock->path);
 				else
