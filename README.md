@@ -1,6 +1,10 @@
-# pftbld
+# pftbld(8)
 
-`pftbld` is a lightweight [OpenBSD](https://www.openbsd.org) daemon written to automate [pf(4) table](http://man.openbsd.org/pf.conf#TABLES) content management and is typically used for maintaining dynamic firewall blacklists.
+`pftbld(8)` is a lightweight [OpenBSD](https://www.openbsd.org) daemon written to automate [pf(4) table](http://man.openbsd.org/pf.conf#TABLES) content management and is typically used for building and maintaining dynamic firewall blocklists.
+
+## How to interface
+
+Other programs usually interact with `pftbld` by sending plain text messages to specified UNIX-domain sockets. Most common case probably is [httpd(8)](http://man.openbsd.org/httpd) through FastCGI as outlined in [pftbld.conf(5)](https://mpfr.github.io/pftbld/pftbld.conf.5.html#EXAMPLES). The most native and therefore most recommended option, however, is offered through the [httpd-plus](https://github.com/mpfr/httpd-plus/tree/6.7-stable#notify-on-block) add-on package, allowing the two daemons to perfectly complement each other.
 
 ## How to install
 
