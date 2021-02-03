@@ -145,8 +145,6 @@ listener(int argc, char *argv[])
 	gid_t			 group;
 	mode_t			 mode;
 	int			 ctrlfd, kqfd, srvsockfd;
-	size_t			 datamax;
-	time_t			 timeout;
 	struct sockaddr_un	 ssa_un;
 	struct kevent		 kev;
 	struct kevcb		 ctrl_handler, srvsock_handler;
@@ -173,8 +171,8 @@ listener(int argc, char *argv[])
 	STOLL(group, argv[6]);
 	STOI(mode, argv[7]);
 	STOI(backlog, argv[8]);
-	STOLL(datamax, argv[9]);
-	STOLL(timeout, argv[10]);
+	STOLL(ibuftmpl.datamax, argv[9]);
+	STOLL(ibuftmpl.timeout, argv[10]);
 
 	if (*tgtname != '\0')
 		ASPRINTF(&ptitle, "data-listener[%s%s]", tgtname, sockid);
@@ -206,11 +204,10 @@ listener(int argc, char *argv[])
 
 	ccnt = 0;
 	flags = 0;
-	memset(&ibuftmpl, 0, sizeof(ibuftmpl));
+
 	(void)strlcpy(ibuftmpl.tgtname, tgtname, sizeof(ibuftmpl.tgtname));
 	(void)strlcpy(ibuftmpl.sockid, sockid, sizeof(ibuftmpl.sockid));
-	ibuftmpl.datamax = datamax;
-	ibuftmpl.timeout = timeout;
+	ibuftmpl.nr = 0;
 
 	if ((kqfd = kqueue()) == -1)
 		FATAL("kqueue");
