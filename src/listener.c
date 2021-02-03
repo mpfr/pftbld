@@ -538,7 +538,8 @@ proc_ctrl(struct inbuf *ibuf)
 	char		*buf;
 
 	STRDUP(buf, data);
-	DPRINTF("received control command: '%s'", replace(buf, "\n", ','));
+	DPRINTF("received control command: '%s'(%zu)", replace(buf, "\n", ','),
+	    datalen);
 	free(buf);
 #endif
 
@@ -570,7 +571,7 @@ proc_ctrl(struct inbuf *ibuf)
 		status = 0;
 	}
 
-	if (errno != EPIPE && status)
+	if (status)
 		msg_send(sfd, "Syntax error.\n");
 
 	close(sfd->fd);
@@ -687,7 +688,7 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	struct crange	*cr;
 	int		 act = 0, addrs = 0, lim = 0, cnt = 0;
 	unsigned int	 hits[2] = { 0 };
-	const char	*err;
+	const char	*errstr;
 	struct timespec	 now, tsdiff;
 	struct client	*clt;
 	char		*age, tstr[TS_SIZE], *d;
@@ -721,23 +722,24 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 
 				if ((d = strchr(arg, '-')) == NULL)
 					hits[0] = hits[1] = strtonum(arg, 1,
-					    UINT_MAX, &err);
+					    UINT_MAX, &errstr);
 				else if (strlen(arg) > 1) {
 					*d = '\0';
-					err = NULL;
-					hits[0] = *arg == '\0' ? 1 :
-					    strtonum(arg, 1, UINT_MAX, &err);
-					if (err == NULL)
+					errstr = NULL;
+					hits[0] = *arg == '\0' ?
+					    1 : strtonum(arg, 1, UINT_MAX,
+					    &errstr);
+					if (errstr == NULL)
 						hits[1] = *(d + 1) == '\0' ?
 						    UINT_MAX : strtonum(d + 1,
-						    1, UINT_MAX, &err);
+						    1, UINT_MAX, &errstr);
 					*d = '-';
 				} else
 					return (1);
 
-				if (err != NULL || hits[0] > hits[1]) {
+				if (errstr != NULL || hits[0] > hits[1]) {
 					msg_send(sfd, "hits %s.\n",
-					    err ? err : "range invalid");
+					    errstr ? errstr : "range invalid");
 					return (0);
 				}
 			} else if (!strcmp("next", arg)) {
@@ -757,9 +759,9 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 				if ((arg = shift(arg, data, datalen)) == NULL)
 					return (1);
 
-				cnt = strtonum(arg, 1, INT_MAX, &err);
-				if (err != NULL) {
-					msg_send(sfd, "limit %s.\n", err);
+				cnt = strtonum(arg, 1, INT_MAX, &errstr);
+				if (errstr != NULL) {
+					msg_send(sfd, "limit %s.\n", errstr);
 					return (0);
 				}
 				lim *= cnt;
@@ -1024,7 +1026,7 @@ perform_ctrl_verbose(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	extern int	 privfd;
 
 	int		 v;
-	const char	*err;
+	const char	*errstr;
 	enum msgtype	 mt;
 
 	if (shift(arg, data, datalen) != NULL)
@@ -1034,9 +1036,9 @@ perform_ctrl_verbose(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		msg_send(sfd, "%d\n", log_getverbose());
 		return (0);
 	}
-	v = strtonum(arg, 0, INT_MAX, &err);
-	if (err != NULL) {
-		msg_send(sfd, "Verbosity level %s.\n", err);
+	v = strtonum(arg, 0, INT_MAX, &errstr);
+	if (errstr != NULL) {
+		msg_send(sfd, "Verbosity level %s.\n", errstr);
 		return (0);
 	}
 	log_setverbose(v);
