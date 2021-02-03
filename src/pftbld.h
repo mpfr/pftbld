@@ -289,20 +289,6 @@ struct kevcb {
 	void	  *args;
 };
 
-struct inbuf {
-	int		 datafd;
-	char		 tgtname[NAME_MAX];
-	char		 sockid[NAME_MAX];
-	char		*data;
-	long long	 nr;
-	long long	 datamax;
-	time_t		 timeout;
-	struct kevcb	 handler;
-
-	TAILQ_ENTRY(inbuf) inbufs;
-};
-TAILQ_HEAD(inbufq, inbuf);
-
 struct table {
 	char		 name[NAME_MAX];
 	unsigned int	 hits;
@@ -342,6 +328,20 @@ struct target {
 	SIMPLEQ_ENTRY(target) targets;
 };
 SIMPLEQ_HEAD(targetq, target);
+
+struct inbuf {
+	int		 datafd;
+	char		 tgtname[sizeof(((struct target *)0)->name)];
+	char		 sockid[sizeof(((struct socket *)0)->id)];
+	char		*data;
+	long long	 nr;
+	long long	 datamax;
+	time_t		 timeout;
+	struct kevcb	 handler;
+
+	TAILQ_ENTRY(inbuf) inbufs;
+};
+TAILQ_HEAD(inbufq, inbuf);
 
 struct config {
 	struct socket	 ctrlsock;
