@@ -122,18 +122,19 @@ handle_srvsock(struct kevent *kev)
 
 	if ((pid = fork()) == -1)
 		FATAL("fork");
-	if (pid == 0) { /* child */
-		if (pledge("sendfd stdio", NULL) == -1)
-			FATAL("pledge");
 
-		while (send_fd(datafd, &ibuftmpl, sizeof(ibuftmpl),
-		    sched_ifd) == -1)
-			NANONAP;
-
-		exit(0);
+	if (pid != 0) { /* parent */
+		close(datafd);
+		return;
 	}
-	/* parent */
-	close(datafd);
+	/* child */
+	if (pledge("sendfd stdio", NULL) == -1)
+		FATAL("pledge");
+
+	while (send_fd(datafd, &ibuftmpl, sizeof(ibuftmpl), sched_ifd) == -1)
+		NANONAP;
+
+	_exit(0);
 }
 
 __dead void
