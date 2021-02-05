@@ -593,6 +593,9 @@ print_conf(struct statfd *sfd)
 			free(estr);
 		}
 
+		if (tgt->skip > 0)
+			msg_send(sfd, "\tskip %u\n", tgt->skip);
+
 		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets) {
 			estr = esc(sock->path);
 			msg_send(sfd, "\tsocket \"%s\" {\n", estr);

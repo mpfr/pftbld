@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: January 16 2021 $
+.Dd $Mdocdate: February 5 2021 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -94,8 +94,8 @@ keyword is used instead of a
 value, IP addresses will be kept forever.
 .It Ic exclude Ar option | Brq ...
 Specifies exclusion criteria for incoming data.
-Multiple criterias may be either specified separately, one at a time, or
-collected by curly brackets.
+Multiple criterias may be either specified one at a time or enclosed in curly
+brackets.
 Valid options are:
 .Bl -tag -width Ds
 .It Ic localhosts
@@ -210,8 +210,8 @@ stop evaluating the appearance count of an IP address.
 .It Ic kill | keep Ar option | Brq ...
 Set/Unset kill options used when adding an address into a
 .Ic table .
-Multiple options may be either specified separately, one at a time, or
-collected by curly brackets.
+Multiple options may be either specified one at a time or enclosed in curly
+brackets.
 Valid options are:
 .Bl -tag -width Ds
 .It Ic nodes
@@ -282,6 +282,14 @@ submitting a list of plain IP addresses (one per line) without any further
 information.
 In this case, the two other fields will be initialized to 1 for the number of
 hits and the current time for the last hit timestamp.
+.It Ic skip Ar number
+Makes
+.Xr pftbld 8
+skip the given
+.Ar number
+of appearances of a new client, i.e. it will not be added to any
+.Xr pf 4
+table and it will appear as just expired.
 .It Ic socket Ar path Oo Bro ... Brc Oc
 Specifies a UNIX-domain socket at
 .Ar path

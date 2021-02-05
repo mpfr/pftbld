@@ -87,8 +87,8 @@
   <dt id="exclude"><a class="permalink" href="#exclude"><code class="Ic">exclude</code></a>
     <var class="Ar">option</var> | {...}</dt>
   <dd>Specifies exclusion criteria for incoming data. Multiple criterias may be
-      either specified separately, one at a time, or collected by curly
-      brackets. Valid options are:
+      either specified one at a time or enclosed in curly brackets. Valid
+      options are:
     <dl class="Bl-tag">
       <dt id="localhosts"><a class="permalink" href="#localhosts"><code class="Ic">localhosts</code></a></dt>
       <dd>Exclude all IP addresses found in the local host name lookup file
@@ -185,8 +185,8 @@
             <var class="Ar">option</var> | {...}</dt>
           <dd>Set/Unset kill options used when adding an address into a
               <code class="Ic">table</code>. Multiple options may be either
-              specified separately, one at a time, or collected by curly
-              brackets. Valid options are:
+              specified one at a time or enclosed in curly brackets. Valid
+              options are:
             <dl class="Bl-tag">
               <dt id="nodes"><a class="permalink" href="#nodes"><code class="Ic">nodes</code></a></dt>
               <dd>Refers to a reported address' <span class="Pa">source
@@ -246,6 +246,13 @@
             other fields will be initialized to 1 for the number of hits and the
             current time for the last hit timestamp.</p>
       </dd>
+      <dt id="skip"><a class="permalink" href="#skip"><code class="Ic">skip</code></a>
+        <var class="Ar">number</var></dt>
+      <dd>Makes <a class="Xr" href="pftbld.8.html">pftbld(8)</a> skip the given
+          <var class="Ar">number</var> of appearances of a new client, i.e. it
+          will not be added to any
+          <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table and
+          it will appear as just expired.</dd>
       <dt id="socket"><a class="permalink" href="#socket"><code class="Ic">socket</code></a>
         <var class="Ar">path</var> [{...}]</dt>
       <dd>Specifies a UNIX-domain socket at <var class="Ar">path</var> to be
@@ -443,7 +450,7 @@ function pftbld_feed() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">January 16, 2021</td>
+    <td class="foot-date">February 5, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
