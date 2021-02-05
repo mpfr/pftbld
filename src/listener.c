@@ -314,6 +314,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	struct timespec	 now, tsdiff;
 	struct table	*tbl;
 	size_t		 datalen;
+	unsigned int	 clthits, skip;
 	struct pfcmd	 cmd;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
@@ -393,7 +394,6 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		if (ign->cnt > 0)
 			goto end;
 
-		clt->exp = 0;
 		TAILQ_REMOVE(&cltq, clt, clients);
 	}
 
@@ -401,58 +401,74 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	    replace(data, "\n", '\0'));
 	append_data_log(data, datalen);
 
-	clt->hits++;
+	clthits = ++clt->hits;
+	skip = tgt->skip;
 
 	tbl = STAILQ_FIRST(&clt->tgt->cascade);
-	while (tbl != NULL && tbl->hits > 0 && clt->hits > tbl->hits)
+	while (tbl != NULL && tbl->hits > 0 && clthits > tbl->hits)
 		tbl = STAILQ_NEXT(tbl, tables);
 	if (tbl == NULL)
 		FATALX("open cascade");
 
-	PFCMD_INIT(&cmd, PFCMD_ADD, tbl->name, tbl->flags);
-	STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
-	cmd.addrcnt = 1;
-
-	pfexec(&pfres, &cmd);
-
-	print_ts_log("%s [%s]:[%s]:(%dx",
-	    pfres.nadd > 0 ? ">>> Added" : "Aquired",
-	    clt->addr.str, tgtname, clt->hits);
+	if (clthits > skip) {
+		PFCMD_INIT(&cmd, PFCMD_ADD, tbl->name, tbl->flags);
+		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
+		cmd.addrcnt = 1;
+		pfexec(&pfres, &cmd);
+		print_ts_log("%s [%s]:[%s]:(%ux",
+		    pfres.nadd > 0 ? ">>> Added" : "Aquired", clt->addr.str,
+		    tgtname, clthits);
+	} else
+		print_ts_log("Skipped (%u/%u", clthits, skip);
 
 	GET_TIME(&now);
 
-	if (clt->hits > 1) {
+	if (clthits > 1) {
 		timespecsub(&now, &clt->ts, &tsdiff);
 		age = hrage(&tsdiff);
 		print_log(":%s", age);
 		free(age);
 	}
 
-	print_log(") %s { %s }", pfres.nadd > 0 ? "to" : "from", tbl->name);
-
 	clt->tbl = tbl;
 	clt->ts = now;
 
-	if (timespec_isinfinite(&tbl->expire))
-		clt->to = TIMESPEC_INFINITE;
-	else {
-		timespecadd(&now, &tbl->expire, &clt->to);
-		age = hrage(&tbl->expire);
-		print_log(" for %s", age);
-		free(age);
-	}
+	if (clthits > skip) {
+		print_log(") %s { %s }", pfres.nadd > 0 ? "to" : "from",
+		    tbl->name);
 
-	if (pfres.nkill > 0 || pfres.snkill > 0) {
-		print_log(" and killed ");
+		clt->exp = 0;
+		if (timespec_isinfinite(&tbl->expire))
+			clt->to = TIMESPEC_INFINITE;
+		else {
+			timespecadd(&now, &tbl->expire, &clt->to);
+			age = hrage(&tbl->expire);
+			print_log(" for %s", age);
+			free(age);
+		}
 
-		if (pfres.nkill > 0)
-			print_log("%u state%s", pfres.nkill,
-			    pfres.nkill != 1 ? "s" : "");
+		if (pfres.nkill > 0 || pfres.snkill > 0) {
+			print_log(" and killed ");
 
-		if (pfres.snkill > 0)
-			print_log("%s%u node%s",
-			    pfres.nkill > 0 ? " plus " : "",
-			    pfres.snkill, pfres.snkill != 1 ? "s" : "");
+			if (pfres.nkill > 0)
+				print_log("%u state%s", pfres.nkill,
+				    pfres.nkill != 1 ? "s" : "");
+
+			if (pfres.snkill > 0)
+				print_log("%s%u node%s",
+				    pfres.nkill > 0 ? " plus " : "",
+				    pfres.snkill, pfres.snkill != 1 ? "s" : "");
+		}
+	} else {
+		print_log(") [%s]:[%s]", clt->addr.str, tgtname);
+
+		if (clthits == 1) {
+			clt->exp = 1;
+			if (timespec_isinfinite(&tbl->drop))
+				clt->to = TIMESPEC_INFINITE;
+			else
+				timespecadd(&clt->ts, &tbl->drop, &clt->to);
+		}
 	}
 
 	print_log(".\n");
@@ -463,9 +479,13 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		if (first != NULL)
 			EV_MOD(kqfd, &kev, (unsigned long)first, EVFILT_TIMER,
 			    EV_DELETE, 0, 0, NULL);
-		if (!timespec_isinfinite(&tbl->expire))
+		if (!clt->exp && !timespec_isinfinite(&tbl->expire))
 			EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER,
 			    EV_ADD, 0, tbl->expire.tv_sec * 1000,
+			    &expire_handler);
+		else if (clt->exp && !timespec_isinfinite(&tbl->drop))
+			EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER,
+			    EV_ADD, 0, tbl->drop.tv_sec * 1000,
 			    &expire_handler);
 	}
 

@@ -320,6 +320,7 @@ struct target {
 	char		 name[NAME_MAX];
 	char		 persist[PATH_MAX];
 	struct timespec	 drop;
+	unsigned int	 skip;
 	struct socketq	 datasocks;
 	struct crangeq	 exclcranges;
 	struct ptrq	 exclkeyterms;
