@@ -94,7 +94,7 @@ struct ptrq	*curr_exclkeytermq;
 
 %token	BACKLOG CASCADE DATAMAX DROP EXCLUDE EXPIRE GROUP HITS ID KEEP KEYTERM
 %token	KEYTERMFILE KILL LOCALHOSTS LOG MODE NET NETFILE NO NODES OWNER PERSIST
-%token	SOCKET STATES STEP TABLE TARGET TIMEOUT
+%token	SKIP SOCKET STATES STEP TABLE TARGET TIMEOUT
 %token	<v.number>	NUMBER
 %token	<v.string>	STRING
 %token	<v.time>	TIME
@@ -279,19 +279,26 @@ targetoptsl	: CASCADE			{
 				YYERROR;
 			}
 			target->drop.tv_sec = $2;
-			DPRINTF("drop time of target [%s]: %lld", target->name,
-			    target->drop.tv_sec);
+			DPRINTF("drop time: %lld", target->drop.tv_sec);
 		}
 		| exclude
 		| NO DROP			{
 			target->drop = CONF_NO_DROP;
-			DPRINTF("no drop for target [%s]", target->name);
+			DPRINTF("no drop");
 		}
 		| PERSIST STRING		{
 			CANONICAL_PATH_SET($2, target->persist, "persist file",
 			    free($2), YYERROR);
 			free($2);
-			DPRINTF("persist file is %s", target->persist);
+			DPRINTF("persist file: %s", target->persist);
+		}
+		| SKIP NUMBER			{
+			if ($2 <= 0 || $2 > UINT_MAX) {
+				yyerror("skip number out of bounds");
+				YYERROR;
+			}
+			target->skip = $2;
+			DPRINTF("skip: %u", target->skip);
 		}
 		| SOCKET STRING			{
 			struct target	*t;
@@ -412,8 +419,7 @@ sockoptsl	: BACKLOG NUMBER	{
 				YYERROR;
 			}
 			sock->group = $2;
-			DPRINTF("socket %s group: %d", sock->path,
-			    sock->group);
+			DPRINTF("group: %d", sock->group);
 		}
 		| GROUP STRING		{
 			struct group	*grp;
@@ -686,6 +692,7 @@ static const struct keyword {
 	{ "nodes",	NODES },
 	{ "owner",	OWNER },
 	{ "persist",	PERSIST },
+	{ "skip",	SKIP },
 	{ "socket",	SOCKET },
 	{ "states",	STATES },
 	{ "step",	STEP },
