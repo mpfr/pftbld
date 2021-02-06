@@ -1,5 +1,5 @@
 .\"
-.\" Copyright (c) 2020 Matthias Pressfreund
+.\" Copyright (c) 2020, 2021 Matthias Pressfreund
 .\"
 .\" Permission to use, copy, modify, and distribute this software for any
 .\" purpose with or without fee is hereby granted, provided that the above
@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 15 2020 $
+.Dd $Mdocdate: February 6 2021 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -38,7 +38,7 @@ by programs such as network services and applications, and makes them traverse
 .Xr pf 4
 tables according to its configuration and the history of their occurrance.
 The daemon was originally designed to maintain service/application specific
-firewall blacklists, but may just as well serve any other kind of filtering or
+firewall blocklists, but may just as well serve any other kind of filtering or
 translation purposes.
 As
 .Nm
@@ -174,7 +174,7 @@ which is connected to the
 .Pa www
 target, will cause two log entries:
 .Bd -literal -offset indent
-[...] Hit :: [www] <- [11.22.33.44][GET /test.php 404]
+[...] Add :: [www] <- [11.22.33.44][GET /test.php 404]
 [...] >>> Added [11.22.33.44]:[www]:(2x:3h16m25s) \\
 to { attackers } for 1h.
 .Ed
