@@ -139,7 +139,7 @@ parse_conf(void)
 	}
 	if (!conf->datamax) {
 		conf->datamax = DEFAULT_DATAMAX;
-		DPRINTF("using global default datamax (%lld)", conf->datamax);
+		DPRINTF("using global default datamax (%zd)", conf->datamax);
 	}
 	if (!timespecisset(&conf->drop)) {
 		conf->drop = TIMESPEC_INFINITE;
@@ -197,7 +197,7 @@ parse_conf(void)
 					    "socket %s", sock->path);
 				else
 					DPRINTF("assuming socket %s datamax "
-					    "(%lld)", sock->path,
+					    "(%zd)", sock->path,
 					    sock->datamax);
 #endif
 			}
@@ -468,7 +468,7 @@ print_conf(struct statfd *sfd)
 	if (conf->datamax == CONF_NO_DATAMAX)
 		msg_send(sfd, "no datamax\n");
 	else
-		msg_send(sfd, "datamax %lld\n", conf->datamax);
+		msg_send(sfd, "datamax %zd\n", conf->datamax);
 
 	if (timespeccmp(&conf->drop, &CONF_NO_DROP, ==))
 		msg_send(sfd, "no drop\n");
@@ -629,7 +629,7 @@ print_conf(struct statfd *sfd)
 				if (sock->datamax == CONF_NO_DATAMAX)
 					msg_send(sfd, "\t\tno datamax\n");
 				else
-					msg_send(sfd, "\t\tdatamax %lld\n",
+					msg_send(sfd, "\t\tdatamax %zd\n",
 					    sock->datamax);
 			}
 

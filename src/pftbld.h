@@ -63,7 +63,7 @@
 #define CONF_NO_BACKLOG		-1
 #define CONF_BACKLOG_MAX	INT_MAX
 #define CONF_NO_DATAMAX		-1
-#define CONF_DATAMAX_MAX	LLONG_MAX
+#define CONF_DATAMAX_MAX	SSIZE_MAX
 #define CONF_NO_TIMEOUT		-1
 #define CONF_TIMEOUT_MAX	LLONG_MAX
 #define CONF_NO_DROP		TIMESPEC_INFINITE
@@ -316,7 +316,7 @@ struct socket {
 	gid_t		 group;
 	mode_t		 mode;
 	int		 backlog;
-	long long	 datamax;
+	ssize_t		 datamax;
 	time_t		 timeout;
 	pid_t		 pid;
 	int		 ctrlfd;
@@ -345,8 +345,8 @@ struct inbuf {
 	char		 tgtname[sizeof(((struct target *)0)->name)];
 	char		 sockid[sizeof(((struct socket *)0)->id)];
 	char		*data;
-	long long	 nr;
-	long long	 datamax;
+	ssize_t		 nr;
+	ssize_t		 datamax;
 	time_t		 timeout;
 	struct kevcb	 handler;
 
@@ -358,7 +358,7 @@ struct config {
 	struct socket	 ctrlsock;
 	char		 log[PATH_MAX];
 	int		 backlog;
-	long long	 datamax;
+	ssize_t		 datamax;
 	time_t		 timeout;
 	struct timespec	 drop;
 	struct targetq	 ctargets;
