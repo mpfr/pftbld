@@ -681,12 +681,12 @@ handle_inbuf(struct kevent *kev)
 		    ibuf->sockid, errno);
 		goto abort;
 	}
-	if (nr == 0)
+	if (nr <= 0)
 		goto eof;
 
 	inr = ibuf->nr + nr;
 	if (HAS_DATAMAX(ibuf) && inr > ibuf->datamax) {
-		log_warnx("read on target [%s%s] exceeded size limit (%lld)",
+		log_warnx("read on target [%s%s] exceeded size limit (%zd)",
 		    ibuf->tgtname, ibuf->sockid, ibuf->datamax);
 		goto abort;
 	}

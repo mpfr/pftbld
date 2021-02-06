@@ -120,7 +120,7 @@ main		: BACKLOG NUMBER		{
 				YYERROR;
 			}
 			conf->datamax = $2;
-			DPRINTF("global datamax: %lld", conf->datamax);
+			DPRINTF("global datamax: %zd", conf->datamax);
 		}
 		| DROP TIME			{
 			if ($2 <= 0 || $2 > CONF_DROP_MAX) {
@@ -412,7 +412,7 @@ sockoptsl	: ACTION actionopt	{
 				YYERROR;
 			}
 			sock->datamax = $2;
-			DPRINTF("datamax: %lld", sock->datamax);
+			DPRINTF("datamax: %zd", sock->datamax);
 		}
 		| GROUP NUMBER		{
 			struct group	*grp;
