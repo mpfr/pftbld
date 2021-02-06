@@ -261,6 +261,21 @@
           socket must be specified per <code class="Ic">target</code>, followed
           by an optional block of parameters enclosed in curly brackets:
         <dl class="Bl-tag">
+          <dt id="action"><a class="permalink" href="#action"><code class="Ic">action
+            add</code></a> |
+            <a class="permalink" href="#delete"><code class="Ic" id="delete">delete</code></a>
+            |
+            <a class="permalink" href="#drop"><code class="Ic" id="drop">drop</code></a></dt>
+          <dd>Specifies how to process client IP addresses received through the
+              parent <code class="Ic">socket</code>. The default action is
+              <code class="Ic">add</code>, inserting the client into the
+              corresponding
+              <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table.
+              Whereas <code class="Ic">delete</code> would remove the client
+              from its table just as if it had expired. If
+              <code class="Ic">drop</code> if specified, the client will not
+              just get deleted, but also completely removed from the daemon's
+              memory.</dd>
           <dt>[<code class="Ic">no</code>] <code class="Ic">backlog</code>
             <var class="Ar">number</var></dt>
           <dd>Overrides the global <code class="Ic">backlog</code> value.</dd>
@@ -450,7 +465,7 @@ function pftbld_feed() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">February 5, 2021</td>
+    <td class="foot-date">February 6, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

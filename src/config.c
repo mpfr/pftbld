@@ -58,18 +58,30 @@ find_socket(struct socketq *sockq, struct socket *sock)
 }
 
 struct target *
-find_target(struct targetq *tgtq, const char *name)
+find_target_byname(struct targetq *tgtq, const char *name)
 {
 	struct target	*t;
 
 	if (name == NULL || *name == '\0')
 		return (NULL);
 
-	SIMPLEQ_FOREACH(t, tgtq, targets)
-		if (!strncmp(t->name, name, sizeof(t->name)))
-			return (t);
+	SIMPLEQ_MATCH(t, tgtq, targets,
+	    !strncmp(t->name, name, sizeof(t->name)));
 
-	return (NULL);
+	return (t);
+}
+
+struct socket *
+find_socket_byid(struct socketq *sockq, const char *id)
+{
+	struct socket	*s;
+
+	if (id == NULL)
+		return (NULL);
+
+	SIMPLEQ_MATCH(s, sockq, sockets, !strncmp(s->id, id, sizeof(s->id)));
+
+	return (s);
 }
 
 int
@@ -327,7 +339,8 @@ reload_conf(void)
 	memcpy(&conf->ctrlsock, &confbak->ctrlsock, sizeof(struct socket));
 
 	SIMPLEQ_FOREACH(oldtgt, &confbak->ctargets, targets)
-		if (find_target(&conf->ctargets, oldtgt->name) == NULL) {
+		if (find_target_byname(&conf->ctargets,
+		    oldtgt->name) == NULL) {
 			DPRINTF("starting delete on target [%s]",
 			    oldtgt->name);
 			update_sockets(NULL, &oldtgt->datasocks, NULL);
@@ -336,7 +349,7 @@ reload_conf(void)
 		}
 	SIMPLEQ_FOREACH(newtgt, &conf->ctargets, targets) {
 		DPRINTF("starting update of target [%s]", newtgt->name);
-		oldtgt = find_target(&confbak->ctargets, newtgt->name);
+		oldtgt = find_target_byname(&confbak->ctargets, newtgt->name);
 		update_sockets(&newtgt->datasocks,
 		    oldtgt ? &oldtgt->datasocks : NULL, newtgt);
 		DPRINTF("finished update of target [%s]", newtgt->name);
@@ -600,6 +613,9 @@ print_conf(struct statfd *sfd)
 			estr = esc(sock->path);
 			msg_send(sfd, "\tsocket \"%s\" {\n", estr);
 			free(estr);
+
+			msg_send(sfd, "\t\taction %s\n",
+			    ACTION_TO_STR(sock->action));
 
 			if (conf->backlog != sock->backlog) {
 				if (sock->backlog == CONF_NO_BACKLOG)
