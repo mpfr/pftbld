@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <!-- This is an automatically generated file.  Do not edit.
-   Copyright (c) 2020 Matthias Pressfreund
+   Copyright (c) 2020, 2021 Matthias Pressfreund
   
    Permission to use, copy, modify, and distribute this software for any
    purpose with or without fee is hereby granted, provided that the above
@@ -63,7 +63,7 @@
     <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables according
     to its configuration and the history of their occurrance. The daemon was
     originally designed to maintain service/application specific firewall
-    blacklists, but may just as well serve any other kind of filtering or
+    blocklists, but may just as well serve any other kind of filtering or
     translation purposes. As <code class="Nm">pftbld</code> can persist managed
     addresses and meta-data, it is capable of restoring its runtime status and
     corresponding <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>
@@ -160,7 +160,7 @@
     cause two log entries:</p>
 <div class="Bd Pp Bd-indent">
 <pre>
-[...] Hit :: [www] &lt;- [11.22.33.44][GET /test.php 404]
+[...] Add :: [www] &lt;- [11.22.33.44][GET /test.php 404]
 [...] &gt;&gt;&gt; Added [11.22.33.44]:[www]:(2x:3h16m25s) \
 to { attackers } for 1h.
 </pre>
@@ -214,7 +214,7 @@ to { attackers } for 1h.
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">December 15, 2020</td>
+    <td class="foot-date">February 6, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

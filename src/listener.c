@@ -28,6 +28,28 @@
 
 #define FLAG_SRVSOCK_CCNTLOG	0x01
 
+#define CADDR_TO_CRANGE(r, a)					\
+	do {							\
+		(r)->first = (r)->last = (a)->value;		\
+		(r)->type = (a)->type;				\
+		(void)strlcpy((r)->str, (a)->str,		\
+		    sizeof((r)->str));				\
+		(void)strlcat((r)->str,				\
+		    (r)->type == ADDR_IPV4 ? "/32" :		\
+		    (r)->type == ADDR_IPV6 ? "/128" : "",	\
+		    sizeof((r)->str));				\
+	} while (0)
+
+#define TIME_TO_STR(str, ts)						\
+	do {								\
+		struct timespec	 _ts = *ts;				\
+		struct tm	*_tm;					\
+		if ((_tm = localtime(&_ts.tv_sec)) == NULL)		\
+			FATALX("localtime failed");			\
+		if (strftime(str, sizeof(str), TS_FMT, _tm) == 0)	\
+			FATALX("strftime overflow");			\
+	} while (0)
+
 static void	 handle_ctrl(struct kevent *);
 static void	 handle_srvsock(struct kevent *);
 static struct ptr
@@ -36,7 +58,7 @@ static struct crange
 		*check_exclcranges(struct crangeq *, struct caddr *);
 static char	*enq_target_address_params(char *, char *, size_t,
 		    struct ptrq *, struct crangeq *);
-static void	 free_target_address_queues(struct ptrq *, struct crangeq *);
+static void	 free_target_address_queues(struct crangeq *, struct ptrq *);
 static int	 perform_ctrl_config(struct statfd *, char *, char *, size_t);
 static int	 perform_ctrl_delete(struct statfd *, char *, char *, size_t,
 		    int (*)(struct crangeq *, struct ptrq *),
@@ -276,25 +298,21 @@ fork_listener(struct socket *sockcfg, char *tgtname)
 static struct ptr *
 check_exclkeyterms(struct ptrq *ktq, char *buf)
 {
-	struct ptr	*exclk;
+	struct ptr	*kt;
 
-	STAILQ_FOREACH(exclk, ktq, ptrs)
-		if (strstr(buf, exclk->p) != NULL)
-			return (exclk);
+	STAILQ_MATCH(kt, ktq, ptrs, strstr(buf, kt->p) != NULL);
 
-	return (NULL);
+	return (kt);
 }
 
 static struct crange *
 check_exclcranges(struct crangeq *crq, struct caddr *addr)
 {
-	struct crange	*exclr;
+	struct crange	*cr;
 
-	STAILQ_FOREACH(exclr, crq, cranges)
-		if (addr_inrange(exclr, addr))
-			return (exclr);
+	STAILQ_MATCH(cr, crq, cranges, addr_inrange(cr, addr));
 
-	return (NULL);
+	return (cr);
 }
 
 void
@@ -307,9 +325,13 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	struct target	*tgt;
 	char		*tgtname, *sockid, *data, *age;
 	struct caddr	 addr;
-	struct ptr	*exclk;
+	struct ptr	*pt;
 	struct ignore	*ign;
-	struct crange	*exclr;
+	struct socket	*sock;
+	enum pfaction	 action;
+	struct crangeq	 crq;
+	struct ptrq	 tpq;
+	struct crange	*cr;
 	struct client	*clt, *first;
 	struct timespec	 now, tsdiff;
 	struct table	*tbl;
@@ -336,14 +358,14 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	data = ibuf->data;
 	datalen = ibuf->nr;
 
-	if ((tgt = find_target(&conf->ctargets, tgtname)) == NULL)
+	if ((tgt = find_target_byname(&conf->ctargets, tgtname)) == NULL)
 		FATALX("invalid target [%s]", tgtname);
 
-	if ((exclk = check_exclkeyterms(&tgt->exclkeyterms, data)) != NULL ||
-	    (exclk = check_exclkeyterms(&conf->exclkeyterms, data)) != NULL) {
-		ign = request_ignore(&addr, tgtname, sockid, exclk);
+	if ((pt = check_exclkeyterms(&tgt->exclkeyterms, data)) != NULL ||
+	    (pt = check_exclkeyterms(&conf->exclkeyterms, data)) != NULL) {
+		ign = request_ignore(&addr, tgtname, sockid, pt);
 		if (ign->cnt == 0) {
-			ASPRINTF(&ign->data, "keyterm '%s'", exclk->p);
+			ASPRINTF(&ign->data, "keyterm '%s'", pt->p);
 			print_ts_log("Ignored excluded %s :: [%s%s] <- [%s]",
 			    ign->data, tgtname, sockid,
 			    replace(data, "\n", '\0'));
@@ -353,15 +375,13 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		goto end;
 	}
 
-	if ((exclr = check_exclcranges(&tgt->exclcranges, &addr)) != NULL ||
-	    (exclr = check_exclcranges(&conf->exclcranges, &addr)) != NULL) {
-		ign = request_ignore(&addr, tgtname, sockid, exclr);
+	if ((cr = check_exclcranges(&tgt->exclcranges, &addr)) != NULL ||
+	    (cr = check_exclcranges(&conf->exclcranges, &addr)) != NULL) {
+		ign = request_ignore(&addr, tgtname, sockid, cr);
 		if (ign->cnt == 0) {
 			(void)replace(data, "\n", '\0');
-			if (addrvals_cmp(&exclr->first, &exclr->last,
-			    exclr->type))
-				ASPRINTF(&ign->data, "network <%s>",
-				    exclr->str);
+			if (addrvals_cmp(&cr->first, &cr->last, cr->type))
+				ASPRINTF(&ign->data, "network <%s>", cr->str);
 			else
 				ASPRINTF(&ign->data, "address");
 			print_ts_log("Ignored excluded %s :: [%s%s] <- [%s]",
@@ -372,16 +392,64 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		goto end;
 	}
 
-	if ((first = clt = TAILQ_FIRST(&cltq)) != NULL) {
-		if (timespec_isinfinite(&first->to))
-			first = NULL;
+	if ((sock = find_socket_byid(&tgt->datasocks, sockid)) == NULL)
+		FATALX("invalid socket [%s]", sockid);
 
-		while (clt->tgt != tgt || addrs_cmp(&clt->addr, &addr))
-			if ((clt = TAILQ_NEXT(clt, clients)) == NULL)
+	ign = request_ignore(&addr, tgtname, sockid, &sock->action);
+	action = sock->action;
+
+	TAILQ_FOREACH(clt, &cltq, clients)
+		if (clt->tgt == tgt && !addrs_cmp(&clt->addr, &addr))
+			break;
+
+	if (action != ACTION_ADD) {
+		print_ts_log("%s :: [%s%s] <- [%s]",
+		    action == ACTION_DELETE ? "Delete" : "Drop",
+		    tgtname, sockid, replace(data, "\n", '\0'));
+		append_data_log(data, datalen);
+
+		if (ign->cnt == 0) {
+			STAILQ_INIT(&crq);
+			MALLOC(cr, sizeof(*cr));
+			CADDR_TO_CRANGE(cr, &addr);
+			STAILQ_INSERT_TAIL(&crq, cr, cranges);
+			STAILQ_INIT(&tpq);
+			MALLOC(pt, sizeof(*pt));
+			pt->p = tgt;
+			STAILQ_INSERT_TAIL(&tpq, pt, ptrs);
+			if (clt != NULL) {
+				GET_TIME(&tsdiff);
+				timespecsub(&tsdiff, &clt->ts, &tsdiff);
+				age = hrage(&tsdiff);
+				ASPRINTF(&data, ":(%ux:%s)", clt->hits, age);
+				free(age);
+			} else
+				CALLOC(data, 1, 1);
+			switch (action) {
+			case ACTION_DELETE:
+				if (expire_clients(&crq, &tpq) == 0)
+					print_ts_log("Skipped needless "
+					    "deletion of [%s]:[%s]%s.\n",
+					    addr.str, tgtname, data);
 				break;
+			case ACTION_DROP:
+				if (drop_clients(&crq, &tpq) == 0)
+					print_ts_log("Skipped needless drop "
+					    "of [%s]:[%s]%s.\n", addr.str,
+					    tgtname, data);
+				break;
+			default:
+				FATALX("invalid action (%d)", action);
+			}
+			free(data);
+			free_target_address_queues(&crq, &tpq);
+		}
+		goto end;
 	}
 
-	ign = request_ignore(&addr, tgtname, sockid, NULL);
+	if ((first = TAILQ_FIRST(&cltq)) != NULL &&
+	    timespec_isinfinite(&first->to))
+		first = NULL;
 
 	if (clt == NULL) {
 		CALLOC(clt, 1, sizeof(*clt));
@@ -397,8 +465,8 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		TAILQ_REMOVE(&cltq, clt, clients);
 	}
 
-	print_ts_log("Hit :: [%s%s] <- [%s]", tgtname, sockid,
-	    replace(data, "\n", '\0'));
+	print_ts_log("Add :: [%s%s] <- [%s]",
+	    tgtname, sockid, replace(data, "\n", '\0'));
 	append_data_log(data, datalen);
 
 	clthits = ++clt->hits;
@@ -497,16 +565,6 @@ end:
 	close(datafd);
 }
 
-#define TIME_TO_STR(str, ts)						\
-	do {								\
-		struct timespec	 _ts = *ts;				\
-		struct tm	*_tm;					\
-		if ((_tm = localtime(&_ts.tv_sec)) == NULL)		\
-			FATALX("localtime failed");			\
-		if (strftime(str, sizeof(str), TS_FMT, _tm) == 0)	\
-			FATALX("strftime overflow");			\
-	} while (0)
-
 static char *
 enq_target_address_params(char *arg, char *data, size_t datalen,
     struct ptrq *tpq, struct crangeq *crq)
@@ -516,7 +574,7 @@ enq_target_address_params(char *arg, char *data, size_t datalen,
 	struct crange	*cr;
 
 	do {
-		if ((tgt = find_target(&conf->ctargets, arg)) != NULL) {
+		if ((tgt = find_target_byname(&conf->ctargets, arg)) != NULL) {
 			MALLOC(tp, sizeof(*tp));
 			tp->p = tgt;
 			STAILQ_INSERT_TAIL(tpq, tp, ptrs);
@@ -530,7 +588,7 @@ enq_target_address_params(char *arg, char *data, size_t datalen,
 }
 
 static void
-free_target_address_queues(struct ptrq *tpq, struct crangeq *crq)
+free_target_address_queues(struct crangeq *crq, struct ptrq *tpq)
 {
 	struct ptr	*tp;
 	struct crange	*cr;
@@ -666,7 +724,7 @@ perform_ctrl_delete(struct statfd *sfd, char *arg, char *data, size_t datalen,
 	}
 
 end:
-	free_target_address_queues(&tpq, &crq);
+	free_target_address_queues(&crq, &tpq);
 	return (0);
 }
 
@@ -687,7 +745,7 @@ perform_ctrl_dump(struct statfd *sfd, char *arg, char *data, size_t datalen)
 
 	TAILQ_FOREACH(clt, &cltq, clients) {
 		if (!STAILQ_EMPTY(&tpq)) {
-			STAILQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
+			STAILQ_MATCH(tp, &tpq, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
@@ -696,7 +754,7 @@ perform_ctrl_dump(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	}
 
 end:
-	free_target_address_queues(&tpq, NULL);
+	free_target_address_queues(NULL, &tpq);
 	return (0);
 }
 
@@ -812,12 +870,12 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		    (clt->hits < hits[0] || clt->hits > hits[1]))
 			continue;
 		if (!STAILQ_EMPTY(&tpq)) {
-			STAILQ_MATCH(&tpq, tp, ptrs, clt->tgt == tp->p);
+			STAILQ_MATCH(tp, &tpq, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
 		if (!STAILQ_EMPTY(&crq)) {
-			STAILQ_MATCH(&crq, cr, cranges,
+			STAILQ_MATCH(cr, &crq, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -886,7 +944,7 @@ perform_ctrl_list(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	}
 
 end:
-	free_target_address_queues(&tpq, &crq);
+	free_target_address_queues(&crq, &tpq);
 	return (0);
 }
 
@@ -928,7 +986,7 @@ perform_ctrl_save(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	}
 
 end:
-	free_target_address_queues(&tpq, NULL);
+	free_target_address_queues(NULL, &tpq);
 	return (0);
 }
 

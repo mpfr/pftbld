@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 5 2021 $
+.Dd $Mdocdate: February 6 2021 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -301,6 +301,21 @@ At least one data socket must be specified per
 .Ic target ,
 followed by an optional block of parameters enclosed in curly brackets:
 .Bl -tag -width Ds
+.It Ic action add | delete | drop
+Specifies how to process client IP addresses received through the parent
+.Ic socket .
+The default action is
+.Ic add ,
+inserting the client into the corresponding
+.Xr pf 4
+table.
+Whereas
+.Ic delete
+would remove the client from its table just as if it had expired.
+If
+.Ic drop
+if specified, the client will not just get deleted, but also completely
+removed from the daemon's memory.
 .It Oo Ic no Oc Ic backlog Ar number
 Overrides the global
 .Ic backlog

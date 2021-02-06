@@ -92,9 +92,9 @@ struct ptrq	*curr_exclkeytermq;
 
 %}
 
-%token	BACKLOG CASCADE DATAMAX DROP EXCLUDE EXPIRE GROUP HITS ID KEEP KEYTERM
-%token	KEYTERMFILE KILL LOCALHOSTS LOG MODE NET NETFILE NO NODES OWNER PERSIST
-%token	SKIP SOCKET STATES STEP TABLE TARGET TIMEOUT
+%token	ACTION ADD BACKLOG CASCADE DATAMAX DELETE DROP EXCLUDE EXPIRE GROUP
+%token	HITS ID KEEP KEYTERM KEYTERMFILE KILL LOCALHOSTS LOG MODE NET NETFILE
+%token	NO NODES OWNER PERSIST SKIP SOCKET STATES STEP TABLE TARGET TIMEOUT
 %token	<v.number>	NUMBER
 %token	<v.string>	STRING
 %token	<v.time>	TIME
@@ -395,13 +395,16 @@ sockopts_l	: sockoptsl optcommanl sockopts_l
 		| sockoptsl optnl
 		;
 
-sockoptsl	: BACKLOG NUMBER	{
+sockoptsl	: ACTION actionopt	{
+			DPRINTF("action: %d", sock->action);
+		}
+		| BACKLOG NUMBER	{
 			if ($2 <= 0 || $2 > CONF_BACKLOG_MAX) {
 				yyerror("backlog out of bounds");
 				YYERROR;
 			}
 			sock->backlog = $2;
-			DPRINTF("backlog: %d", conf->backlog);
+			DPRINTF("backlog: %d", sock->backlog);
 		}
 		| DATAMAX NUMBER	{
 			if ($2 <= 0 || $2 > CONF_DATAMAX_MAX) {
@@ -501,6 +504,17 @@ sockoptsl	: BACKLOG NUMBER	{
 			}
 			sock->timeout = $2;
 			DPRINTF("timeout: %lld", sock->timeout);
+		}
+		;
+
+actionopt	: ADD		{
+			sock->action = ACTION_ADD;
+		}
+		| DELETE	{
+			sock->action = ACTION_DELETE;
+		}
+		| DROP		{
+			sock->action = ACTION_DROP;
 		}
 		;
 
@@ -669,9 +683,12 @@ static const struct keyword {
 	const char	*name;
 	int		 token;
 } keywords[] = {
+	{ "action",	ACTION},
+	{ "add",	ADD},
 	{ "backlog",	BACKLOG},
 	{ "cascade",	CASCADE },
 	{ "datamax",	DATAMAX },
+	{ "delete",	DELETE },
 	{ "drop",	DROP },
 	{ "exclude",	EXCLUDE },
 	{ "expire",	EXPIRE },

@@ -104,7 +104,7 @@ update_conf(struct config *nc)
 
 	while ((clt = TAILQ_FIRST(&cqc)) != NULL) {
 		TAILQ_REMOVE(&cqc, clt, clients);
-		clt->tgt = find_target(&nc->ctargets, clt->tgt->name);
+		clt->tgt = find_target_byname(&nc->ctargets, clt->tgt->name);
 		if (bind_table(clt, &cmdq))
 			sort_client_desc(clt);
 		else
@@ -186,12 +186,12 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if (!STAILQ_EMPTY(tpq)) {
-			STAILQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+			STAILQ_MATCH(tp, tpq, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
 		if (!STAILQ_EMPTY(crq)) {
-			STAILQ_MATCH(crq, cr, cranges,
+			STAILQ_MATCH(cr, crq, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -249,12 +249,12 @@ drop_clients_r(struct crangeq *crq, struct ptrq *tpq)
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if (!STAILQ_EMPTY(tpq)) {
-			STAILQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+			STAILQ_MATCH(tp, tpq, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
 		if (!STAILQ_EMPTY(crq)) {
-			STAILQ_MATCH(crq, cr, cranges,
+			STAILQ_MATCH(cr, crq, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -311,12 +311,12 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 		if (clt->exp)
 			continue;
 		if (!STAILQ_EMPTY(tpq)) {
-			STAILQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+			STAILQ_MATCH(tp, tpq, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
 		if (!STAILQ_EMPTY(crq)) {
-			STAILQ_MATCH(crq, cr, cranges,
+			STAILQ_MATCH(cr, crq, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -387,12 +387,12 @@ expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 		if (clt->exp )
 			continue;
 		if (!STAILQ_EMPTY(tpq)) {
-			STAILQ_MATCH(tpq, tp, ptrs, clt->tgt == tp->p);
+			STAILQ_MATCH(tp, tpq, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
 				continue;
 		}
 		if (!STAILQ_EMPTY(crq)) {
-			STAILQ_MATCH(crq, cr, cranges,
+			STAILQ_MATCH(cr, crq, cranges,
 			    addr_inrange(cr, &clt->addr));
 			if (cr == NULL)
 				continue;
@@ -723,7 +723,7 @@ remove:
 	TAILQ_REMOVE(&inbq, ibuf, inbufs);
 
 	if (*ibuf->tgtname != '\0') {
-		if ((tgt = find_target(&conf->ctargets,
+		if ((tgt = find_target_byname(&conf->ctargets,
 		    ibuf->tgtname)) == NULL)
 			FATALX("could find target [%s]", ibuf->tgtname);
 		sock = STAILQ_FIRST(&tgt->datasocks);
@@ -787,9 +787,9 @@ handle_expire(struct kevent *kev)
 
 	timespecsub(&ts, &clt->ts, &ts);
 	age = hrage(&ts);
-	print_ts_log("%s%s[%s]:[%s]:(%dx:%s)", pfres.ndel > 0 ? ">>> " : "",
-	    exp ? "Deleted " : "", clt->addr.str, clt->tgt->name, clt->hits,
-	    age);
+	print_ts_log("%s[%s]:[%s]:(%ux:%s)", exp ? pfres.ndel > 0 ?
+	    ">>> Deleted " : "Skipped needless deletion of " : "",
+	    clt->addr.str, clt->tgt->name, clt->hits, age);
 	free(age);
 
 	if (exp) {
@@ -832,7 +832,9 @@ handle_ignore(struct kevent *kev)
 		timespecsub(&ts, timeout, &ts);
 	print_ts_log("[%lld ms] Ignored %u ", TIMESPEC_TO_MSEC(&ts), ign->cnt);
 	if (ign->data == NULL)
-		print_log("duplicate hit%s", ign->cnt == 1 ? "" : "s");
+		print_log("duplicate %s request%s",
+		    ACTION_TO_STR(*(enum pfaction *)ign->ident),
+		    ign->cnt == 1 ? "" : "s");
 	else
 		print_log("more time%s excluded %s", ign->cnt == 1 ? "" : "s",
 		    ign->data);

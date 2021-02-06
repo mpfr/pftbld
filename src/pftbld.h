@@ -79,7 +79,7 @@
 	    (e)->flags & EV_DELETE ? "/DELETE" : "/???" : "",	\
 	    (e)->data)
 
-#define STAILQ_MATCH(q, e, t, m)	\
+#define STAILQ_MATCH(e, q, t, m)	\
 	do {				\
 		STAILQ_FOREACH(e, q, t)	\
 			if (m)		\
@@ -300,6 +300,15 @@ struct table {
 };
 STAILQ_HEAD(tableq, table);
 
+enum pfaction {
+	ACTION_ADD = 0,
+	ACTION_DELETE,
+	ACTION_DROP
+};
+#define ACTION_TO_STR(a)	(a == ACTION_ADD ? "add" :		\
+				 a == ACTION_DELETE ? "delete" :	\
+				 a == ACTION_DROP ? "drop" : "???")
+
 struct socket {
 	char		 path[sizeof(((struct sockaddr_un *)0)->sun_path)];
 	char		 id[NAME_MAX];
@@ -311,6 +320,7 @@ struct socket {
 	time_t		 timeout;
 	pid_t		 pid;
 	int		 ctrlfd;
+	enum pfaction	 action;
 
 	STAILQ_ENTRY(socket) sockets;
 };
@@ -440,7 +450,8 @@ void		 pfexec(struct pfresult *, struct pfcmd *);
 __dead void	 pftbld(int, char **);
 
 /* config.c */
-struct target	*find_target(struct targetq *, const char *);
+struct target	*find_target_byname(struct targetq *, const char *);
+struct socket	*find_socket_byid(struct socketq *, const char *);
 int		 parse_conf(void);
 int		 reload_conf(void);
 void		 free_conf(struct config *);
