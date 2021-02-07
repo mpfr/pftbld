@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 6 2021 $
+.Dd $Mdocdate: February 7 2021 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -72,7 +72,7 @@ utility.
 This will limit the number of
 .Ar bytes
 allowed to be transmitted per connection, the terminating
-.Sq Li \e0
+.Sq Dv \e0
 character included.
 In case a client exceeds this limit, the connection will be closed and all
 transmitted data will be discarded.
@@ -153,6 +153,18 @@ The default value is 10000 milliseconds.
 .Sh TARGETS
 Typically, targets are used to distinguish input data by service type and apply
 appropriate handling.
+An IP address submitted by a client will always (automatically) be associated
+with a
+.Ic target .
+As the same IP address may be submitted by different clients each using its own
+.Ic socket ,
+and hence being assigned to different targets, this combination (also referred
+to as
+.Pa client entry )
+by nature is a many-to-many relationship, i.e. one IP address may be assigned
+to multiple targets as well as multiple addresses may be associated with the
+same target.
+.Pp
 In order to start
 .Xr pftbld 8 ,
 at least one
@@ -287,9 +299,13 @@ Makes
 .Xr pftbld 8
 skip the given
 .Ar number
-of appearances of a new client, i.e. it will not be added to any
-.Xr pf 4
-table and it will appear as just expired.
+of appearances of an IP address on a
+.Ic socket
+with
+.Ic action add
+(the default) specified.
+Please note that appearances of IP addresses on sockets with other actions
+specified will be skipped anyway without the appearance being counted.
 .It Ic socket Ar path Oo Bro ... Brc Oc
 Specifies a UNIX-domain socket at
 .Ar path
@@ -302,20 +318,21 @@ At least one data socket must be specified per
 followed by an optional block of parameters enclosed in curly brackets:
 .Bl -tag -width Ds
 .It Ic action add | delete | drop
-Specifies how to process client IP addresses received through the parent
+Specifies how to process IP addresses received through the parent
 .Ic socket .
 The default action is
 .Ic add ,
-inserting the client into the corresponding
+creating a new client entry and inserting the address into the corresponding
 .Xr pf 4
 table.
-Whereas
+The
 .Ic delete
-would remove the client from its table just as if it had expired.
+action removes the address from the corresponding table as if it just had
+expired.
 If
 .Ic drop
-if specified, the client will not just get deleted, but also completely
-removed from the daemon's memory.
+is specified, the address will not just get deleted, but the associated client
+entry will be completely removed from the daemon's memory as well.
 .It Oo Ic no Oc Ic backlog Ar number
 Overrides the global
 .Ic backlog
@@ -517,6 +534,41 @@ function pftbld_feed() {
 		    "{$_SERVER['REMOTE_ADDR']}\\n".
 		    "{$_SERVER['REQUEST_URI']}\\n".
 		    "{$_SERVER['HTTP_USER_AGENT']}");
+	socket_close($sock);
+}
+.Ed
+.Pp
+In case a web application should be capable to, for instance, drop client
+entries from
+.Xr pftbld 8
+autonomously, at first an additional
+.Ic socket
+entry, this time with the
+.Ic action drop
+option is required in the configuration:
+.Bd -literal -offset indent
+target "www" {
+	...
+	socket "/var/www/run/pftbld-www-drop.sock" {
+		action drop
+		owner "www"
+		group "www"
+	}
+	...
+}
+.Ed
+.Pp
+Now, the above PHP code may simply be reused as follows:
+.Bd -literal -offset indent
+function pftbld_drop() {
+	$sock = socket_create(AF_UNIX, SOCK_STREAM, 0);
+	if ($sock === false)
+		return;
+	if (socket_connect($sock,
+	    '/run/pftbld-www-drop.sock') !== false)
+		socket_write($sock,
+		    "{$_SERVER['REMOTE_ADDR']}\\n".
+		    "client ok");
 	socket_close($sock);
 }
 .Ed

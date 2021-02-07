@@ -71,7 +71,7 @@
     <var class="Ar">bytes</var></dt>
   <dd>This will limit the number of <var class="Ar">bytes</var> allowed to be
       transmitted per connection, the terminating
-      &#x2018;<code class="Li">\0</code>&#x2019; character included. In case a
+      &#x2018;<code class="Dv">\0</code>&#x2019; character included. In case a
       client exceeds this limit, the connection will be closed and all
       transmitted data will be discarded. If the <code class="Ic">no</code>
       keyword is specified instead of the number of <var class="Ar">bytes</var>,
@@ -135,7 +135,15 @@
 <section class="Sh">
 <h1 class="Sh" id="TARGETS"><a class="permalink" href="#TARGETS">TARGETS</a></h1>
 <p class="Pp">Typically, targets are used to distinguish input data by service
-    type and apply appropriate handling. In order to start
+    type and apply appropriate handling. An IP address submitted by a client
+    will always (automatically) be associated with a
+    <code class="Ic">target</code>. As the same IP address may be submitted by
+    different clients each using its own <code class="Ic">socket</code>, and
+    hence being assigned to different targets, this combination (also referred
+    to as <span class="Pa">client entry</span>) by nature is a many-to-many
+    relationship, i.e. one IP address may be assigned to multiple targets as
+    well as multiple addresses may be associated with the same target.</p>
+<p class="Pp">In order to start
     <a class="Xr" href="pftbld.8.html">pftbld(8)</a>, at least one
     <code class="Ic">target</code> entry needs to be defined.</p>
 <dl class="Bl-tag">
@@ -249,10 +257,11 @@
       <dt id="skip"><a class="permalink" href="#skip"><code class="Ic">skip</code></a>
         <var class="Ar">number</var></dt>
       <dd>Makes <a class="Xr" href="pftbld.8.html">pftbld(8)</a> skip the given
-          <var class="Ar">number</var> of appearances of a new client, i.e. it
-          will not be added to any
-          <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table and
-          it will appear as just expired.</dd>
+          <var class="Ar">number</var> of appearances of an IP address on a
+          <code class="Ic">socket</code> with <code class="Ic">action add</code>
+          (the default) specified. Please note that appearances of IP addresses
+          on sockets with other actions specified will be skipped anyway without
+          the appearance being counted.</dd>
       <dt id="socket"><a class="permalink" href="#socket"><code class="Ic">socket</code></a>
         <var class="Ar">path</var> [{...}]</dt>
       <dd>Specifies a UNIX-domain socket at <var class="Ar">path</var> to be
@@ -266,16 +275,16 @@
             <a class="permalink" href="#delete"><code class="Ic" id="delete">delete</code></a>
             |
             <a class="permalink" href="#drop"><code class="Ic" id="drop">drop</code></a></dt>
-          <dd>Specifies how to process client IP addresses received through the
-              parent <code class="Ic">socket</code>. The default action is
-              <code class="Ic">add</code>, inserting the client into the
-              corresponding
+          <dd>Specifies how to process IP addresses received through the parent
+              <code class="Ic">socket</code>. The default action is
+              <code class="Ic">add</code>, creating a new client entry and
+              inserting the address into the corresponding
               <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table.
-              Whereas <code class="Ic">delete</code> would remove the client
-              from its table just as if it had expired. If
-              <code class="Ic">drop</code> if specified, the client will not
-              just get deleted, but also completely removed from the daemon's
-              memory.</dd>
+              The <code class="Ic">delete</code> action removes the address from
+              the corresponding table as if it just had expired. If
+              <code class="Ic">drop</code> is specified, the address will not
+              just get deleted, but the associated client entry will be
+              completely removed from the daemon's memory as well.</dd>
           <dt>[<code class="Ic">no</code>] <code class="Ic">backlog</code>
             <var class="Ar">number</var></dt>
           <dd>Overrides the global <code class="Ic">backlog</code> value.</dd>
@@ -448,6 +457,40 @@ function pftbld_feed() {
 }
 </pre>
 </div>
+<p class="Pp">In case a web application should be capable to, for instance, drop
+    client entries from <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
+    autonomously, at first an additional <code class="Ic">socket</code> entry,
+    this time with the <code class="Ic">action drop</code> option is required in
+    the configuration:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+target &quot;www&quot; {
+	...
+	socket &quot;/var/www/run/pftbld-www-drop.sock&quot; {
+		action drop
+		owner &quot;www&quot;
+		group &quot;www&quot;
+	}
+	...
+}
+</pre>
+</div>
+<p class="Pp">Now, the above PHP code may simply be reused as follows:</p>
+<div class="Bd Pp Bd-indent">
+<pre>
+function pftbld_drop() {
+	$sock = socket_create(AF_UNIX, SOCK_STREAM, 0);
+	if ($sock === false)
+		return;
+	if (socket_connect($sock,
+	    '/run/pftbld-www-drop.sock') !== false)
+		socket_write($sock,
+		    &quot;{$_SERVER['REMOTE_ADDR']}\n&quot;.
+		    &quot;client ok&quot;);
+	socket_close($sock);
+}
+</pre>
+</div>
 </section>
 <section class="Sh">
 <h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
@@ -465,7 +508,7 @@ function pftbld_feed() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">February 6, 2021</td>
+    <td class="foot-date">February 7, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
