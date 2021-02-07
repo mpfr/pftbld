@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 6 2021 $
+.Dd $Mdocdate: February 7 2021 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -37,9 +37,9 @@ daemon listens on UNIX-domain sockets for incoming IP addresses, usually sent
 by programs such as network services and applications, and makes them traverse
 .Xr pf 4
 tables according to its configuration and the history of their occurrance.
-The daemon was originally designed to maintain service/application specific
-firewall blocklists, but may just as well serve any other kind of filtering or
-translation purposes.
+The daemon was originally designed to build and maintain service/application
+specific firewall blocklists, but may just as well serve any other kind of
+filtering or translation purposes.
 As
 .Nm
 can persist managed addresses and meta-data, it is capable of restoring its
@@ -122,9 +122,9 @@ or data to a
 this enables printing server replies to
 .Ar stdout .
 In the latter case, receiving the sequence
-.Sq ACK
+.Sq Dv ACK
 indicates that the server successfully received and processed all data, while
-.Sq NAK
+.Sq Dv NAK
 would imply that received data was discarded, either because communication has
 failed or because the data was invalid.
 If used along with
@@ -153,10 +153,11 @@ A message for a
 must start with an
 .Pa IP address
 followed by an arbitrary number of
-.Pa optional text sections ,
-whose sole purpose is getting matched against the
+.Pa optional text sections .
+Its sole purpose is getting matched against the
 .Ic exclude keyterms
-specified in the configuration and finally get written into the log file.
+specified in the configuration before getting written into the log file.
+.Pp
 Here's an example:
 .Bd -literal -offset indent
 # msg="11.22.33.44\\nGET /test.php 404"

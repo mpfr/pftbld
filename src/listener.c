@@ -335,7 +335,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	struct client	*clt, *first;
 	struct timespec	 now, tsdiff;
 	struct table	*tbl;
-	size_t		 datalen;
+	ssize_t		 datalen;
 	unsigned int	 clthits, skip;
 	struct pfcmd	 cmd;
 	struct pfresult	 pfres;
@@ -428,14 +428,18 @@ proc_data(struct inbuf *ibuf, int kqfd)
 			switch (action) {
 			case ACTION_DELETE:
 				if (expire_clients(&crq, &tpq) == 0)
-					print_ts_log("Skipped needless "
-					    "deletion of [%s]:[%s]%s.\n",
-					    addr.str, tgtname, data);
+					print_ts_log("Skipped %s "
+					    "[%s]:[%s]%s.\n", clt != NULL ?
+					    "needless deletion of" :
+					    "deleting unknown", addr.str,
+					    tgtname, data);
 				break;
 			case ACTION_DROP:
 				if (drop_clients(&crq, &tpq) == 0)
-					print_ts_log("Skipped needless drop "
-					    "of [%s]:[%s]%s.\n", addr.str,
+					print_ts_log("Skipped %s "
+					    "[%s]:[%s]%s.\n", clt != NULL ?
+					    "needless dropping of" :
+					    "dropping unknown", addr.str,
 					    tgtname, data);
 				break;
 			default:
