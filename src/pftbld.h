@@ -305,9 +305,13 @@ enum pfaction {
 	ACTION_DELETE,
 	ACTION_DROP
 };
-#define ACTION_TO_STR(a)	(a == ACTION_ADD ? "add" :		\
-				 a == ACTION_DELETE ? "delete" :	\
-				 a == ACTION_DROP ? "drop" : "???")
+#define ACTION_TO_STR(a, s_add, s_delete, s_drop)	\
+	(a == ACTION_ADD ? s_add :			\
+	 a == ACTION_DELETE ? s_delete :		\
+	 a == ACTION_DROP ? s_drop : "")
+#define ACTION_TO_LSTR(a)	ACTION_TO_STR(a, "add", "delete", "drop")
+#define ACTION_TO_CSTR(a)	ACTION_TO_STR(a, "Add", "Delete", "Drop")
+#define ACTION_TO_LPSTR(a)	ACTION_TO_STR(a, "added", "deleted", "dropped")
 
 struct socket {
 	char		 path[sizeof(((struct sockaddr_un *)0)->sun_path)];
@@ -481,10 +485,10 @@ int		 load(struct target *);
 /* scheduler.c */
 void		 sort_client_asc(struct client *);
 void		 sort_client_desc(struct client *);
-int		 drop_clients(struct crangeq *, struct ptrq *);
-int		 drop_clients_r(struct crangeq *, struct ptrq *);
-int		 expire_clients(struct crangeq *, struct ptrq *);
-int		 expire_clients_r(struct crangeq *, struct ptrq *);
+unsigned int	 drop_clients(struct crangeq *, struct ptrq *);
+unsigned int	 drop_clients_r(struct crangeq *, struct ptrq *);
+unsigned int	 expire_clients(struct crangeq *, struct ptrq *);
+unsigned int	 expire_clients_r(struct crangeq *, struct ptrq *);
 struct ignore	*request_ignore(struct caddr *, char *, char *, void *);
 void		 start_ignore(struct ignore *);
 __dead void	 scheduler(int, char **);

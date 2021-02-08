@@ -615,7 +615,7 @@ print_conf(struct statfd *sfd)
 			free(estr);
 
 			msg_send(sfd, "\t\taction %s\n",
-			    ACTION_TO_STR(sock->action));
+			    ACTION_TO_LSTR(sock->action));
 
 			if (conf->backlog != sock->backlog) {
 				if (sock->backlog == CONF_NO_BACKLOG)

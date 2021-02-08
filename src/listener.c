@@ -61,8 +61,9 @@ static char	*enq_target_address_params(char *, char *, size_t,
 static void	 free_target_address_queues(struct crangeq *, struct ptrq *);
 static int	 perform_ctrl_config(struct statfd *, char *, char *, size_t);
 static int	 perform_ctrl_delete(struct statfd *, char *, char *, size_t,
-		    int (*)(struct crangeq *, struct ptrq *),
-		    int (*)(struct crangeq *, struct ptrq *), const char *);
+		    unsigned int (*)(struct crangeq *, struct ptrq *),
+		    unsigned int (*)(struct crangeq *, struct ptrq *),
+		    const char *);
 static int	 perform_ctrl_dump(struct statfd *, char *, char *, size_t);
 static int	 perform_ctrl_list(struct statfd *, char *, char *, size_t);
 static int	 perform_ctrl_save(struct statfd *, char *, char *, size_t);
@@ -403,12 +404,18 @@ proc_data(struct inbuf *ibuf, int kqfd)
 			break;
 
 	if (action != ACTION_ADD) {
-		print_ts_log("%s :: [%s%s] <- [%s]",
-		    action == ACTION_DELETE ? "Delete" : "Drop",
+		print_ts_log("%s :: [%s%s] <- [%s]", ACTION_TO_CSTR(action),
 		    tgtname, sockid, replace(data, "\n", '\0'));
 		append_data_log(data, datalen);
 
 		if (ign->cnt == 0) {
+			if (clt == NULL) {
+				print_ts_log("Hmm... Who is [%s]:[%s] to be "
+				    "%s ?\n", addr.str, tgtname,
+				    ACTION_TO_LPSTR(action));
+				goto end;
+			}
+
 			STAILQ_INIT(&crq);
 			MALLOC(cr, sizeof(*cr));
 			CADDR_TO_CRANGE(cr, &addr);
@@ -417,35 +424,33 @@ proc_data(struct inbuf *ibuf, int kqfd)
 			MALLOC(pt, sizeof(*pt));
 			pt->p = tgt;
 			STAILQ_INSERT_TAIL(&tpq, pt, ptrs);
-			if (clt != NULL) {
+			switch (action) {
+			case ACTION_DELETE:
+				switch (expire_clients(&crq, &tpq)) {
+				case 0:
+					break;
+				case 1:
+					goto end;
+				default:
+					FATALX("delete failed on [%s]:[%s]",
+					    addr.str, tgtname);
+				}
 				GET_TIME(&tsdiff);
 				timespecsub(&tsdiff, &clt->ts, &tsdiff);
 				age = hrage(&tsdiff);
-				ASPRINTF(&data, ":(%ux:%s)", clt->hits, age);
+				print_ts_log("Hmm... [%s]:[%s]:(%ux:%s) not "
+				    "found in { %s }.\n", addr.str, tgtname,
+				    clt->hits, age, clt->tbl->name);
 				free(age);
-			} else
-				CALLOC(data, 1, 1);
-			switch (action) {
-			case ACTION_DELETE:
-				if (expire_clients(&crq, &tpq) == 0)
-					print_ts_log("Skipped %s "
-					    "[%s]:[%s]%s.\n", clt != NULL ?
-					    "needless deletion of" :
-					    "deleting unknown", addr.str,
-					    tgtname, data);
 				break;
 			case ACTION_DROP:
 				if (drop_clients(&crq, &tpq) == 0)
-					print_ts_log("Skipped %s "
-					    "[%s]:[%s]%s.\n", clt != NULL ?
-					    "needless dropping of" :
-					    "dropping unknown", addr.str,
-					    tgtname, data);
+					FATALX("drop failed on [%s]:[%s]",
+					    addr.str, tgtname);
 				break;
 			default:
 				FATALX("invalid action (%d)", action);
 			}
-			free(data);
 			free_target_address_queues(&crq, &tpq);
 		}
 		goto end;
@@ -687,12 +692,14 @@ perform_ctrl_config(struct statfd *sfd, char *arg, char *data, size_t datalen)
 
 static int
 perform_ctrl_delete(struct statfd *sfd, char *arg, char *data, size_t datalen,
-    int (*func)(struct crangeq *, struct ptrq *),
-    int (*func_r)(struct crangeq *, struct ptrq *), const char *action)
+    unsigned int (*func)(struct crangeq *, struct ptrq *),
+    unsigned int (*func_r)(struct crangeq *, struct ptrq *),
+    const char *action)
 {
 	struct ptrq	 tpq;
 	struct crangeq	 crq;
-	int		 recap, cnt;
+	int		 recap;
+	unsigned int	 cnt;
 
 	if (arg == NULL)
 		return (1);

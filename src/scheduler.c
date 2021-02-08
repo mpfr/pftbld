@@ -164,14 +164,14 @@ sort_client_desc(struct client *clt)
 		TAILQ_INSERT_AFTER(&cltq, c, clt, clients);
 }
 
-int
+unsigned int
 drop_clients(struct crangeq *crq, struct ptrq *tpq)
 {
 	struct pfcmd	 cmd;
 	struct ptr	*tp;
 	struct crange	*cr;
 	struct client	*clt, *nc, *first;
-	int		 cnt;
+	unsigned int	 cnt;
 	char		*age;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
@@ -207,20 +207,21 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
 		pfexec(&pfres, &cmd);
 
+		TAILQ_REMOVE(&cltq, clt, clients);
+
 		GET_TIME(&ts);
 		timespecsub(&ts, &clt->ts, &ts);
 		age = hrage(&ts);
-		print_ts_log("%s[%s]:[%s]:(%dx:%s) ",
-		    pfres.ndel > 0 ? ">>> Deleted " : "",
-		    clt->addr.str, clt->tgt->name, clt->hits, age);
+		if (pfres.ndel > 0)
+			print_ts_log(">>> Deleted [%s]:[%s]:(%ux:%s) from "
+			    "{ %s } and dropped.\n", clt->addr.str,
+			    clt->tgt->name, clt->hits, age, clt->tbl->name);
+		else
+			print_ts_log("Dropped [%s]:[%s]:(%ux:%s).\n",
+			    clt->addr.str, clt->tgt->name, clt->hits, age);
 		free(age);
 
-		if (pfres.ndel > 0)
-			print_log("from { %s } and ", clt->tbl->name);
-
-		TAILQ_REMOVE(&cltq, clt, clients);
 		free(clt);
-		print_log("dropped.\n");
 		cnt++;
 	}
 
@@ -230,12 +231,12 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 	return (cnt);
 }
 
-int
+unsigned int
 drop_clients_r(struct crangeq *crq, struct ptrq *tpq)
 {
 	struct pfcmdq	 cmdq;
 	struct clientq	 dcq;
-	int		 cnt;
+	unsigned int	 cnt;
 	struct client	*clt, *nc, *first;
 	struct ptr	*tp;
 	struct crange	*cr;
@@ -285,7 +286,7 @@ drop_clients_r(struct crangeq *crq, struct ptrq *tpq)
 	return (cnt);
 }
 
-int
+unsigned int
 expire_clients(struct crangeq *crq, struct ptrq *tpq)
 {
 	struct pfcmd	 cmd;
@@ -293,7 +294,7 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 	struct crange	*cr;
 	struct client	*clt, *nc, *first;
 	struct clientq	 dcq;
-	int		 cnt;
+	unsigned int	 cnt;
 	char		*age;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
@@ -338,16 +339,14 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 		else
 			timespecadd(&ts, &clt->tgt->drop, &clt->to);
 		clt->exp = 1;
-		timespecsub(&ts, &clt->ts, &ts);
-		age = hrage(&ts);
-		print_ts_log("%sDeleted [%s]:[%s]:(%dx:%s)",
-		    pfres.ndel > 0 ? ">>> " : "",
-		    clt->addr.str, clt->tgt->name, clt->hits, age);
-		free(age);
-
-		if (pfres.ndel > 0)
-			print_log(" from { %s }", clt->tbl->name);
-		print_log(".\n");
+		if (pfres.ndel > 0) {
+			timespecsub(&ts, &clt->ts, &ts);
+			age = hrage(&ts);
+			print_ts_log(">>> Deleted [%s]:[%s]:(%ux:%s) from "
+			    "{ %s }.\n", clt->addr.str, clt->tgt->name,
+			    clt->hits, age, clt->tbl->name);
+			free(age);
+		}
 
 		TAILQ_REMOVE(&cltq, clt, clients);
 		TAILQ_INSERT_TAIL(&dcq, clt, clients);
@@ -365,12 +364,12 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 	return (cnt);
 }
 
-int
+unsigned int
 expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 {
 	struct pfcmdq	 cmdq;
 	struct clientq	 dcq;
-	int		 cnt;
+	unsigned int	 cnt;
 	struct client	*clt, *nc, *first;
 	struct ptr	*tp;
 	struct crange	*cr;
@@ -725,13 +724,10 @@ remove:
 	if (*ibuf->tgtname != '\0') {
 		if ((tgt = find_target_byname(&conf->ctargets,
 		    ibuf->tgtname)) == NULL)
-			FATALX("could find target [%s]", ibuf->tgtname);
-		sock = STAILQ_FIRST(&tgt->datasocks);
-		while (sock != NULL && strncmp(sock->id, ibuf->sockid,
-		    sizeof(sock->id)))
-			sock = STAILQ_NEXT(sock, sockets);
-		if (sock == NULL)
-			FATALX("could not find socket [%s]", ibuf->sockid);
+			FATALX("invalid target [%s]", ibuf->tgtname);
+		if ((sock = find_socket_byid(&tgt->datasocks,
+		    ibuf->sockid)) == NULL)
+			FATALX("invalid socket [%s]", ibuf->sockid);
 	} else
 		sock = &conf->ctrlsock;
 
@@ -787,20 +783,18 @@ handle_expire(struct kevent *kev)
 
 	timespecsub(&ts, &clt->ts, &ts);
 	age = hrage(&ts);
-	print_ts_log("%s[%s]:[%s]:(%ux:%s)", exp ? pfres.ndel > 0 ?
-	    ">>> Deleted " : "Skipped needless deletion of " : "",
+	print_ts_log("%s [%s]:[%s]:(%ux:%s)",
+	    exp ? pfres.ndel > 0 ? ">>> Deleted" : "Hmm..." : "Dropped",
 	    clt->addr.str, clt->tgt->name, clt->hits, age);
 	free(age);
 
 	if (exp) {
-		if (pfres.ndel > 0)
-			print_log(" from { %s }", tbl->name);
+		print_log(" %s { %s }",
+		    pfres.ndel > 0 ? "from" : "not found in", tbl->name);
 		if (drop)
-			print_log(" and");
+			print_log(pfres.ndel > 0 ?
+			    " and dropped" : " but dropped anyway");
 	}
-	if (drop)
-		print_log(" dropped");
-
 	print_log(".\n");
 
 	if (drop)
@@ -833,7 +827,7 @@ handle_ignore(struct kevent *kev)
 	print_ts_log("[%lld ms] Ignored %u ", TIMESPEC_TO_MSEC(&ts), ign->cnt);
 	if (ign->data == NULL)
 		print_log("duplicate %s request%s",
-		    ACTION_TO_STR(*(enum pfaction *)ign->ident),
+		    ACTION_TO_LSTR(*(enum pfaction *)ign->ident),
 		    ign->cnt == 1 ? "" : "s");
 	else
 		print_log("more time%s excluded %s", ign->cnt == 1 ? "" : "s",
