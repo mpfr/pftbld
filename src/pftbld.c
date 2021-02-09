@@ -46,7 +46,7 @@ static void	 send_conf(int);
 extern struct config	*conf;
 
 char	*basepath = NULL;
-char	*conffile = CONF_FILE;
+char	 conffile[PATH_MAX] = CONF_FILE;
 int	 privfd;
 
 const struct procfunc	 process[] = {
@@ -170,13 +170,15 @@ pftbld(int argc, char *argv[])
 	while ((c = getopt(argc, argv, "b:df:np:s:uv")) != -1) {
 		switch (c) {
 		case 'b':
-			basepath = optarg;
+			if (*(basepath = optarg) != '/')
+				errx(1, "base path must be absolute");
 			break;
 		case 'd':
 			debug = 1;
 			break;
 		case 'f':
-			conffile = optarg;
+			CANONICAL_PATH_SET(conffile, optarg,
+			    "configuration file", warnx, exit(1));
 			break;
 		case 'n':
 			noaction = 1;
@@ -211,9 +213,6 @@ pftbld(int argc, char *argv[])
 		}
 	}
 
-	if (basepath != NULL && *basepath != '/')
-		errx(1, "base path must be absolute");
-
 	log_init(__progname, debug ? debug : 1, verbose);
 
 	argc -= optind;
@@ -246,9 +245,8 @@ pftbld(int argc, char *argv[])
 		conf->flags |= FLAG_GLOBAL_UNLOAD;
 
 	sock = &conf->ctrlsock;
-	if (strlcpy(sock->path, sockfile,
-	    sizeof(sock->path)) >= sizeof(sock->path))
-		errx(1, "control socket path too long: %s", sockfile);
+	CANONICAL_PATH_SET(sock->path, sockfile, "control socket", warnx,
+	    exit(1));
 	if (prefill_socketopts(sock) == -1)
 		FATAL("prefill control socket options");
 
