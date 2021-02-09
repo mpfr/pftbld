@@ -63,13 +63,28 @@ sockpipe(const char *path, int verbose)
 	struct sockaddr_un	 ssa_un;
 	char			 buf[BUFSIZ];
 	ssize_t			 nw;
+	char			 cp[PATH_MAX];
 
-	if (path == NULL || *path == '\0' || strlen(path) >= PATH_MAX)
+	switch (check_path(path, cp, sizeof(cp))) {
+	case PATH_OK:
+		break;
+	case PATH_EMPTY:
+		errx(1, "empty path");
+	case PATH_RELATIVE:
+		errx(1, "path cannot be relative");
+	case PATH_INVALID:
 		errx(1, "invalid path");
+	case PATH_DIRECTORY:
+		errx(1, "path cannot be a directory");
+	case PATH_FILENAME:
+		errx(1, "invalid socket name");
+	default:
+		errx(1, "internal error");
+	}
 
 	memset(&ssa_un, 0, sizeof(ssa_un));
 	ssa_un.sun_family = AF_UNIX;
-	if (strlcpy(ssa_un.sun_path, path,
+	if (strlcpy(ssa_un.sun_path, cp,
 	    sizeof(ssa_un.sun_path)) >= sizeof(ssa_un.sun_path))
 		errx(1, "path too long");
 
@@ -83,7 +98,7 @@ sockpipe(const char *path, int verbose)
 		err(1, "socket failed");
 
 	if (connect(fd, (struct sockaddr *)&ssa_un, sizeof(ssa_un)) == -1)
-		err(1, "connect (%s) failed", path);
+		err(1, "connect failed");
 
 	nw = do_pipe(STDIN_FILENO, fd, buf,
 	    "stdin read failed", "socket write failed");

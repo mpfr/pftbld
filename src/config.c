@@ -90,7 +90,7 @@ parse_conf(void)
 	extern FILE		*yyfp;
 	extern int		 yyparse(void);
 	extern int		 errors, lineno, colno;
-	extern char		*conffile;
+	extern char		 conffile[PATH_MAX];
 	extern struct crangeq	*curr_exclcrangeq;
 	extern struct ptrq	*curr_exclkeytermq;
 

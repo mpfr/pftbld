@@ -30,37 +30,8 @@
 
 #define HOSTS_FILE	"/etc/hosts"
 
-#define CANONICAL_PATH_SET(path, str, txt, err, exit)			\
-	do {								\
-		char		 _cp[PATH_MAX];				\
-		enum pathres	 _pr;					\
-		_pr = check_path(path, _cp, sizeof(_cp));		\
-		switch (_pr) {						\
-		case PATH_OK:						\
-			break;						\
-		case PATH_EMPTY:					\
-			err; yyerror("empty "txt" path");		\
-			exit;						\
-		case PATH_RELATIVE:					\
-			err; yyerror(txt" path cannot be relative");	\
-			exit;						\
-		case PATH_INVALID:					\
-			err; yyerror("invalid "txt" path");		\
-			exit;						\
-		case PATH_DIRECTORY:					\
-			err; yyerror(txt" path cannot be a directory");	\
-			exit;						\
-		case PATH_FILENAME:					\
-			err; yyerror("invalid "txt" name");		\
-			exit;						\
-		default:						\
-			FATALX("invalid path check result (%d)", _pr);	\
-		}							\
-		if (strlcpy(str, _cp, sizeof(str)) >= sizeof(str)) {	\
-			err; yyerror(txt" path too long");		\
-			exit;						\
-		}							\
-	} while (0)
+#define YY_CANONICAL_PATH_SET(str, path, txt, err, exit)	\
+	CANONICAL_PATH_SET(str, path, txt, err yyerror, exit)
 
 static void	yyerror(const char *, ...);
 static int	yylex(void);
@@ -132,8 +103,8 @@ main		: BACKLOG NUMBER		{
 		}
 		| exclude
 		| LOG STRING			{
-			CANONICAL_PATH_SET($2, conf->log, "log file", free($2),
-			    YYERROR);
+			YY_CANONICAL_PATH_SET(conf->log, $2, "log file",
+			    free($2);, YYERROR);
 			free($2);
 			conf->flags &= ~FLAG_GLOBAL_NOLOG;
 			DPRINTF("log file is %s, flags: %02X", conf->log,
@@ -287,8 +258,8 @@ targetoptsl	: CASCADE			{
 			DPRINTF("no drop");
 		}
 		| PERSIST STRING		{
-			CANONICAL_PATH_SET($2, target->persist, "persist file",
-			    free($2), YYERROR);
+			YY_CANONICAL_PATH_SET(target->persist, $2,
+			    "persist file", free($2);, YYERROR);
 			free($2);
 			DPRINTF("persist file: %s", target->persist);
 		}
@@ -305,8 +276,8 @@ targetoptsl	: CASCADE			{
 			struct socket	*s;
 
 			CALLOC(sock, 1, sizeof(*sock));
-			CANONICAL_PATH_SET($2, sock->path, "socket",
-			    free($2); free(sock), YYERROR);
+			YY_CANONICAL_PATH_SET(sock->path, $2, "socket",
+			    free($2); free(sock);, YYERROR);
 			free($2);
 			if ((s = SIMPLEQ_FIRST(&target->datasocks)) != NULL &&
 			    *s->id == '\0') {
@@ -752,7 +723,7 @@ load_exclude_keyterms(const char *file)
 	int		 cnt;
 	struct ptr	*k;
 
-	CANONICAL_PATH_SET(file, cpath, "keyterms file",, return (-1));
+	YY_CANONICAL_PATH_SET(cpath, file, "keyterms file",, return (-1));
 
 	if ((fp = fopen(cpath, "r")) == NULL) {
 		yyerror("failed opening exclude keyterms file");
@@ -801,7 +772,7 @@ load_exclude_cranges(const char *file)
 	ssize_t		 n;
 	int		 cnt;
 
-	CANONICAL_PATH_SET(file, cpath, "networks file",, return (-1));
+	YY_CANONICAL_PATH_SET(cpath, file, "networks file",, return (-1));
 
 	if ((fp = fopen(cpath, "r")) == NULL) {
 		yyerror("failed opening exclude addresses file");
