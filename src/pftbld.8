@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 7 2021 $
+.Dd $Mdocdate: February 9 2021 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -47,25 +47,23 @@ runtime status and corresponding
 .Xr pf 4
 tables through system reboots and migrations.
 .Pp
-.Nm
-obtains its configuration from
-.Xr pftbld.conf 5 .
-.Pp
 Sole prerequisite for client programs is the ability to directly or indirectly
 (i.e. through some other tool) connect and write to UNIX-domain sockets.
 A FastCGI supported
 .Xr httpd 8
 server reporting offenders through such a socket is a typical example (see also
 .Xr pftbld.conf 5 Ns ).
-Furthermore, sending client data through indirect connections may be easily
-accomplished by means of either the
-.Xr pftblctl 8
-tool or the
+Indirect connections, however, may as well be established through
 .Nm
-binary itself when used in pipe mode (details described below).
+itself when used in pipe mode (details described below), or by means of the
+.Xr pftblctl 8
+tool.
 .Pp
 .Nm
-rereads the configuration file when it receives
+obtains its configuration from
+.Xr pftbld.conf 5 .
+.Pp
+It rereads the configuration file on
 .Dv SIGHUP
 and reopens its log file when it receives
 .Dv SIGUSR1 .
@@ -75,7 +73,11 @@ The options are as follows:
 .It Fl b Ar path
 Specifies a base
 .Ar path
-automatically prepended to all relative paths found in the configuration file.
+automatically prepended to all relative paths found in the configuration file
+as well as with
+.Fl f
+and
+.Fl s .
 .It Fl d
 Debug mode.
 Don't detach or become a daemon.
@@ -97,6 +99,8 @@ to the UNIX-domain
 .Ar socket
 specified and terminates silently right after.
 No other actions will be carried out and no other files will be accessed.
+.Ar socket
+must be an absolute path.
 .It Fl s Ar socket
 Specifies the control
 .Ar socket .

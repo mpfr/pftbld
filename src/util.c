@@ -438,7 +438,7 @@ check_path(const char *path, char *cpath, size_t cpathsize)
 
 	char	*apath, *dpath, *file;
 
-	if (*path == '\0')
+	if (path == NULL || *path == '\0')
 		return (PATH_EMPTY);
 
 	if (*path == '/')

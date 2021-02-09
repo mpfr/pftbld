@@ -69,27 +69,28 @@
     status and corresponding
     <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables through
     system reboots and migrations.</p>
-<p class="Pp"><code class="Nm">pftbld</code> obtains its configuration from
-    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.</p>
 <p class="Pp">Sole prerequisite for client programs is the ability to directly
     or indirectly (i.e. through some other tool) connect and write to
     UNIX-domain sockets. A FastCGI supported
     <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a> server
     reporting offenders through such a socket is a typical example (see also
-    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>). Furthermore,
-    sending client data through indirect connections may be easily accomplished
-    by means of either the <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a>
-    tool or the <code class="Nm">pftbld</code> binary itself when used in pipe
-    mode (details described below).</p>
-<p class="Pp"><code class="Nm">pftbld</code> rereads the configuration file when
-    it receives <code class="Dv">SIGHUP</code> and reopens its log file when it
-    receives <code class="Dv">SIGUSR1</code>.</p>
+    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>). Indirect
+    connections, however, may as well be established through
+    <code class="Nm">pftbld</code> itself when used in pipe mode (details
+    described below), or by means of the
+    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a> tool.</p>
+<p class="Pp"><code class="Nm">pftbld</code> obtains its configuration from
+    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.</p>
+<p class="Pp">It rereads the configuration file on
+    <code class="Dv">SIGHUP</code> and reopens its log file when it receives
+    <code class="Dv">SIGUSR1</code>.</p>
 <p class="Pp">The options are as follows:</p>
 <dl class="Bl-tag">
   <dt id="b"><a class="permalink" href="#b"><code class="Fl">-b</code></a>
     <var class="Ar">path</var></dt>
   <dd>Specifies a base <var class="Ar">path</var> automatically prepended to all
-      relative paths found in the configuration file.</dd>
+      relative paths found in the configuration file as well as with
+      <code class="Fl">-f</code> and <code class="Fl">-s</code>.</dd>
   <dt id="d"><a class="permalink" href="#d"><code class="Fl">-d</code></a></dt>
   <dd>Debug mode. Don't detach or become a daemon. This allows for easy
       monitoring of <code class="Nm">pftbld</code>.</dd>
@@ -105,7 +106,7 @@
       <var class="Ar">stdin</var> to the UNIX-domain
       <var class="Ar">socket</var> specified and terminates silently right
       after. No other actions will be carried out and no other files will be
-      accessed.</dd>
+      accessed. <var class="Ar">socket</var> must be an absolute path.</dd>
   <dt id="s"><a class="permalink" href="#s"><code class="Fl">-s</code></a>
     <var class="Ar">socket</var></dt>
   <dd>Specifies the control <var class="Ar">socket</var>. Defaults to
@@ -216,7 +217,7 @@ to { attackers } for 1h.
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">February 7, 2021</td>
+    <td class="foot-date">February 9, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
