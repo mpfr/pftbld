@@ -410,8 +410,8 @@ proc_data(struct inbuf *ibuf, int kqfd)
 
 		if (ign->cnt == 0) {
 			if (clt == NULL) {
-				print_ts_log("Hmm... Who is [%s]:[%s] to be "
-				    "%s ?\n", addr.str, tgtname,
+				print_ts_log("Hmm... [%s]:[%s] is unknown and "
+				    "hence cannot be %s.\n", addr.str, tgtname,
 				    ACTION_TO_LPSTR(action));
 				goto end;
 			}
