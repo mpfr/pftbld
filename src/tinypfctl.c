@@ -51,60 +51,54 @@ static struct pfioc_table *
 pf_table_prepare(const char *name)
 {
 	struct pfr_table	*tbl;
-	struct pfioc_table	*io = NULL;
+	struct pfioc_table	*io;
 
 	if ((tbl = calloc(1, sizeof(*tbl))) == NULL)
-		goto fail;
+		return (NULL);
 
 	if (strlcpy(tbl->pfrt_name, name,
 	    sizeof(tbl->pfrt_name)) >= sizeof(tbl->pfrt_name)) {
+		free(tbl);
 		errno = ENAMETOOLONG;
-		goto fail;
+		return (NULL);
 	}
-	if ((io = calloc(1, sizeof(*io))) == NULL)
-		goto fail;
-
+	if ((io = calloc(1, sizeof(*io))) == NULL) {
+		free(tbl);
+		free(io);
+		return (NULL);
+	}
 	io->pfrio_buffer = tbl;
 	io->pfrio_esize = sizeof(*tbl);
 	io->pfrio_size = 1;
 	return (io);
-
-fail:
-	free(tbl);
-	free(io);
-	return (NULL);
 }
 
 static int
 pf_add_table(int pffd, const char *name)
 {
 	struct pfioc_table	*io;
-	struct pfr_table	*tbl = NULL;
+	struct pfr_table	*tbl;
 	int			 nadd;
 
 	if ((io = pf_table_prepare(name)) == NULL)
-		goto fail;
+		return (-1);
 
 	tbl = io->pfrio_buffer;
 	tbl->pfrt_flags |= PFR_TFLAG_PERSIST;
 
-	if (ioctl(pffd, DIOCRADDTABLES, io) == -1)
-		goto fail;
-
-	nadd = io->pfrio_nadd;
-
+	if (ioctl(pffd, DIOCRADDTABLES, io) == -1) {
+		free(tbl);
+		free(io);
+		return (-1);
+	}
 	free(tbl);
+	nadd = io->pfrio_nadd;
 	free(io);
 #if DEBUG
 	if (nadd > 0)
 		DPRINTF("table <%s> added", name);
 #endif
 	return (nadd);
-
-fail:
-	free(tbl);
-	free(io);
-	return (-1);
 }
 
 static struct pfioc_table *
@@ -151,60 +145,48 @@ log_mod_table(const char *tname, struct pfr_addr *addr, int n, const char *mod)
 static int
 pf_add_addresses(int pffd, const char *tname, struct pfr_addr *addrs, size_t n)
 {
-	struct pfioc_table	*io = NULL;
+	struct pfioc_table	*io;
 	int			 nadd;
 
-	if (pf_add_table(pffd, tname) == -1)
-		goto fail;
+	if (pf_add_table(pffd, tname) == -1 ||
+	    (io = pf_addresses_prepare(tname, addrs, n)) == NULL)
+		return (-1);
 
-	if ((io = pf_addresses_prepare(tname, addrs, n)) == NULL)
-		goto fail;
-
-	if (ioctl(pffd, DIOCRADDADDRS, io) == -1)
-		goto fail;
-
+	if (ioctl(pffd, DIOCRADDADDRS, io) == -1) {
+		free(io);
+		return (-1);
+	}
 	nadd = io->pfrio_nadd;
-
 	free(io);
 #if DEBUG
 	if (nadd > 0)
 		log_mod_table(tname, addrs, nadd, "added to");
 #endif
 	return (nadd);
-
-fail:
-	free(io);
-	return (-1);
 }
 
 static int
 pf_delete_addresses(int pffd, const char *tname, struct pfr_addr *addrs,
     size_t n)
 {
-	struct pfioc_table	*io = NULL;
+	struct pfioc_table	*io;
 	int			 ndel;
 
-	if (pf_add_table(pffd, tname) == -1)
-		goto fail;
+	if (pf_add_table(pffd, tname) == -1 ||
+	    (io = pf_addresses_prepare(tname, addrs, n)) == NULL)
+		return (-1);
 
-	if ((io = pf_addresses_prepare(tname, addrs, n)) == NULL)
-		goto fail;
-
-	if (ioctl(pffd, DIOCRDELADDRS, io) == -1)
-		goto fail;
-
+	if (ioctl(pffd, DIOCRDELADDRS, io) == -1) {
+		free(io);
+		return (-1);
+	}
 	ndel = io->pfrio_ndel;
-
 	free(io);
 #if DEBUG
 	if (ndel > 0)
 		log_mod_table(tname, addrs, ndel, "deleted from");
 #endif
 	return (ndel);
-
-fail:
-	free(io);
-	return (-1);
 }
 
 static int
