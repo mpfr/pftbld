@@ -59,29 +59,32 @@
 <h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
 <p class="Pp">The <code class="Nm">pftbld</code> daemon listens on UNIX-domain
     sockets for incoming IP addresses, usually sent by programs such as network
-    services and applications, and makes them traverse
-    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables according
-    to its configuration and the history of their occurrance. The daemon was
-    originally designed to build and maintain service/application specific
-    firewall blocklists, but may just as well serve any other kind of filtering
-    or translation purposes. As <code class="Nm">pftbld</code> can persist
-    managed addresses and meta-data, it is capable of restoring its runtime
-    status and corresponding
-    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables through
-    system reboots and migrations.</p>
-<p class="Pp">Sole prerequisite for client programs is the ability to directly
-    or indirectly (i.e. through some other tool) connect and write to
-    UNIX-domain sockets. A FastCGI supported
-    <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a> server
-    reporting offenders through such a socket is a typical example (see also
-    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>). Indirect
-    connections, however, may as well be established through
-    <code class="Nm">pftbld</code> itself when used in pipe mode (details
-    described below), or by means of the
-    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a> tool.</p>
+    services and applications.</p>
+<p class="Pp">What typically happens to a submitted IP address is actually
+    pretty simple: It is immediately added to a
+    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table according
+    to the daemon's configuration for and the frequency of its occurrence on the
+    respective socket. Then, after an expiry time also specified in the
+    configuration, the address is deleted from the table again.</p>
 <p class="Pp"><code class="Nm">pftbld</code> obtains its configuration from
     <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.</p>
-<p class="Pp">It rereads the configuration file on
+<p class="Pp">The daemon was originally designed to build and maintain dynamic,
+    service/application specific firewall blocklists, but may just as well serve
+    any other kind of filtering or translation purposes.</p>
+<p class="Pp">As <code class="Nm">pftbld</code> can persist managed addresses
+    and meta-data, it is capable of restoring its runtime status and
+    corresponding <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>
+    tables through system reboots and migrations.</p>
+<p class="Pp">Client programs may directly or indirectly (i.e. through some
+    other tool) connect and write to the daemon's UNIX-domain sockets. A FastCGI
+    supported <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a>
+    server reporting offenders through such a socket is a typical example (see
+    also <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>). Indirect
+    connections, however, may as well be established through
+    <code class="Nm">pftbld</code> itself when used in pipe mode (details
+    described below) or by means of the
+    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a> tool.</p>
+<p class="Pp"><code class="Nm">pftbld</code> rereads the configuration file on
     <code class="Dv">SIGHUP</code> and reopens its log file when it receives
     <code class="Dv">SIGUSR1</code>.</p>
 <p class="Pp">The options are as follows:</p>
@@ -217,7 +220,7 @@ to { attackers } for 1h.
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">February 9, 2021</td>
+    <td class="foot-date">February 12, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

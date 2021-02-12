@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 9 2021 $
+.Dd $Mdocdate: February 12 2021 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -34,12 +34,24 @@ table content management
 The
 .Nm
 daemon listens on UNIX-domain sockets for incoming IP addresses, usually sent
-by programs such as network services and applications, and makes them traverse
+by programs such as network services and applications.
+.Pp
+What typically happens to a submitted IP address is actually pretty simple:
+It is immediately added to a
 .Xr pf 4
-tables according to its configuration and the history of their occurrance.
-The daemon was originally designed to build and maintain service/application
-specific firewall blocklists, but may just as well serve any other kind of
-filtering or translation purposes.
+table according to the daemon's configuration for and the frequency of its
+occurrence on the respective socket.
+Then, after an expiry time also specified in the configuration, the address is
+deleted from the table again.
+.Pp
+.Nm
+obtains its configuration from
+.Xr pftbld.conf 5 .
+.Pp
+The daemon was originally designed to build and maintain dynamic,
+service/application specific firewall blocklists, but may just as well serve
+any other kind of filtering or translation purposes.
+.Pp
 As
 .Nm
 can persist managed addresses and meta-data, it is capable of restoring its
@@ -47,23 +59,20 @@ runtime status and corresponding
 .Xr pf 4
 tables through system reboots and migrations.
 .Pp
-Sole prerequisite for client programs is the ability to directly or indirectly
-(i.e. through some other tool) connect and write to UNIX-domain sockets.
+Client programs may directly or indirectly (i.e. through some other tool)
+connect and write to the daemon's UNIX-domain sockets.
 A FastCGI supported
 .Xr httpd 8
 server reporting offenders through such a socket is a typical example (see also
 .Xr pftbld.conf 5 Ns ).
 Indirect connections, however, may as well be established through
 .Nm
-itself when used in pipe mode (details described below), or by means of the
+itself when used in pipe mode (details described below) or by means of the
 .Xr pftblctl 8
 tool.
 .Pp
 .Nm
-obtains its configuration from
-.Xr pftbld.conf 5 .
-.Pp
-It rereads the configuration file on
+rereads the configuration file on
 .Dv SIGHUP
 and reopens its log file when it receives
 .Dv SIGUSR1 .
