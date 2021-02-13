@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: January 10 2021 $
+.Dd $Mdocdate: February 13 2021 $
 .Dt PFTBLCTL 8
 .Os
 .Sh NAME
@@ -29,19 +29,19 @@ daemon
 .Op Ar argument ...
 .Sh DESCRIPTION
 .Nm
-acually is a wrapper script facilitating the use of
+is actually a wrapper script facilitating the use of
 .Xr pftbld 8
 in verbose pipe mode.
 It is primarily intended to be used for sending commands to the
 .Ar control socket ,
-but may as well be utilized to forward client data to the corresponding
+but may as well be used to forward client data to the corresponding
 .Ar data socket .
 .Pp
 The options are as follows:
 .Bl -tag -width "-s socket"
 .It Fl q
 Quiet mode, generally preventing output on
-.Ar stdout .
+.Pa stdout .
 This flag may be specified multiple times.
 If specified just once, the
 .Ar command
@@ -76,7 +76,7 @@ Valid options are:
 .Bl -tag -width Ds
 .It Ic print
 Prints the current configuration to
-.Ar stdout .
+.Pa stdout .
 .It Ic reload
 Reconfigures
 .Xr pftbld 8
@@ -121,7 +121,7 @@ Prints managed addresses and meta-data (number of hits and timestamp of last
 occurrence) of the specified
 .Ar target
 names to
-.Ar stdout .
+.Pa stdout .
 If there is no
 .Ar target
 specified, addresses of all targets will be printed.
@@ -133,7 +133,7 @@ command, but deletes matching client entries from
 tables only, still keeping them memorized.
 .It Ic list Oo Ar option ... Oc Oo Ic from Ar address/network | target ... Oc
 Prints a list of memorized client information to
-.Ar stdout .
+.Pa stdout .
 The list will be reversely ordered by expiration/drop date with the next event
 printed last.
 There are multiple ways to filter the output.
@@ -221,15 +221,15 @@ keyword is used instead of an
 .Ar address/network ,
 the current self-exclude will be deleted.
 If called without parameter, the current self-exclude will be printed to
-.Ar stdout .
+.Pa stdout .
 .It Ic status
 Prints a status report to
-.Ar stdout .
+.Pa stdout .
 .It Ic verbose Oo Ar level Oc
 Get/Set the verbosity
 .Ar level .
 If issued without parameter, the current level will be printed to
-.Ar stdout .
+.Pa stdout .
 .El
 .Sh FILES
 .Bl -tag -width "/var/run/pftbld.sock" -compact

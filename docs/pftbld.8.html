@@ -60,12 +60,17 @@
 <p class="Pp">The <code class="Nm">pftbld</code> daemon listens on UNIX-domain
     sockets for incoming IP addresses, usually sent by programs such as network
     services and applications.</p>
-<p class="Pp">What typically happens to a submitted IP address is actually
-    pretty simple: It is immediately added to a
-    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table according
-    to the daemon's configuration for and the frequency of its occurrence on the
-    respective socket. Then, after an expiry time also specified in the
-    configuration, the address is deleted from the table again.</p>
+<p class="Pp">What typically happens to a submitted IP address is pretty
+  simple:</p>
+<p class="Pp"></p>
+<ol class="Bl-enum Bd-indent Bl-compact">
+  <li>The address is immediately added to a
+      <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table according
+      to the daemon's configuration for and the frequency of its appearance on
+      the respective socket.</li>
+  <li>After an expiry time also specified in the configuration, the address is
+      deleted from the table.</li>
+</ol>
 <p class="Pp"><code class="Nm">pftbld</code> obtains its configuration from
     <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.</p>
 <p class="Pp">The daemon was originally designed to build and maintain dynamic,
@@ -123,10 +128,10 @@
   <dd>Verbose mode. If used with the server, multiple <code class="Fl">-v</code>
       options increase the verbosity. If used with pipe mode to write either
       commands to the <span class="Pa">control socket</span> or data to a
-      <span class="Pa">data socket</span>, this enables printing server replies
-      to <var class="Ar">stdout</var>. In the latter case, receiving the
-      sequence &#x2018;<code class="Dv">ACK</code>&#x2019; indicates that the
-      server successfully received and processed all data, while
+      <span class="Pa">data socket</span>, this enables printing server
+      responses to <span class="Pa">stdout</span>. In the latter case, receiving
+      the sequence &#x2018;<code class="Dv">ACK</code>&#x2019; indicates that
+      the server successfully received and processed all data, while
       &#x2018;<code class="Dv">NAK</code>&#x2019; would imply that received data
       was discarded, either because communication has failed or because the data
       was invalid. If used along with <code class="Fl">-n</code>, the
@@ -136,18 +141,18 @@
 </section>
 <section class="Sh">
 <h1 class="Sh" id="MESSAGES"><a class="permalink" href="#MESSAGES">MESSAGES</a></h1>
-<p class="Pp">Messages may be sent to any <code class="Ic">socket</code>
-    specified in the configuration. Each message must be formatted as
-    <span class="Pa">one single plain text string</span>, and may consist of
-    multiple <span class="Pa">newline-delimited</span> parts. By default, the
-    maximum length of a message is 2048 bytes, but this may be changed via the
-    <code class="Ic">datamax</code> parameter in
+<p class="Pp">Client programs may send messages to any
+    <code class="Ic">socket</code> specified in the configuration. Each message
+    must be formatted as <span class="Pa">one single plain text string</span>,
+    and may consist of multiple <span class="Pa">newline-delimited</span> parts.
+    By default, the maximum length of a message is 2048 bytes, but this may be
+    changed via the <code class="Ic">datamax</code> parameter in
     <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.</p>
 <p class="Pp">A message for a <span class="Pa">data socket</span> must start
-    with an <span class="Pa">IP address</span> followed by an arbitrary number
-    of <span class="Pa">optional text sections</span>. Its sole purpose is
-    getting matched against the <code class="Ic">exclude keyterms</code>
-    specified in the configuration before getting written into the log file.</p>
+    with an <span class="Pa">IP address</span> followed by any number of
+    <span class="Pa">optional pieces of text</span>, the sole purpose of which
+    is to be matched against the <code class="Ic">exclude keyterms</code>
+    specified in the configuration before they are written to the log file.</p>
 <p class="Pp">Here's an example:</p>
 <div class="Bd Pp Bd-indent">
 <pre>
@@ -175,17 +180,17 @@ to { attackers } for 1h.
     optional parts. The following entry lets us know that this is the second
     time the address <span class="Pa">11.22.33.44</span> was reported, while the
     last time was exactly 3 hours, 16 minutes and 25 seconds ago. Finally, we
-    learn that the address was added into the <span class="Pa">attackers</span>
-    table where it will remain for 1 hour before, in turn, getting deleted
-    causing another log entry:</p>
+    learn that the address was added to the <span class="Pa">attackers</span>
+    table where it will remain for 1 hour before being deleted causing another
+    log entry:</p>
 <div class="Bd Pp Bd-indent">
 <pre>
 [...] &gt;&gt;&gt; Deleted [11.22.33.44]:[www]:(2x:1h) from { attackers }.
 </pre>
 </div>
-<p class="Pp">Even though sending messages to a <span class="Pa">control
-    socket</span> basically works the same way, it is recommended to use the
-    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a> tool for the sake of
+<p class="Pp">Although sending messages to a <span class="Pa">control
+    socket</span> basically works the same way, using the
+    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a> tool is recommended for
     simplicity. A list of accepted commands is available on its manpage.</p>
 </section>
 <section class="Sh">
@@ -220,7 +225,7 @@ to { attackers } for 1h.
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">February 12, 2021</td>
+    <td class="foot-date">February 13, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
