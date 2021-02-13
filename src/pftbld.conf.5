@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 7 2021 $
+.Dd $Mdocdate: February 13 2021 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -22,12 +22,12 @@
 .Xr pftbld 8
 .Sh DESCRIPTION
 .Nm
-maintains the configuration for
+is the configuration file for
 .Xr pftbld 8 .
-In this context, values of type
+In its context, values of type
 .Ar time
-must be specified as a sequence of number/unit combinations, with the number
-assumed in decimal format, e.g.
+must be given as a sequence of number/unit combinations, assuming that numbers
+are in decimal format, e.g.
 .Pa 7w3d
 for a period of 7 weeks and 3 days.
 Valid units are:
@@ -61,15 +61,15 @@ In case the
 .Ic no
 keyword is used instead of a
 .Ar number ,
-only one connection at a time will be permitted.
+only one connection will be allowed at a time.
 If not specified, the default value of 5 connections will be used.
-The de facto upper limit of this parameter is the value of the
+The actual upper limit of this parameter is the value of the
 .Pa kern.somaxconn
-kernel state which may be figured out by means of the
+kernel state which can be determined by means of the
 .Xr sysctl 8
 utility.
 .It Oo Ic no Oc Ic datamax Ar bytes
-This will limit the number of
+This limits the number of
 .Ar bytes
 allowed to be transmitted per connection, the terminating
 .Sq Dv \e0
@@ -80,11 +80,11 @@ If the
 .Ic no
 keyword is specified instead of the number of
 .Ar bytes ,
-no limit will be applied to the amount of data accepted by a connection.
+no limit is applied to the amount of data accepted by a connection.
 Defaults to 2048 bytes per connection.
 .It Oo Ic no Oc Ic drop Ar time
-The period of time (starting at the moment of reception) after which a managed
-IP address will be discarded/dropped from
+The amount of time (from the moment it is received) after which a managed IP
+address will be discarded/dropped from
 .Xr pftbld 8
 memory.
 In case the
@@ -141,27 +141,25 @@ keyword instead of specifying a
 .It Oo Ic no Oc Ic timeout Ar milliseconds
 Sets the maximum time for a client to transmit its data after making a
 connection.
-If a client did not succeed sending data after the specified number of
+If a client does not succeed sending data within the specified number of
 .Ar milliseconds ,
 the connection will be closed and all transmitted data will be discarded.
 In order to disable this timeout, the
 .Ic no
-keyword may be specified instead of a number of
+keyword may be specified instead of the number of
 .Ar milliseconds .
 The default value is 10000 milliseconds.
 .El
 .Sh TARGETS
 Typically, targets are used to distinguish input data by service type and apply
 appropriate handling.
-An IP address submitted by a client will always (automatically) be associated
-with a
+An IP address transmitted by a client is always (automatically) assigned to a
 .Ic target .
-As the same IP address may be submitted by different clients each using its own
-.Ic socket ,
-and hence being assigned to different targets, this combination (also referred
-to as
+Since the same IP address may be submitted by different clients via their own
+sockets which may be assigned to different targets, this combination (also
+known as
 .Pa client entry )
-by nature is a many-to-many relationship, i.e. one IP address may be assigned
+is by nature a many-to-many relationship, i.e. one IP address may be assigned
 to multiple targets as well as multiple addresses may be associated with the
 same target.
 .Pp
@@ -198,10 +196,9 @@ option specified globally or with the enclosing
 .It Ic expire Ar time
 Specifies the period of time an IP address will be held in the corresponding
 .Ic table .
-When that period has passed, the address will be deleted from the table.
 If omitted,
-addresses will not expire and remain in their tables until deleted manually,
-e.g. by utilizing the
+addresses do not expire and remain in their tables until deleted manually, e.g.
+by using the
 .Xr pftblctl 8
 .Ic drop
 command.
@@ -210,17 +207,17 @@ Maximum number of appearances for a specific IP address in the corresponding
 .Ic table .
 If
 .Ar number
-gets exceeded by an IP address, it will move on to the next
+is exceeded by an IP address, it will move on to the next
 .Ic step .
 In order to properly close a
 .Ic cascade ,
 this option needs to be omitted on the last
 .Ic step
-as this will make
+as this makes
 .Xr pftbld 8
 stop evaluating the appearance count of an IP address.
 .It Ic kill | keep Ar option | Brq ...
-Set/Unset kill options used when adding an address into a
+Set/Unset kill options used when adding an address to a
 .Ic table .
 Multiple options may be either specified one at a time or enclosed in curly
 brackets.
@@ -237,7 +234,8 @@ Refers to a reported address'
 The default is
 .Ic kill .
 .El
-Generally, kill options will be applied to the current
+.Pp
+Generally, kill options are applied to the current
 .Ic step
 and all its successors, until revoked by their counterparts.
 .It Ic step Ar option | Brq ...
@@ -252,7 +250,7 @@ If there is no
 .Ar option
 specified for a
 .Ic step ,
-it will be inherited from its predecessor.
+it is inherited from its predecessor.
 Steps are traversed in the order of their appearance.
 .It Ic table Ar name
 The
@@ -265,9 +263,9 @@ This option is mandatory at
 definition and optional for every enclosed
 .Ic step .
 .sp
-It shall further be noted that, even though sharing tables is discouraged,
-unmanaged entries added by other means will perfectly coexist and neither
-interfere with nor get affected by those created and managed by
+It should also be noted that while sharing tables is discouraged, unmanaged
+entries added by other means coexist perfectly and neither interfere with nor
+get affected by those created and managed by
 .Xr pftbld 8 .
 .El
 .It Oo Ic no Oc Ic drop Ar time
@@ -283,17 +281,30 @@ settings.
 .It Ic persist Ar path
 Specifies a file at
 .Ar path
-where managed IP addresses get saved to on service shutdown and loaded from on
-service startup.
-Each line of the file contains three space-separated fields: the address at
-first, followed by the number of hits and finally the UNIX timestamp of the
-last hit in the end.
-.sp
+in which managed IP addresses are saved when the daemon shuts down and from
+which they are loaded on startup.
+Each line of the file contains three space-separated fields:
+.Pp
+.Bl -enum -offset indent -compact
+.It
+The IP address.
+.It
+The number of appearances.
+.It
+The UNIX timestamp of the last appearance.
+.El
+.Pp
 This option may also be used to initialize the daemon's memory on startup by
 submitting a list of plain IP addresses (one per line) without any further
 information.
-In this case, the two other fields will be initialized to 1 for the number of
-hits and the current time for the last hit timestamp.
+In this case, the other two fields are initialized as follows:
+.Pp
+.Bl -bullet -offset indent -compact
+.It
+The number of appearances is set to 1.
+.It
+The time stamp of the last appearance is set to the current time.
+.El
 .It Ic skip Ar number
 Makes
 .Xr pftbld 8
@@ -305,7 +316,7 @@ with
 .Ic action add
 (the default) specified.
 Please note that appearances of IP addresses on sockets with other actions
-specified will be skipped anyway without the appearance being counted.
+specified will be skipped anyway without being counted.
 .It Ic socket Ar path Oo Bro ... Brc Oc
 Specifies a UNIX-domain socket at
 .Ar path
@@ -331,8 +342,8 @@ action removes the address from the corresponding table as if it just had
 expired.
 If
 .Ic drop
-is specified, the address will not just get deleted, but the associated client
-entry will be completely removed from the daemon's memory as well.
+is specified, the address will not just be deleted, but the associated client
+entry will also be completely removed from the daemon's memory.
 .It Oo Ic no Oc Ic backlog Ar number
 Overrides the global
 .Ic backlog
@@ -454,13 +465,13 @@ The first 4 times an address (outside the
 .Pa 10.0.0/24
 network and the hosts found in
 .Pa /etc/hosts )
-gets reported, it will be added to the
+is reported, it will be added to the
 .Pa attackers
 table for 1 hour.
-From the 5th until the 12th time, the address will remain in the same table
+From the 5th until the 12th time, the address will remains in the same table
 for 6 hours.
-Until here, if an address has not been reported for 3 weeks, it will be
-dropped from memory.
+Until here, if an address is not reported for 3 weeks, it will be dropped from
+memory.
 Related state entries will be killed while source nodes will be kept (the
 default).
 .Pp
