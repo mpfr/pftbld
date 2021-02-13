@@ -37,10 +37,10 @@
 </section>
 <section class="Sh">
 <h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
-<p class="Pp"><code class="Nm">pftbld.conf</code> maintains the configuration
-    for <a class="Xr" href="pftbld.8.html">pftbld(8)</a>. In this context,
-    values of type <var class="Ar">time</var> must be specified as a sequence of
-    number/unit combinations, with the number assumed in decimal format, e.g.
+<p class="Pp"><code class="Nm">pftbld.conf</code> is the configuration file for
+    <a class="Xr" href="pftbld.8.html">pftbld(8)</a>. In its context, values of
+    type <var class="Ar">time</var> must be given as a sequence of number/unit
+    combinations, assuming that numbers are in decimal format, e.g.
     <span class="Pa">7w3d</span> for a period of 7 weeks and 3 days. Valid units
     are: <span class="Pa">w</span> (weeks), <span class="Pa">d</span> (days),
     <span class="Pa">h</span> (hours), <span class="Pa">m</span> (minutes) and
@@ -61,26 +61,26 @@
   <dd>The maximum allowed number of simultaneous connections on a
       <code class="Ic">socket</code>. In case the <code class="Ic">no</code>
       keyword is used instead of a <var class="Ar">number</var>, only one
-      connection at a time will be permitted. If not specified, the default
-      value of 5 connections will be used. The de facto upper limit of this
-      parameter is the value of the <span class="Pa">kern.somaxconn</span>
-      kernel state which may be figured out by means of the
+      connection will be allowed at a time. If not specified, the default value
+      of 5 connections will be used. The actual upper limit of this parameter is
+      the value of the <span class="Pa">kern.somaxconn</span> kernel state which
+      can be determined by means of the
       <a class="Xr" href="http://man.openbsd.org/sysctl.8">sysctl(8)</a>
       utility.</dd>
   <dt>[<code class="Ic">no</code>] <code class="Ic">datamax</code>
     <var class="Ar">bytes</var></dt>
-  <dd>This will limit the number of <var class="Ar">bytes</var> allowed to be
+  <dd>This limits the number of <var class="Ar">bytes</var> allowed to be
       transmitted per connection, the terminating
       &#x2018;<code class="Dv">\0</code>&#x2019; character included. In case a
       client exceeds this limit, the connection will be closed and all
       transmitted data will be discarded. If the <code class="Ic">no</code>
       keyword is specified instead of the number of <var class="Ar">bytes</var>,
-      no limit will be applied to the amount of data accepted by a connection.
+      no limit is applied to the amount of data accepted by a connection.
       Defaults to 2048 bytes per connection.</dd>
   <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
     <var class="Ar">time</var></dt>
-  <dd>The period of time (starting at the moment of reception) after which a
-      managed IP address will be discarded/dropped from
+  <dd>The amount of time (from the moment it is received) after which a managed
+      IP address will be discarded/dropped from
       <a class="Xr" href="pftbld.8.html">pftbld(8)</a> memory. In case the
       <code class="Ic">no</code> keyword is used instead of a
       <var class="Ar">time</var> value, IP addresses will be kept forever.</dd>
@@ -124,25 +124,25 @@
   <dt>[<code class="Ic">no</code>] <code class="Ic">timeout</code>
     <var class="Ar">milliseconds</var></dt>
   <dd>Sets the maximum time for a client to transmit its data after making a
-      connection. If a client did not succeed sending data after the specified
+      connection. If a client does not succeed sending data within the specified
       number of <var class="Ar">milliseconds</var>, the connection will be
       closed and all transmitted data will be discarded. In order to disable
       this timeout, the <code class="Ic">no</code> keyword may be specified
-      instead of a number of <var class="Ar">milliseconds</var>. The default
+      instead of the number of <var class="Ar">milliseconds</var>. The default
       value is 10000 milliseconds.</dd>
 </dl>
 </section>
 <section class="Sh">
 <h1 class="Sh" id="TARGETS"><a class="permalink" href="#TARGETS">TARGETS</a></h1>
 <p class="Pp">Typically, targets are used to distinguish input data by service
-    type and apply appropriate handling. An IP address submitted by a client
-    will always (automatically) be associated with a
-    <code class="Ic">target</code>. As the same IP address may be submitted by
-    different clients each using its own <code class="Ic">socket</code>, and
-    hence being assigned to different targets, this combination (also referred
-    to as <span class="Pa">client entry</span>) by nature is a many-to-many
-    relationship, i.e. one IP address may be assigned to multiple targets as
-    well as multiple addresses may be associated with the same target.</p>
+    type and apply appropriate handling. An IP address transmitted by a client
+    is always (automatically) assigned to a <code class="Ic">target</code>.
+    Since the same IP address may be submitted by different clients via their
+    own sockets which may be assigned to different targets, this combination
+    (also known as <span class="Pa">client entry</span>) is by nature a
+    many-to-many relationship, i.e. one IP address may be assigned to multiple
+    targets as well as multiple addresses may be associated with the same
+    target.</p>
 <p class="Pp">In order to start
     <a class="Xr" href="pftbld.8.html">pftbld(8)</a>, at least one
     <code class="Ic">target</code> entry needs to be defined.</p>
@@ -171,27 +171,26 @@
           <dt id="expire"><a class="permalink" href="#expire"><code class="Ic">expire</code></a>
             <var class="Ar">time</var></dt>
           <dd>Specifies the period of time an IP address will be held in the
-              corresponding <code class="Ic">table</code>. When that period has
-              passed, the address will be deleted from the table. If omitted,
-              addresses will not expire and remain in their tables until deleted
-              manually, e.g. by utilizing the
+              corresponding <code class="Ic">table</code>. If omitted, addresses
+              do not expire and remain in their tables until deleted manually,
+              e.g. by using the
               <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a>
               <code class="Ic">drop</code> command.</dd>
           <dt id="hits"><a class="permalink" href="#hits"><code class="Ic">hits</code></a>
             <var class="Ar">number</var></dt>
           <dd>Maximum number of appearances for a specific IP address in the
               corresponding <code class="Ic">table</code>. If
-              <var class="Ar">number</var> gets exceeded by an IP address, it
-              will move on to the next <code class="Ic">step</code>. In order to
+              <var class="Ar">number</var> is exceeded by an IP address, it will
+              move on to the next <code class="Ic">step</code>. In order to
               properly close a <code class="Ic">cascade</code>, this option
               needs to be omitted on the last <code class="Ic">step</code> as
-              this will make <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
-              stop evaluating the appearance count of an IP address.</dd>
+              this makes <a class="Xr" href="pftbld.8.html">pftbld(8)</a> stop
+              evaluating the appearance count of an IP address.</dd>
           <dt id="kill"><a class="permalink" href="#kill"><code class="Ic">kill</code></a>
             |
             <a class="permalink" href="#keep"><code class="Ic" id="keep">keep</code></a>
             <var class="Ar">option</var> | {...}</dt>
-          <dd>Set/Unset kill options used when adding an address into a
+          <dd>Set/Unset kill options used when adding an address to a
               <code class="Ic">table</code>. Multiple options may be either
               specified one at a time or enclosed in curly brackets. Valid
               options are:
@@ -205,9 +204,10 @@
                   entries</span>. The default is
                 <code class="Ic">kill</code>.</dd>
             </dl>
-            Generally, kill options will be applied to the current
-              <code class="Ic">step</code> and all its successors, until revoked
-              by their counterparts.</dd>
+            <p class="Pp">Generally, kill options are applied to the current
+                <code class="Ic">step</code> and all its successors, until
+                revoked by their counterparts.</p>
+          </dd>
           <dt id="step"><a class="permalink" href="#step"><code class="Ic">step</code></a>
             <var class="Ar">option</var> | {...}</dt>
           <dd>The next step in the cascade followed by at least one
@@ -215,8 +215,8 @@
               (except <code class="Ic">step</code> itself), multiple options
               enclosed in curly brackets. If there is no
               <code class="Ic">table</code> <var class="Ar">option</var>
-              specified for a <code class="Ic">step</code>, it will be inherited
-              from its predecessor. Steps are traversed in the order of their
+              specified for a <code class="Ic">step</code>, it is inherited from
+              its predecessor. Steps are traversed in the order of their
               appearance.</dd>
           <dt id="table"><a class="permalink" href="#table"><code class="Ic">table</code></a>
             <var class="Ar">name</var></dt>
@@ -225,10 +225,10 @@
               This option is mandatory at <code class="Ic">cascade</code>
               definition and optional for every enclosed
               <code class="Ic">step</code>.
-            <p class="Pp">It shall further be noted that, even though sharing
-                tables is discouraged, unmanaged entries added by other means
-                will perfectly coexist and neither interfere with nor get
-                affected by those created and managed by
+            <p class="Pp">It should also be noted that while sharing tables is
+                discouraged, unmanaged entries added by other means coexist
+                perfectly and neither interfere with nor get affected by those
+                created and managed by
                 <a class="Xr" href="pftbld.8.html">pftbld(8)</a>.</p>
           </dd>
         </dl>
@@ -243,16 +243,26 @@
           <code class="Ic">exclude</code> settings.</dd>
       <dt id="persist"><a class="permalink" href="#persist"><code class="Ic">persist</code></a>
         <var class="Ar">path</var></dt>
-      <dd>Specifies a file at <var class="Ar">path</var> where managed IP
-          addresses get saved to on service shutdown and loaded from on service
-          startup. Each line of the file contains three space-separated fields:
-          the address at first, followed by the number of hits and finally the
-          UNIX timestamp of the last hit in the end.
+      <dd>Specifies a file at <var class="Ar">path</var> in which managed IP
+          addresses are saved when the daemon shuts down and from which they are
+          loaded on startup. Each line of the file contains three
+          space-separated fields:
+        <p class="Pp"></p>
+        <ol class="Bl-enum Bd-indent Bl-compact">
+          <li>The IP address.</li>
+          <li>The number of appearances.</li>
+          <li>The UNIX timestamp of the last appearance.</li>
+        </ol>
         <p class="Pp">This option may also be used to initialize the daemon's
             memory on startup by submitting a list of plain IP addresses (one
-            per line) without any further information. In this case, the two
-            other fields will be initialized to 1 for the number of hits and the
-            current time for the last hit timestamp.</p>
+            per line) without any further information. In this case, the other
+            two fields are initialized as follows:</p>
+        <p class="Pp"></p>
+        <ul class="Bl-bullet Bd-indent Bl-compact">
+          <li>The number of appearances is set to 1.</li>
+          <li>The time stamp of the last appearance is set to the current
+            time.</li>
+        </ul>
       </dd>
       <dt id="skip"><a class="permalink" href="#skip"><code class="Ic">skip</code></a>
         <var class="Ar">number</var></dt>
@@ -261,7 +271,7 @@
           <code class="Ic">socket</code> with <code class="Ic">action add</code>
           (the default) specified. Please note that appearances of IP addresses
           on sockets with other actions specified will be skipped anyway without
-          the appearance being counted.</dd>
+          being counted.</dd>
       <dt id="socket"><a class="permalink" href="#socket"><code class="Ic">socket</code></a>
         <var class="Ar">path</var> [{...}]</dt>
       <dd>Specifies a UNIX-domain socket at <var class="Ar">path</var> to be
@@ -283,8 +293,8 @@
               The <code class="Ic">delete</code> action removes the address from
               the corresponding table as if it just had expired. If
               <code class="Ic">drop</code> is specified, the address will not
-              just get deleted, but the associated client entry will be
-              completely removed from the daemon's memory as well.</dd>
+              just be deleted, but the associated client entry will also be
+              completely removed from the daemon's memory.</dd>
           <dt>[<code class="Ic">no</code>] <code class="Ic">backlog</code>
             <var class="Ar">number</var></dt>
           <dd>Overrides the global <code class="Ic">backlog</code> value.</dd>
@@ -385,12 +395,12 @@ target &quot;www&quot; {
 </div>
 <p class="Pp">The first 4 times an address (outside the
     <span class="Pa">10.0.0/24</span> network and the hosts found in
-    <span class="Pa">/etc/hosts</span>) gets reported, it will be added to the
+    <span class="Pa">/etc/hosts</span>) is reported, it will be added to the
     <span class="Pa">attackers</span> table for 1 hour. From the 5th until the
-    12th time, the address will remain in the same table for 6 hours. Until
-    here, if an address has not been reported for 3 weeks, it will be dropped
-    from memory. Related state entries will be killed while source nodes will be
-    kept (the default).</p>
+    12th time, the address will remains in the same table for 6 hours. Until
+    here, if an address is not reported for 3 weeks, it will be dropped from
+    memory. Related state entries will be killed while source nodes will be kept
+    (the default).</p>
 <p class="Pp">From the 13th appearance forth, an address will be held in the
     <span class="Pa">attackers</span> table for 5 days, is not going to be
     dropped from memory anymore and source nodes will be killed along with state
@@ -508,7 +518,7 @@ function pftbld_drop() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">February 7, 2021</td>
+    <td class="foot-date">February 13, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 12 2021 $
+.Dd $Mdocdate: February 13 2021 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -36,13 +36,18 @@ The
 daemon listens on UNIX-domain sockets for incoming IP addresses, usually sent
 by programs such as network services and applications.
 .Pp
-What typically happens to a submitted IP address is actually pretty simple:
-It is immediately added to a
+What typically happens to a submitted IP address is pretty simple:
+.Pp
+.Bl -enum -offset indent -compact
+.It
+The address is immediately added to a
 .Xr pf 4
 table according to the daemon's configuration for and the frequency of its
-occurrence on the respective socket.
-Then, after an expiry time also specified in the configuration, the address is
-deleted from the table again.
+appearance on the respective socket.
+.It
+After an expiry time also specified in the configuration, the address is
+deleted from the table.
+.El
 .Pp
 .Nm
 obtains its configuration from
@@ -132,8 +137,8 @@ If used with pipe mode to write either commands to the
 .Pa control socket
 or data to a
 .Pa data socket ,
-this enables printing server replies to
-.Ar stdout .
+this enables printing server responses to
+.Pa stdout .
 In the latter case, receiving the sequence
 .Sq Dv ACK
 indicates that the server successfully received and processed all data, while
@@ -147,7 +152,7 @@ the configuration will be echoed to
 if valid.
 .El
 .Sh MESSAGES
-Messages may be sent to any
+Client programs may send messages to any
 .Ic socket
 specified in the configuration.
 Each message must be formatted as
@@ -165,11 +170,11 @@ A message for a
 .Pa data socket
 must start with an
 .Pa IP address
-followed by an arbitrary number of
-.Pa optional text sections .
-Its sole purpose is getting matched against the
+followed by any number of
+.Pa optional pieces of text ,
+the sole purpose of which is to be matched against the
 .Ic exclude keyterms
-specified in the configuration before getting written into the log file.
+specified in the configuration before they are written to the log file.
 .Pp
 Here's an example:
 .Bd -literal -offset indent
@@ -198,19 +203,19 @@ The following entry lets us know that this is the second time the address
 .Pa 11.22.33.44
 was reported, while the last time was exactly 3 hours, 16 minutes and 25
 seconds ago.
-Finally, we learn that the address was added into the
+Finally, we learn that the address was added to the
 .Pa attackers
-table where it will remain for 1 hour before, in turn, getting deleted causing
+table where it will remain for 1 hour before being deleted causing
 another log entry:
 .Bd -literal -offset indent
 [...] >>> Deleted [11.22.33.44]:[www]:(2x:1h) from { attackers }.
 .Ed
 .Pp
-Even though sending messages to a
+Although sending messages to a
 .Pa control socket
-basically works the same way, it is recommended to use the
+basically works the same way, using the
 .Xr pftblctl 8
-tool for the sake of simplicity.
+tool is recommended for simplicity.
 A list of accepted commands is available on its manpage.
 .Sh FILES
 .Bl -tag -width "/etc/pftbld/pftbld.conf" -compact

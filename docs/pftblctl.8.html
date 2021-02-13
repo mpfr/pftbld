@@ -47,16 +47,16 @@
 </section>
 <section class="Sh">
 <h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
-<p class="Pp"><code class="Nm">pftblctl</code> acually is a wrapper script
+<p class="Pp"><code class="Nm">pftblctl</code> is actually a wrapper script
     facilitating the use of <a class="Xr" href="pftbld.8.html">pftbld(8)</a> in
     verbose pipe mode. It is primarily intended to be used for sending commands
-    to the <var class="Ar">control socket</var>, but may as well be utilized to
+    to the <var class="Ar">control socket</var>, but may as well be used to
     forward client data to the corresponding <var class="Ar">data
   socket</var>.</p>
 <p class="Pp">The options are as follows:</p>
 <dl class="Bl-tag">
   <dt id="q"><a class="permalink" href="#q"><code class="Fl">-q</code></a></dt>
-  <dd>Quiet mode, generally preventing output on <var class="Ar">stdout</var>.
+  <dd>Quiet mode, generally preventing output on <span class="Pa">stdout</span>.
       This flag may be specified multiple times. If specified just once, the
       <var class="Ar">command</var> will be sent to the server and
       <code class="Nm">pftblctl</code> will silently wait for the conversation
@@ -84,7 +84,8 @@
       options are:
     <dl class="Bl-tag">
       <dt id="print"><a class="permalink" href="#print"><code class="Ic">print</code></a></dt>
-      <dd>Prints the current configuration to <var class="Ar">stdout</var>.</dd>
+      <dd>Prints the current configuration to
+        <span class="Pa">stdout</span>.</dd>
       <dt id="reload"><a class="permalink" href="#reload"><code class="Ic">reload</code></a></dt>
       <dd>Reconfigures <a class="Xr" href="pftbld.8.html">pftbld(8)</a> by
           initiating a reload of its configuration file
@@ -125,8 +126,9 @@
     [<var class="Ar">target ...</var>]</dt>
   <dd>Prints managed addresses and meta-data (number of hits and timestamp of
       last occurrence) of the specified <var class="Ar">target</var> names to
-      <var class="Ar">stdout</var>. If there is no <var class="Ar">target</var>
-      specified, addresses of all targets will be printed.</dd>
+      <span class="Pa">stdout</span>. If there is no
+      <var class="Ar">target</var> specified, addresses of all targets will be
+      printed.</dd>
   <dt id="expire"><a class="permalink" href="#expire"><code class="Ic">expire</code></a>
     [<code class="Ic">recap</code>] <var class="Ar">address/network</var> |
     <var class="Ar">target ...</var></dt>
@@ -138,7 +140,7 @@
     <var class="Ar">address/network</var> | <var class="Ar">target
     ...</var>]</dt>
   <dd>Prints a list of memorized client information to
-      <var class="Ar">stdout</var>. The list will be reversely ordered by
+      <span class="Pa">stdout</span>. The list will be reversely ordered by
       expiration/drop date with the next event printed last. There are multiple
       ways to filter the output. One or more
       <var class="Ar">address/network</var> and/or <var class="Ar">target</var>
@@ -196,14 +198,14 @@
       <code class="Ic">remove</code> keyword is used instead of an
       <var class="Ar">address/network</var>, the current self-exclude will be
       deleted. If called without parameter, the current self-exclude will be
-      printed to <var class="Ar">stdout</var>.</dd>
+      printed to <span class="Pa">stdout</span>.</dd>
   <dt id="status"><a class="permalink" href="#status"><code class="Ic">status</code></a></dt>
-  <dd>Prints a status report to <var class="Ar">stdout</var>.</dd>
+  <dd>Prints a status report to <span class="Pa">stdout</span>.</dd>
   <dt id="verbose"><a class="permalink" href="#verbose"><code class="Ic">verbose</code></a>
     [<var class="Ar">level</var>]</dt>
   <dd>Get/Set the verbosity <var class="Ar">level</var>. If issued without
       parameter, the current level will be printed to
-      <var class="Ar">stdout</var>.</dd>
+      <span class="Pa">stdout</span>.</dd>
 </dl>
 </div>
 </section>
@@ -298,7 +300,7 @@ ACK
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">January 10, 2021</td>
+    <td class="foot-date">February 13, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
