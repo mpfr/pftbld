@@ -2,9 +2,11 @@
 
 `pftbld(8)` is a lightweight [OpenBSD](https://www.openbsd.org) daemon written to automate [pf(4) table](http://man.openbsd.org/pf.conf#TABLES) content management and is typically used for building and maintaining dynamic firewall blocklists.
 
+For further information, please have a look at the manpages of [pftbld(8)](https://mpfr.net/man/pftbld/6.8-stable/pftbld.8.html), its configuration file [pftbld.conf(5)](https://mpfr.net/man/pftbld/6.8-stable/pftbld.conf.5.html), and its control tool [pftblctl(8)](https://mpfr.net/man/pftbld/6.8-stable/pftblctl.8.html).
+
 ## How to interface
 
-Other programs usually interact with `pftbld` by sending plain text messages to specified UNIX-domain sockets. Most common case probably is [httpd(8)](http://man.openbsd.org/httpd) through FastCGI as outlined in [pftbld.conf(5)](https://mpfr.github.io/pftbld/pftbld.conf.5.html#EXAMPLES). The most native and therefore most recommended option, however, is offered through the [httpd-plus](https://github.com/mpfr/httpd-plus/tree/6.8-stable#notify-on-block) add-on package, allowing the two daemons to perfectly complement each other.
+Other programs usually interact with `pftbld` by sending plain text messages to specified UNIX-domain sockets. Most common case probably is [httpd(8)](http://man.openbsd.org/httpd) through FastCGI as outlined in [pftbld.conf(5)](https://mpfr.net/man/pftbld/6.8-stable/pftbld.conf.5.html#EXAMPLES). The most native and therefore most recommended option, however, is offered through the [httpd-plus](https://github.com/mpfr/httpd-plus/tree/6.8-stable#notify-on-block) add-on package, allowing the two daemons to perfectly complement each other.
 
 ## How to install
 
@@ -118,8 +120,6 @@ Start the `pftbld` daemon.
 $ doas rcctl start pftbld
 pftbld(ok)
 ```
-
-> The manpages of `pftbld(8)`, its configuration file `pftbld.conf(5)`, and its control tool `pftblctl(8)` are available either on the console or by pointing your browser to the corresponding `html` files under `pftbld-6.8-stable/docs/`.
 
 ## How to uninstall
 
