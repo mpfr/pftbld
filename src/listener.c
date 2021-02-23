@@ -319,9 +319,7 @@ check_exclcranges(struct crangeq *crq, struct caddr *addr)
 void
 proc_data(struct inbuf *ibuf, int kqfd)
 {
-	static const char	 ack[] = REPLY_ACK,
-				 nak[] = REPLY_NAK;
-
+	const char	 ack[] = REPLY_ACK, nak[] = REPLY_NAK;
 	int		 datafd = ibuf->datafd;
 	struct target	*tgt;
 	char		*tgtname, *sockid, *data, *age;

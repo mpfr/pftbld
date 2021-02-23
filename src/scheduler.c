@@ -656,8 +656,7 @@ handle_inbfd(struct kevent *kev)
 static void
 handle_inbuf(struct kevent *kev)
 {
-	static const char	 nak[] = REPLY_NAK;
-
+	const char	 nak[] = REPLY_NAK;
 	unsigned long	 kevid = kev->ident;
 	struct inbuf	*ibuf = kev->udata;
 	char		 buf[BUFSIZ], *data;
