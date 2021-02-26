@@ -19,6 +19,7 @@
 #include <netinet/in.h>
 
 #include <sys/event.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/un.h>
@@ -130,28 +131,30 @@
 			FATAL("strdup");	\
 	} while (0)
 
-#define READ(d, b, n)				\
+#define RECV(d, b, n)				\
 	do {					\
-		if (read(d, b, n) == -1)	\
-			FATAL("read");		\
+		if (recv(d, b, n, 0) == -1)	\
+			FATAL("recv");		\
 	} while (0)
 
-#define READ2(d, b1, n1, b2, n2)					\
-	do {								\
-		if (read(d, b1, n1) == -1 || read(d, b2, n2) == -1)	\
-			FATAL("read");					\
-	} while (0)
-
-#define WRITE(d, b, n)				\
+#define RECV2(d, b1, n1, b2, n2)		\
 	do {					\
-		if (write(d, b, n) == -1)	\
-			FATAL("write");		\
+		if (recv(d, b1, n1, 0) == -1 ||	\
+		    recv(d, b2, n2, 0) == -1)	\
+			FATAL("recv");		\
 	} while (0)
 
-#define WRITE2(d, b1, n1, b2, n2)					\
-	do {								\
-		if (write(d, b1, n1) == -1 || write(d, b2, n2) == -1)	\
-			FATAL("write");					\
+#define SEND(d, b, n)				\
+	do {					\
+		if (send(d, b, n, 0) == -1)	\
+			FATAL("send");		\
+	} while (0)
+
+#define SEND2(d, b1, n1, b2, n2)		\
+	do {					\
+		if (send(d, b1, n1, 0) == -1 ||	\
+		    send(d, b2, n2, 0) == -1)	\
+			FATAL("send");		\
 	} while (0)
 
 #define GETENV(s, e)							\

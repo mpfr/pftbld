@@ -91,7 +91,7 @@ handle_ctrl(struct kevent *kev)
 		FATALX("connection closed unexpectedly");
 
 	ctrlfd = kev->ident;
-	READ(ctrlfd, &mt, sizeof(mt));
+	RECV(ctrlfd, &mt, sizeof(mt));
 	switch (mt) {
 	case MSG_UPDATE_LOGFD:
 		recv_logfd(ctrlfd);
@@ -103,7 +103,7 @@ handle_ctrl(struct kevent *kev)
 		}
 		break;
 	case MSG_SET_VERBOSE:
-		READ(ctrlfd, &v, sizeof(v));
+		RECV(ctrlfd, &v, sizeof(v));
 		log_setverbose(v);
 		break;
 	case MSG_INBUF_DONE:
@@ -113,7 +113,7 @@ handle_ctrl(struct kevent *kev)
 		FATALX("invalid message type (%d)", mt);
 	}
 	mt = MSG_ACK;
-	WRITE(ctrlfd, &mt, sizeof(mt));
+	SEND(ctrlfd, &mt, sizeof(mt));
 }
 
 static void
@@ -378,7 +378,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	    (cr = check_exclcranges(&conf->exclcranges, &addr)) != NULL) {
 		ign = request_ignore(&addr, tgtname, sockid, cr);
 		if (ign->cnt == 0) {
-			(void)replace(data, "\n", '\0');
+			replace(data, "\n", '\0');
 			if (addrvals_cmp(&cr->first, &cr->last, cr->type))
 				ASPRINTF(&ign->data, "network <%s>", cr->str);
 			else
@@ -678,9 +678,9 @@ perform_ctrl_config(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		print_conf(sfd);
 	else if (!strcmp("reload", arg)) {
 		mt = MSG_CONF_RELOAD;
-		WRITE(privfd, &mt, sizeof(mt));
+		SEND(privfd, &mt, sizeof(mt));
 		/* wait for reply */
-		READ(privfd, &mt, sizeof(mt));
+		RECV(privfd, &mt, sizeof(mt));
 		msg_send(sfd, mt == MSG_ACK ? "Initiated.\n" : "Failed.\n");
 	} else
 		return (1);
@@ -1133,9 +1133,9 @@ perform_ctrl_verbose(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	ITOE(ENV_VERBOSE, v);
 
 	mt = MSG_SET_VERBOSE;
-	WRITE2(privfd, &mt, sizeof(mt), &v, sizeof(v));
+	SEND2(privfd, &mt, sizeof(mt), &v, sizeof(v));
 	/* wait for reply */
-	READ(privfd, &mt, sizeof(mt));
+	RECV(privfd, &mt, sizeof(mt));
 	msg_send(sfd, mt == MSG_ACK ? "Done.\n" : "Failed.\n");
 
 	return (0);
