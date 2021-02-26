@@ -438,11 +438,11 @@ check_targets(void)
 	char		*buf, *tgt;
 	struct client	*clt;
 
-	READ(sched_cfd, &len, sizeof(len));
+	RECV(sched_cfd, &len, sizeof(len));
 	MALLOC(buf, len);
-	READ(sched_cfd, buf, len);
+	RECV(sched_cfd, buf, len);
 
-	(void)replace(buf, "\n", '\0');
+	replace(buf, "\n", '\0');
 	n = 0;
 	TAILQ_FOREACH(clt, &cltq, clients) {
 		tgt = buf;
@@ -454,7 +454,7 @@ check_targets(void)
 	}
 	free(buf);
 
-	WRITE(sched_cfd, &n, sizeof(n));
+	SEND(sched_cfd, &n, sizeof(n));
 }
 
 static struct config *
@@ -462,7 +462,7 @@ recv_conf(void)
 {
 
 #define CHECK_NEXTITEM					\
-	READ(sched_cfd, &mt, sizeof(mt));		\
+	RECV(sched_cfd, &mt, sizeof(mt));		\
 	if (mt == MSG_QUEUE_ENDITEMS)			\
 		break;					\
 	if (mt != MSG_QUEUE_NEXTITEM)			\
@@ -488,7 +488,7 @@ recv_conf(void)
 		CHECK_NEXTITEM;
 
 		MALLOC(tgt, sizeof(*tgt));
-		READ(sched_cfd, tgt, sizeof(*tgt));
+		RECV(sched_cfd, tgt, sizeof(*tgt));
 		STAILQ_INSERT_TAIL(&nc->ctargets, tgt, targets);
 
 		STAILQ_INIT(&tgt->datasocks);
@@ -509,7 +509,7 @@ recv_conf(void)
 			CHECK_NEXTITEM;
 
 			MALLOC(cr, sizeof(*cr));
-			READ(sched_cfd, cr, sizeof(*cr));
+			RECV(sched_cfd, cr, sizeof(*cr));
 			STAILQ_INSERT_TAIL(&tgt->exclcranges, cr, cranges);
 		}
 
@@ -519,9 +519,9 @@ recv_conf(void)
 			CHECK_NEXTITEM;
 
 			MALLOC(kt, sizeof(*kt));
-			READ2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
+			RECV2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
 			MALLOC(kt->p, n);
-			READ(sched_cfd, kt->p, n);
+			RECV(sched_cfd, kt->p, n);
 			STAILQ_INSERT_TAIL(&tgt->exclkeyterms, kt, ptrs);
 		}
 
@@ -531,7 +531,7 @@ recv_conf(void)
 			CHECK_NEXTITEM;
 
 			MALLOC(tbl, sizeof(*tbl));
-			READ(sched_cfd, tbl, sizeof(*tbl));
+			RECV(sched_cfd, tbl, sizeof(*tbl));
 			STAILQ_INSERT_TAIL(&tgt->cascade, tbl, tables);
 		}
 	}
@@ -542,7 +542,7 @@ recv_conf(void)
 		CHECK_NEXTITEM;
 
 		MALLOC(cr, sizeof(*cr));
-		READ(sched_cfd, cr, sizeof(*cr));
+		RECV(sched_cfd, cr, sizeof(*cr));
 		STAILQ_INSERT_TAIL(&nc->exclcranges, cr, cranges);
 	}
 
@@ -552,9 +552,9 @@ recv_conf(void)
 		CHECK_NEXTITEM;
 
 		MALLOC(kt, sizeof(*kt));
-		READ2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
+		RECV2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
 		MALLOC(kt->p, n);
-		READ(sched_cfd, kt->p, n);
+		RECV(sched_cfd, kt->p, n);
 		STAILQ_INSERT_TAIL(&nc->exclkeyterms, kt, ptrs);
 	}
 
@@ -603,7 +603,7 @@ handle_ctrl(struct kevent *kev)
 	if (kev->flags & EV_EOF)
 		FATALX("connection closed unexpectedly");
 
-	READ(sched_cfd, &mt, sizeof(mt));
+	RECV(sched_cfd, &mt, sizeof(mt));
 	switch (mt) {
 	case MSG_UPDATE_LOGFD:
 		recv_logfd(sched_cfd);
@@ -621,14 +621,14 @@ handle_ctrl(struct kevent *kev)
 		nconf = recv_conf();
 		break;
 	case MSG_SET_VERBOSE:
-		READ(sched_cfd, &v, sizeof(v));
+		RECV(sched_cfd, &v, sizeof(v));
 		log_setverbose(v);
 		break;
 	default:
 		FATALX("invalid message type (%d)", mt);
 	}
 	mt = MSG_ACK;
-	WRITE(sched_cfd, &mt, sizeof(mt));
+	SEND(sched_cfd, &mt, sizeof(mt));
 }
 
 static void
@@ -672,14 +672,14 @@ handle_inbuf(struct kevent *kev)
 	}
 	/* EVFILT_READ */
 	/* ignore EV_EOF */
-	if ((nr = read(ibuf->datafd, buf, sizeof(buf))) == -1) {
+	if ((nr = recv(ibuf->datafd, buf, sizeof(buf), 0)) == -1) {
 		if (errno != EIO && errno != ENOTCONN)
-			FATAL("read");
+			FATAL("recv");
 		log_warn("read on target [%s%s] failed (%d)", ibuf->tgtname,
 		    ibuf->sockid, errno);
 		goto abort;
 	}
-	if (nr <= 0)
+	if (nr == 0)
 		goto eof;
 
 	inr = ibuf->nr + nr;
@@ -690,7 +690,7 @@ handle_inbuf(struct kevent *kev)
 	}
 	if ((data = realloc(ibuf->data, inr + 1)) == NULL)
 		FATAL("realloc");
-	(void)memcpy(&data[ibuf->nr], buf, nr);
+	memcpy(&data[ibuf->nr], buf, nr);
 	data[inr] = '\0';
 	ibuf->data = data;
 	ibuf->nr = inr;
@@ -731,9 +731,9 @@ remove:
 		sock = &conf->ctrlsock;
 
 	mt = MSG_INBUF_DONE;
-	WRITE(sock->ctrlfd, &mt, sizeof(mt));
+	SEND(sock->ctrlfd, &mt, sizeof(mt));
 	/* wait for reply */
-	READ(sock->ctrlfd, &mt, sizeof(mt));
+	RECV(sock->ctrlfd, &mt, sizeof(mt));
 	if (mt != MSG_ACK)
 		FATALX("invalid message type (%d)", mt);
 
@@ -907,13 +907,13 @@ scheduler(int argc, char *argv[])
 	ETOI(sched_cfd, ENV_CTRLFD);
 	ETOI(sched_ifd, ENV_INBFD);
 
-	READ(sched_cfd, &mt, sizeof(mt));
+	RECV(sched_cfd, &mt, sizeof(mt));
 	if (mt == MSG_UPDATE_CONFIG) {
 		conf = recv_conf();
 		mt = MSG_ACK;
 	} else
 		mt = MSG_NAK;
-	WRITE(sched_cfd, &mt, sizeof(mt));
+	SEND(sched_cfd, &mt, sizeof(mt));
 
 	TAILQ_INIT(&cltq);
 	TAILQ_INIT(&inbq);
@@ -1147,6 +1147,6 @@ shutdown_scheduler(void)
 
 end:
 	mt = MSG_SHUTDOWN_MAIN;
-	WRITE(privfd, &mt, sizeof(mt));
+	SEND(privfd, &mt, sizeof(mt));
 	exit(0);
 }

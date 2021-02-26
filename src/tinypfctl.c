@@ -272,7 +272,7 @@ tinypfctl(int argc, char *argv[])
 	/* wait for client addresses */
 	CALLOC(pfaddr, cmd.addrcnt, sizeof(*pfaddr));
 	for (c = 0; c < cmd.addrcnt; c++) {
-		READ(ctrlfd, &addr, sizeof(addr));
+		RECV(ctrlfd, &addr, sizeof(addr));
 		switch (addr.type) {
 		case ADDR_IPV4:
 			pfaddr[c].pfra_af = AF_INET;
@@ -324,7 +324,7 @@ tinypfctl(int argc, char *argv[])
 	close(pffd);
 	free(pfaddr);
 	/* send reply */
-	WRITE(ctrlfd, &pfres, sizeof(pfres));
+	SEND(ctrlfd, &pfres, sizeof(pfres));
 	exit(0);
 }
 
@@ -363,12 +363,12 @@ fork_tinypfctl(struct pfresult *pfres, struct pfcmd *cmd)
 	close(ctrlfd[1]);
 
 	while ((ca = STAILQ_FIRST(&cmd->addrq)) != NULL) {
-		WRITE(ctrlfd[0], ca, sizeof(*ca));
+		SEND(ctrlfd[0], ca, sizeof(*ca));
 		STAILQ_REMOVE_HEAD(&cmd->addrq, caddrs);
 		free(ca);
 	}
 	/* wait for reply */
-	READ(ctrlfd[0], pfres, sizeof(*pfres));
+	RECV(ctrlfd[0], pfres, sizeof(*pfres));
 	free(cmd->tblname);
 	DPRINTF("received pfresult (nadd:%d, ndel:%d, nkill:%d, snkill:%d)",
 	    pfres->nadd, pfres->ndel, pfres->nkill, pfres->snkill);

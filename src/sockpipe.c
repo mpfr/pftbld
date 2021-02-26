@@ -25,36 +25,12 @@
 
 #include "pftbld.h"
 
-static ssize_t	 do_pipe(int, int, char *, const char *, const char *);
-
-static ssize_t
-do_pipe(int from, int to, char *buf, const char *errfrom, const char *errto)
-{
-	ssize_t	 nr, nw, n;
-
-	do {
-		while ((nr = read(from, buf, sizeof(buf))) == -1) {
-			if (errno != EAGAIN)
-				err(1, "%s", errfrom);
-
-			NANONAP;
-		}
-		nw = 0;
-		while (nw < nr) {
-			while ((n = write(to, &buf[nw], nr - nw)) == -1) {
-				if (errno != EAGAIN)
-					err(1, "%s", errto);
-
-				NANONAP;
-			}
-			if (n == 0)
-				break;
-			nw += n;
-		}
-	} while (nr);
-
-	return (nw);
-}
+#define HANDLE_IOERR(e)				\
+	do {					\
+		if (errno != EAGAIN)		\
+			err(1, "%s failed", e);	\
+		NANONAP;			\
+	} while (0)
 
 __dead void
 sockpipe(const char *path, int verbose)
@@ -62,7 +38,7 @@ sockpipe(const char *path, int verbose)
 	int			 fd;
 	struct sockaddr_un	 ssa_un;
 	char			 buf[BUFSIZ];
-	ssize_t			 nw;
+	ssize_t			 nr, nw, n;
 	char			 cp[PATH_MAX];
 
 	switch (check_path(path, cp, sizeof(cp))) {
@@ -100,22 +76,39 @@ sockpipe(const char *path, int verbose)
 	if (connect(fd, (struct sockaddr *)&ssa_un, sizeof(ssa_un)) == -1)
 		err(1, "connect failed");
 
-	nw = do_pipe(STDIN_FILENO, fd, buf,
-	    "stdin read failed", "socket write failed");
+	do {
+		while ((nr = read(STDIN_FILENO, buf, sizeof(buf))) == -1)
+			HANDLE_IOERR("stdin read");
+		nw = 0;
+		while (nw < nr) {
+			while ((n = send(fd, &buf[nw], nr - nw, 0)) == -1)
+				HANDLE_IOERR("socket write");
+			if (n == 0)
+				break;
+			nw += n;
+		}
+	} while (nr);
 
 	if (nw < 1 || buf[--nw] != '\0')
-		while (write(fd, "", 1) == -1) {
-			if (errno != EAGAIN)
-				err(1, "socket write failed");
-
-			NANONAP;
-		}
+		while (send(fd, "", 1, 0) == -1)
+			HANDLE_IOERR("socket write");
 
 	if (!verbose)
 		exit(0);
 
-	(void)do_pipe(fd, STDOUT_FILENO, buf,
-	    "socket read failed", "stdout write failed");
+	do {
+		while ((nr = recv(fd, buf, sizeof(buf), 0)) == -1)
+			HANDLE_IOERR("socket read");
+		nw = 0;
+		while (nw < nr) {
+			while ((n = write(STDOUT_FILENO, &buf[nw],
+			    nr - nw)) == -1)
+				HANDLE_IOERR("stdout write");
+			if (n == 0)
+				break;
+			nw += n;
+		}
+	} while (nr);
 
 	exit(0);
 }
