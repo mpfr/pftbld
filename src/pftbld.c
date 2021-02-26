@@ -110,7 +110,7 @@ handle_privreq(struct kevent *kev)
 		FATALX("connection closed unexpectedly");
 
 	pfd = kev->ident;
-	READ(pfd, &mt, sizeof(mt));
+	RECV(pfd, &mt, sizeof(mt));
 	switch (mt) {
 	case MSG_EXEC_PFCMD:
 		exec_pfcmd(pfd);
@@ -140,15 +140,15 @@ pfexec(struct pfresult *pfres, struct pfcmd *cmd)
 	struct caddr	*ca;
 
 	mt = MSG_EXEC_PFCMD;
-	WRITE2(privfd, &mt, sizeof(mt), cmd, sizeof(*cmd));
+	SEND2(privfd, &mt, sizeof(mt), cmd, sizeof(*cmd));
 	len = strlen(cmd->tblname) + 1;
-	WRITE2(privfd, &len, sizeof(len), cmd->tblname, len);
+	SEND2(privfd, &len, sizeof(len), cmd->tblname, len);
 	while ((ca = SIMPLEQ_FIRST(&cmd->addrq)) != NULL) {
-		WRITE(privfd, ca, sizeof(*ca));
+		SEND(privfd, ca, sizeof(*ca));
 		SIMPLEQ_REMOVE_HEAD(&cmd->addrq, caddrs);
 	}
 	/* wait for reply */
-	READ(privfd, pfres, sizeof(*pfres));
+	RECV(privfd, pfres, sizeof(*pfres));
 }
 
 __dead void
@@ -323,18 +323,18 @@ exec_pfcmd(int pfd)
 	size_t		 c;
 	struct caddr	*ca;
 
-	READ2(pfd, &cmd, sizeof(cmd), &c, sizeof(c));
+	RECV2(pfd, &cmd, sizeof(cmd), &c, sizeof(c));
 	MALLOC(cmd.tblname, c);
-	READ(pfd, cmd.tblname, c);
+	RECV(pfd, cmd.tblname, c);
 	SIMPLEQ_INIT(&cmd.addrq);
 	for (c = 0; c < cmd.addrcnt; c++) {
 		MALLOC(ca, sizeof(*ca));
-		READ(pfd, ca, sizeof(*ca));
+		RECV(pfd, ca, sizeof(*ca));
 		SIMPLEQ_INSERT_TAIL(&cmd.addrq, ca, caddrs);
 	}
 	fork_tinypfctl(&pfres, &cmd);
 	/* wait for reply */
-	WRITE(pfd, &pfres, sizeof(pfres));
+	SEND(pfd, &pfres, sizeof(pfres));
 }
 
 static void
@@ -349,9 +349,9 @@ handle_persist(int pfd)
 #define MODE_FILE_WRONLY	0200
 #define MODE_FILE_RDWR		0666
 
-	READ(pfd, &len, sizeof(len));
+	RECV(pfd, &len, sizeof(len));
 	MALLOC(path, len);
-	READ(pfd, path, len);
+	RECV(pfd, path, len);
 	STRDUP(dpath, path);
 	if ((dir = dirname(dpath)) == NULL) {
 		log_warn("persist directory");
@@ -373,11 +373,11 @@ handle_persist(int pfd)
 		FATAL("open");
 
 	mt = MSG_ACK;
-	WRITE(pfd, &mt, sizeof(mt));
+	SEND(pfd, &mt, sizeof(mt));
 	while (send_fd(fd, &mt, sizeof(mt), pfd) == -1)
 		NANONAP;
 	/* wait for reply */
-	READ(pfd, &mt, sizeof(mt));
+	RECV(pfd, &mt, sizeof(mt));
 	if (mt == MSG_ACK &&
 	    (fchown(fd, dstat.st_uid, dstat.st_gid) == -1 ||
 	    fchmod(fd, MODE_FILE_RDWR & dstat.st_mode) == -1))
@@ -388,7 +388,7 @@ handle_persist(int pfd)
 
 fail:
 	mt = MSG_NAK;
-	WRITE(pfd, &mt, sizeof(mt));
+	SEND(pfd, &mt, sizeof(mt));
 }
 
 static void
@@ -402,7 +402,7 @@ set_verbose(int pfd)
 	struct target	*tgt;
 	struct socket	*sock;
 
-	READ(pfd, &v, sizeof(v));
+	RECV(pfd, &v, sizeof(v));
 	log_setverbose(v);
 	ITOE(ENV_VERBOSE, v);
 	if (logger_pid)
@@ -411,7 +411,7 @@ set_verbose(int pfd)
 		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets)
 			send_verbose(sock->ctrlfd);
 	mt = MSG_ACK;
-	WRITE(pfd, &mt, sizeof(mt));
+	SEND(pfd, &mt, sizeof(mt));
 }
 
 static void
@@ -420,9 +420,9 @@ send_verbose(int ctrlfd)
 	enum msgtype	 mt = MSG_SET_VERBOSE;
 	int		 v = log_getverbose();
 
-	WRITE2(ctrlfd, &mt, sizeof(mt), &v, sizeof(v));
+	SEND2(ctrlfd, &mt, sizeof(mt), &v, sizeof(v));
 	/* wait for reply */
-	READ(ctrlfd, &mt, sizeof(mt));
+	RECV(ctrlfd, &mt, sizeof(mt));
 	if (mt != MSG_ACK)
 		FATALX("verbose level update failed (%d)", mt);
 }
@@ -432,7 +432,7 @@ conf_reload(int pfd)
 {
 	enum msgtype	 mt = MSG_ACK;
 
-	WRITE(pfd, &mt, sizeof(mt));
+	SEND(pfd, &mt, sizeof(mt));
 
 	if (raise(SIGHUP) == -1)
 		FATAL("raise");
@@ -490,50 +490,50 @@ send_conf(int fd)
 	struct ptr	*kt;
 	struct table	*tab;
 
-	WRITE(fd, &mt, sizeof(mt));
+	SEND(fd, &mt, sizeof(mt));
 	while (send_fd(conf->ctrlsock.ctrlfd, conf, sizeof(*conf), fd) == -1)
 		NANONAP;
 
 	SIMPLEQ_FOREACH(tgt, &conf->ctargets, targets) {
-		WRITE2(fd, &inext, sizeof(inext), tgt, sizeof(*tgt));
+		SEND2(fd, &inext, sizeof(inext), tgt, sizeof(*tgt));
 
 		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets) {
-			WRITE(fd, &inext, sizeof(inext));
+			SEND(fd, &inext, sizeof(inext));
 			while (send_fd(sock->ctrlfd, sock, sizeof(*sock),
 			    fd) == -1)
 				NANONAP;
 		}
-		WRITE(fd, &iend, sizeof(iend));
+		SEND(fd, &iend, sizeof(iend));
 
 		SIMPLEQ_FOREACH(cr, &tgt->exclcranges, cranges)
-			WRITE2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
-		WRITE(fd, &iend, sizeof(iend));
+			SEND2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
+		SEND(fd, &iend, sizeof(iend));
 
 		SIMPLEQ_FOREACH(kt, &tgt->exclkeyterms, ptrs) {
-			WRITE2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
+			SEND2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
 			n = strlen(kt->p) + 1;
-			WRITE2(fd, &n, sizeof(n), kt->p, n);
+			SEND2(fd, &n, sizeof(n), kt->p, n);
 		}
-		WRITE(fd, &iend, sizeof(iend));
+		SEND(fd, &iend, sizeof(iend));
 
 		SIMPLEQ_FOREACH(tab, &tgt->cascade, tables)
-			WRITE2(fd, &inext, sizeof(inext), tab, sizeof(*tab));
-		WRITE(fd, &iend, sizeof(iend));
+			SEND2(fd, &inext, sizeof(inext), tab, sizeof(*tab));
+		SEND(fd, &iend, sizeof(iend));
 	}
-	WRITE(fd, &iend, sizeof(iend));
+	SEND(fd, &iend, sizeof(iend));
 
 	SIMPLEQ_FOREACH(cr, &conf->exclcranges, cranges)
-		WRITE2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
-	WRITE(fd, &iend, sizeof(iend));
+		SEND2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
+	SEND(fd, &iend, sizeof(iend));
 
 	SIMPLEQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
-		WRITE2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
+		SEND2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
 		n = strlen(kt->p) + 1;
-		WRITE2(fd, &n, sizeof(n), kt->p, n);
+		SEND2(fd, &n, sizeof(n), kt->p, n);
 	}
-	WRITE(fd, &iend, sizeof(iend));
+	SEND(fd, &iend, sizeof(iend));
 
-	READ(fd, &mt, sizeof(mt));
+	RECV(fd, &mt, sizeof(mt));
 	if (mt != MSG_ACK)
 		FATALX("config update failed (%d)", mt);
 }
