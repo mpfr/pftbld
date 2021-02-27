@@ -70,37 +70,31 @@
 #define CONF_NO_DROP		TIMESPEC_INFINITE
 #define CONF_DROP_MAX		TIMESPEC_INFINITE.tv_sec
 
-#define CANONICAL_PATH_SET(str, path, txt, err, exit)			\
-	do {								\
-		char		 _cp[PATH_MAX];				\
-		enum pathres	 _pr;					\
-		_pr = check_path(path, _cp, sizeof(_cp));		\
-		switch (_pr) {						\
-		case PATH_OK:						\
-			break;						\
-		case PATH_EMPTY:					\
-			err("empty "txt" path");			\
-			exit;						\
-		case PATH_RELATIVE:					\
-			err(txt" path cannot be relative");		\
-			exit;						\
-		case PATH_INVALID:					\
-			err("invalid "txt" path");			\
-			exit;						\
-		case PATH_DIRECTORY:					\
-			err(txt" path cannot be a directory");		\
-			exit;						\
-		case PATH_FILENAME:					\
-			err("invalid "txt" name");			\
-			exit;						\
-		default:						\
-			FATALX("invalid path check result (%d)", _pr);	\
-		}							\
-		if (strlcpy(str, _cp, sizeof(str)) >= sizeof(str)) {	\
-			err(txt" path too long");			\
-			exit;						\
-		}							\
+#define CANONICAL_PATH_SET_0(str, path, txt, err, exit, ferr)	\
+	do {							\
+		switch (check_path(path, str, sizeof(str))) {	\
+		case PATH_OK:					\
+			break;					\
+		case PATH_EMPTY:				\
+			err("empty "txt" path");		\
+			exit;					\
+		case PATH_RELATIVE:				\
+			err(txt" path cannot be relative");	\
+			exit;					\
+		case PATH_TRUNCATED:				\
+			err(txt" path too long");		\
+			exit;					\
+		case PATH_DIRECTORY:				\
+			err(txt" path cannot be a directory");	\
+			exit;					\
+		default:					\
+			ferr;					\
+		}						\
 	} while (0)
+
+#define CANONICAL_PATH_SET(str, path, txt, err, exit)	\
+	CANONICAL_PATH_SET_0(str, path, txt, err, exit,	\
+	    FATALX("internal path check error"))
 
 #define EV_DPRINTF(e, s)					\
 	DPRINTF("KEVENT%s(id:%lu, EVFILT_%s%s, data:%lld)",	\
@@ -447,9 +441,8 @@ enum pathres {
 	PATH_OK = 0,
 	PATH_EMPTY,
 	PATH_RELATIVE,
-	PATH_INVALID,
-	PATH_DIRECTORY,
-	PATH_FILENAME
+	PATH_TRUNCATED,
+	PATH_DIRECTORY
 };
 
 struct procfunc {
