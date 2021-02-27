@@ -673,7 +673,7 @@ handle_inbuf(struct kevent *kev)
 	/* EVFILT_READ */
 	/* ignore EV_EOF */
 	if ((nr = recv(ibuf->datafd, buf, sizeof(buf), 0)) == -1) {
-		if (errno != EIO && errno != ENOTCONN)
+		if (errno != ENOTCONN && errno != ECONNREFUSED)
 			FATAL("recv");
 		log_warn("read on target [%s%s] failed (%d)", ibuf->tgtname,
 		    ibuf->sockid, errno);

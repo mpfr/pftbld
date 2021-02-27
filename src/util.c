@@ -436,7 +436,7 @@ check_path(const char *path, char *cpath, size_t cpathsize)
 {
 	extern char	*basepath;
 
-	char	*apath, *dpath, *file;
+	char	*apath;
 
 	if (path == NULL || *path == '\0')
 		return (PATH_EMPTY);
@@ -450,18 +450,12 @@ check_path(const char *path, char *cpath, size_t cpathsize)
 
 	if (canonicalize_path(apath, cpath, cpathsize) == NULL) {
 		free(apath);
-		return (PATH_INVALID);
+		return (PATH_TRUNCATED);
 	}
 	free(apath);
 	if (cpath[strlen(cpath) - 1] == '/')
 		return (PATH_DIRECTORY);
 
-	STRDUP(dpath, cpath);
-	if ((file = basename(dpath)) == NULL || *file == '/' || *file == '.') {
-		free(dpath);
-		return (PATH_FILENAME);
-	}
-	free(dpath);
 	return (PATH_OK);
 }
 
