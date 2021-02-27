@@ -25,12 +25,8 @@
 
 #include "pftbld.h"
 
-#define HANDLE_IOERR(e)				\
-	do {					\
-		if (errno != EAGAIN)		\
-			err(1, "%s failed", e);	\
-		NANONAP;			\
-	} while (0)
+#define ERR(m)	err(1, "%s failed", m)
+#define ERRX(m)	errx(1, "%s failed", m)
 
 __dead void
 sockpipe(const char *path, int verbose)
@@ -39,76 +35,57 @@ sockpipe(const char *path, int verbose)
 	struct sockaddr_un	 ssa_un;
 	char			 buf[BUFSIZ];
 	ssize_t			 nr, nw, n;
-	char			 cp[PATH_MAX];
-
-	switch (check_path(path, cp, sizeof(cp))) {
-	case PATH_OK:
-		break;
-	case PATH_EMPTY:
-		errx(1, "empty path");
-	case PATH_RELATIVE:
-		errx(1, "path cannot be relative");
-	case PATH_INVALID:
-		errx(1, "invalid path");
-	case PATH_DIRECTORY:
-		errx(1, "path cannot be a directory");
-	case PATH_FILENAME:
-		errx(1, "invalid socket name");
-	default:
-		errx(1, "internal error");
-	}
 
 	memset(&ssa_un, 0, sizeof(ssa_un));
+	CANONICAL_PATH_SET_0(ssa_un.sun_path, path, "socket", warnx, exit(1),
+	    errx(1, "internal error"));
 	ssa_un.sun_family = AF_UNIX;
-	if (strlcpy(ssa_un.sun_path, cp,
-	    sizeof(ssa_un.sun_path)) >= sizeof(ssa_un.sun_path))
-		errx(1, "path too long");
 
 	if (pledge("stdio unix unveil", NULL) == -1)
-		err(1, "pledge failed");
+		ERR("pledge");
 
-	if (unveil(path, "r") == -1 || unveil(NULL, NULL) == -1)
-		err(1, "unveil failed");
+	if (unveil(ssa_un.sun_path, "r") == -1 || unveil(NULL, NULL) == -1)
+		ERR("unveil");
 
-	if ((fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1)
-		err(1, "socket failed");
+	if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+		ERR("socket");
 
 	if (connect(fd, (struct sockaddr *)&ssa_un, sizeof(ssa_un)) == -1)
-		err(1, "connect failed");
+		ERR("connect");
 
 	do {
 		while ((nr = read(STDIN_FILENO, buf, sizeof(buf))) == -1)
-			HANDLE_IOERR("stdin read");
+			ERRX("stdin read");
 		nw = 0;
 		while (nw < nr) {
 			while ((n = send(fd, &buf[nw], nr - nw, 0)) == -1)
-				HANDLE_IOERR("socket write");
+				ERRX("socket write");
 			if (n == 0)
 				break;
 			nw += n;
 		}
-	} while (nr);
+	} while (nr > 0);
 
 	if (nw < 1 || buf[--nw] != '\0')
 		while (send(fd, "", 1, 0) == -1)
-			HANDLE_IOERR("socket write");
+			ERRX("socket write");
 
 	if (!verbose)
 		exit(0);
 
 	do {
 		while ((nr = recv(fd, buf, sizeof(buf), 0)) == -1)
-			HANDLE_IOERR("socket read");
+			ERRX("socket read");
 		nw = 0;
 		while (nw < nr) {
 			while ((n = write(STDOUT_FILENO, &buf[nw],
 			    nr - nw)) == -1)
-				HANDLE_IOERR("stdout write");
+				ERRX("stdout write");
 			if (n == 0)
 				break;
 			nw += n;
 		}
-	} while (nr);
+	} while (nr > 0);
 
 	exit(0);
 }
