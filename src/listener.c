@@ -21,23 +21,21 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <net/if.h>
-
 #include "log.h"
 #include "pftbld.h"
 
 #define FLAG_SRVSOCK_CCNTLOG	0x01
 
-#define CADDR_TO_CRANGE(r, a)					\
-	do {							\
-		(r)->first = (r)->last = (a)->value;		\
-		(r)->type = (a)->type;				\
-		(void)strlcpy((r)->str, (a)->str,		\
-		    sizeof((r)->str));				\
-		(void)strlcat((r)->str,				\
-		    (r)->type == ADDR_IPV4 ? "/32" :		\
-		    (r)->type == ADDR_IPV6 ? "/128" : "",	\
-		    sizeof((r)->str));				\
+#define CADDR_TO_CRANGE(r, a)						\
+	do {								\
+		(r)->first = (r)->last =				\
+		    *(union inaddr *)&(a)->pfaddr.pfra_u;		\
+		(r)->af = (a)->pfaddr.pfra_af;				\
+		(void)strlcpy((r)->str, (a)->str, sizeof((r)->str));	\
+		(void)strlcat((r)->str,					\
+		    (r)->af == AF_INET ? "/32" :			\
+		    (r)->af == AF_INET6 ? "/128" : "",			\
+		    sizeof((r)->str));					\
 	} while (0)
 
 #define TIME_TO_STR(str, ts)						\
@@ -379,7 +377,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		ign = request_ignore(&addr, tgtname, sockid, cr);
 		if (ign->cnt == 0) {
 			replace(data, "\n", '\0');
-			if (addrvals_cmp(&cr->first, &cr->last, cr->type))
+			if (addrvals_cmp(&cr->first, &cr->last, cr->af))
 				ASPRINTF(&ign->data, "network <%s>", cr->str);
 			else
 				ASPRINTF(&ign->data, "address");
@@ -1133,7 +1131,7 @@ perform_ctrl_verbose(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	ITOE(ENV_VERBOSE, v);
 
 	mt = MSG_SET_VERBOSE;
-	SEND2(privfd, &mt, sizeof(mt), &v, sizeof(v));
+	ISEND(privfd, 2, &mt, sizeof(mt), &v, sizeof(v));
 	/* wait for reply */
 	RECV(privfd, &mt, sizeof(mt));
 	msg_send(sfd, mt == MSG_ACK ? "Done.\n" : "Failed.\n");

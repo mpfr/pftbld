@@ -22,8 +22,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <net/if.h>
-
 #include <sys/wait.h>
 
 #include "log.h"

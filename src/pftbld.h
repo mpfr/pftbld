@@ -16,6 +16,9 @@
 
 #include <limits.h>
 
+#include <net/if.h>
+#include <net/pfvar.h>
+
 #include <netinet/in.h>
 
 #include <sys/event.h>
@@ -125,31 +128,24 @@
 			FATAL("strdup");	\
 	} while (0)
 
-#define RECV(d, b, n)				\
-	do {					\
-		if (recv(d, b, n, 0) == -1)	\
-			FATAL("recv");		\
+#define SOCKIO(a, d, b, n, m)						\
+	do {								\
+		ssize_t	 _c;						\
+		size_t	 _n = 0;					\
+		while (n - _n > 0) {					\
+			if ((_c = a(d, (void *)(&((char *)(b))[_n]),	\
+			    n - _n, 0)) == -1)				\
+				FATAL(m);				\
+			if (_c == 0)					\
+				FATALX("connection closed during "m);	\
+			_n += _c;					\
+		}							\
 	} while (0)
+#define SEND(d, b, n)		SOCKIO(send, d, b, n, "send")
+#define RECV(d, b, n)		SOCKIO(recv, d, b, n, "recv")
 
-#define RECV2(d, b1, n1, b2, n2)		\
-	do {					\
-		if (recv(d, b1, n1, 0) == -1 ||	\
-		    recv(d, b2, n2, 0) == -1)	\
-			FATAL("recv");		\
-	} while (0)
-
-#define SEND(d, b, n)				\
-	do {					\
-		if (send(d, b, n, 0) == -1)	\
-			FATAL("send");		\
-	} while (0)
-
-#define SEND2(d, b1, n1, b2, n2)		\
-	do {					\
-		if (send(d, b1, n1, 0) == -1 ||	\
-		    send(d, b2, n2, 0) == -1)	\
-			FATAL("send");		\
-	} while (0)
+#define ISEND(d, m, ...)	send_valist(d, m, __VA_ARGS__)
+#define IRECV(d, m, ...)	recv_valist(d, m, __VA_ARGS__)
 
 #define GETENV(s, e)							\
 	do {								\
@@ -268,25 +264,22 @@
 		SIMPLEQ_INIT(&(c)->addrq);	\
 	} while (0)
 
-union addrvalue {
-	struct in_addr	 ipv4;
-	struct in6_addr	 ipv6;
-};
-enum addrtype { ADDR_IPV4 = 1, ADDR_IPV6 };
-
 struct caddr {
-	union addrvalue	 value;
-	enum addrtype	 type;
+	struct pfr_addr	 pfaddr;
 	char		 str[INET6_ADDRSTRLEN];
 
 	SIMPLEQ_ENTRY(caddr) caddrs;
 };
 SIMPLEQ_HEAD(caddrq, caddr);
 
+union inaddr {
+	struct in_addr	 ipv4;
+	struct in6_addr	 ipv6;
+};
 struct crange {
-	union addrvalue	 first;
-	union addrvalue	 last;
-	enum addrtype	 type;
+	union inaddr	 first;
+	union inaddr	 last;
+	uint8_t		 af;
 	char		 str[INET6_ADDRSTRLEN + 4];
 
 	SIMPLEQ_ENTRY(crange) cranges;
@@ -529,17 +522,19 @@ __dead void	 sockpipe(const char *, int);
 
 /* tinypfctl.c */
 __dead void	 tinypfctl(int, char **);
-void		 fork_tinypfctl(struct pfresult *, struct pfcmd *);
+void		 fork_tinypfctl(struct pfresult *, struct pfcmd *,
+		    struct pfr_addr *);
 
 /* util.c */
 void		 drop_priv(void);
 int		 send_fd(int, void *, size_t, int);
 int		 recv_fd(void *, size_t, int);
+void		 send_valist(int, int, ...);
+void		 recv_valist(int, int, ...);
 int		 parse_addr(struct caddr *, const char *);
 int		 addr_inrange(struct crange *, struct caddr *);
 int		 addrs_cmp(struct caddr *, struct caddr *);
-int		 addrvals_cmp(union addrvalue *, union addrvalue *,
-		    enum addrtype);
+int		 addrvals_cmp(union inaddr *, union inaddr *, uint8_t);
 int		 cranges_eq(struct crange *, struct crange *);
 char		*shift(char *, char *, size_t);
 char		*replace(char *, const char *, const char);
