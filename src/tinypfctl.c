@@ -21,9 +21,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <net/if.h>
-#include <net/pfvar.h>
-
 #include <sys/ioctl.h>
 
 #include "log.h"
@@ -250,9 +247,8 @@ tinypfctl(int argc, char *argv[])
 {
 	int		 debug, verbose, ctrlfd, pffd;
 	struct pfcmd	 cmd;
-	size_t		 c;
+	size_t		 pfaddrlen;
 	struct pfr_addr	*pfaddr;
-	struct caddr	 addr;
 	struct pfresult	 pfres;
 
 	ETOI(debug, ENV_DEBUG);
@@ -269,25 +265,10 @@ tinypfctl(int argc, char *argv[])
 
 	DPRINTF("received cmdid:%d, tblname:'%s', flags:%u, addrcnt:%zu",
 	    cmd.id, cmd.tblname, cmd.flags, cmd.addrcnt);
+	pfaddrlen = cmd.addrcnt * sizeof(*pfaddr);
+	MALLOC(pfaddr, pfaddrlen); /* overflow check passed */
 	/* wait for client addresses */
-	CALLOC(pfaddr, cmd.addrcnt, sizeof(*pfaddr));
-	for (c = 0; c < cmd.addrcnt; c++) {
-		RECV(ctrlfd, &addr, sizeof(addr));
-		switch (addr.type) {
-		case ADDR_IPV4:
-			pfaddr[c].pfra_af = AF_INET;
-			pfaddr[c].pfra_ip4addr = addr.value.ipv4;
-			pfaddr[c].pfra_net = 32;
-			break;
-		case ADDR_IPV6:
-			pfaddr[c].pfra_af = AF_INET6;
-			pfaddr[c].pfra_ip6addr = addr.value.ipv6;
-			pfaddr[c].pfra_net = 128;
-			break;
-		default:
-			FATALX("invalid address type (%d)", addr.type);
-		}
-	}
+	RECV(ctrlfd, pfaddr, pfaddrlen);
 
 	memset(&pfres, 0, sizeof(pfres));
 
@@ -329,14 +310,14 @@ tinypfctl(int argc, char *argv[])
 }
 
 void
-fork_tinypfctl(struct pfresult *pfres, struct pfcmd *cmd)
+fork_tinypfctl(struct pfresult *pfres, struct pfcmd *cmd,
+    struct pfr_addr *pfaddr)
 {
 	extern const struct procfunc	 process[];
 	extern char			*__progname;
 
-	int		 ctrlfd[2], pid;
-	char		*argv[7];
-	struct caddr	*ca;
+	int	 ctrlfd[2], pid;
+	char	*argv[7];
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, ctrlfd) == -1)
 		FATAL("socketpair");
@@ -361,15 +342,12 @@ fork_tinypfctl(struct pfresult *pfres, struct pfcmd *cmd)
 	}
 	/* parent */
 	close(ctrlfd[1]);
+	free(cmd->tblname);
 
-	while ((ca = SIMPLEQ_FIRST(&cmd->addrq)) != NULL) {
-		SEND(ctrlfd[0], ca, sizeof(*ca));
-		SIMPLEQ_REMOVE_HEAD(&cmd->addrq, caddrs);
-		free(ca);
-	}
+	SEND(ctrlfd[0], pfaddr, cmd->addrcnt * sizeof(*pfaddr));
+	free(pfaddr);
 	/* wait for reply */
 	RECV(ctrlfd[0], pfres, sizeof(*pfres));
-	free(cmd->tblname);
 	DPRINTF("received pfresult (nadd:%d, ndel:%d, nkill:%d, snkill:%d)",
 	    pfres->nadd, pfres->ndel, pfres->nkill, pfres->snkill);
 

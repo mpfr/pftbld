@@ -139,9 +139,8 @@ save(struct target *tgt)
 		return (-1);
 
 	mt = MSG_HANDLE_PERSIST;
-	SEND(privfd, &mt, sizeof(mt));
 	len = strlen(file) + 1;
-	SEND2(privfd, &len, sizeof(len), file, len);
+	ISEND(privfd, 3, &mt, sizeof(mt), &len, sizeof(len), file, len);
 	/* wait for reply */
 	RECV(privfd, &mt, sizeof(mt));
 	if (mt != MSG_ACK)

@@ -25,8 +25,6 @@
 
 #include <arpa/inet.h>
 
-#include <net/if.h>
-
 #include "log.h"
 #include "pftbld.h"
 
@@ -129,6 +127,58 @@ recv_fd(void *data, size_t maxlen, int cfd)
 	FATALX("no file descriptor");
 }
 
+#define MSGIOV_FROM_VALIST(msg, iov, n, len)				\
+	do {								\
+		va_list	 _ap;						\
+		int	 _i;						\
+		size_t	 _len;						\
+		memset(msg, 0, sizeof(*(msg)));				\
+		va_start(_ap, n);					\
+		for (_i = 0; _i < n; _i++) {				\
+			(iov)[_i].iov_base = va_arg(_ap, void *);	\
+			_len = va_arg(_ap, size_t);			\
+			(iov)[_i].iov_len = _len;			\
+			*(len) += _len;					\
+		}							\
+		va_end(_ap);						\
+		(msg)->msg_iov = iov;					\
+		(msg)->msg_iovlen = n;					\
+	} while (0)
+
+void
+send_valist(int fd, int n, ...)
+{
+	struct msghdr	 msg;
+	struct iovec	 iov[n];
+	size_t		 len = 0;
+	ssize_t		 ns;
+
+	MSGIOV_FROM_VALIST(&msg, iov, n, &len);
+	if ((ns = sendmsg(fd, &msg, 0)) == -1)
+		FATAL("sendmsg");
+	if (ns == 0)
+		FATALX("connection closed during sendmsg");
+	if (len - ns != 0)
+		FATALX("sendmsg buffer too small");
+}
+
+void
+recv_valist(int fd, int n, ...)
+{
+	struct msghdr	 msg;
+	struct iovec	 iov[n];
+	size_t		 len = 0;
+	ssize_t		 nr;
+
+	MSGIOV_FROM_VALIST(&msg, iov, n, &len);
+	if ((nr = recvmsg(fd, &msg, MSG_WAITALL)) == -1)
+		FATAL("recvmsg");
+	if (nr == 0)
+		FATALX("connection closed during recvmsg");
+	if (len - nr != 0)
+		FATALX("recvmsg buffer too small");
+}
+
 struct crange *
 parse_crange(const char *str)
 {
@@ -146,7 +196,7 @@ parse_crange(const char *str)
 		if (inet_net_ntop(AF_INET, &r->first.ipv4, bits, r->str,
 		    sizeof(r->str)) == NULL)
 			FATAL("inet_net_ntop");
-		r->type = ADDR_IPV4;
+		r->af = AF_INET;
 		first = (unsigned char *)&r->first.ipv4.s_addr;
 		last = (unsigned char *)&r->last.ipv4.s_addr;
 		nbyte = sizeof(struct in_addr);
@@ -155,7 +205,7 @@ parse_crange(const char *str)
 		if (inet_net_ntop(AF_INET6, &r->first.ipv6, bits, r->str,
 		    sizeof(r->str)) == NULL)
 			FATAL("inet_net_ntop");
-		r->type = ADDR_IPV6;
+		r->af = AF_INET6;
 		first = (unsigned char *)&r->first.ipv6.s6_addr;
 		last = (unsigned char *)&r->last.ipv6.s6_addr;
 		nbyte = sizeof(struct in6_addr);
@@ -174,7 +224,7 @@ parse_crange(const char *str)
 		}
 	}
 #if DEBUG
-	if (r->type == ADDR_IPV4)
+	if (r->af == AF_INET)
 		DPRINTF("\"%s\" bits:%d range:%08X...%08X", r->str, bits,
 		    be32toh(r->first.ipv4.s_addr),
 		    be32toh(r->last.ipv4.s_addr));
@@ -193,15 +243,17 @@ int
 parse_addr(struct caddr *addr, const char *str)
 {
 	/* addr must be zeroed */
-	if (inet_pton(AF_INET, str, &addr->value.ipv4) == 1 &&
-	    inet_ntop(AF_INET, &addr->value.ipv4, addr->str,
-	    sizeof(addr->str)) != NULL)
-		addr->type = ADDR_IPV4;
-	else if (inet_pton(AF_INET6, str, &addr->value.ipv6) == 1 &&
-	    inet_ntop(AF_INET6, &addr->value.ipv6, addr->str,
-	    sizeof(addr->str)) != NULL)
-		addr->type = ADDR_IPV6;
-	else {
+	if (inet_pton(AF_INET, str, &addr->pfaddr.pfra_ip4addr) == 1 &&
+	    inet_ntop(AF_INET, &addr->pfaddr.pfra_ip4addr, addr->str,
+	    sizeof(addr->str)) != NULL) {
+		addr->pfaddr.pfra_af = AF_INET;
+		addr->pfaddr.pfra_net = 32;
+	} else if (inet_pton(AF_INET6, str, &addr->pfaddr.pfra_ip6addr) == 1 &&
+	    inet_ntop(AF_INET6, &addr->pfaddr.pfra_ip6addr, addr->str,
+	    sizeof(addr->str)) != NULL) {
+		addr->pfaddr.pfra_af = AF_INET6;
+		addr->pfaddr.pfra_net = 128;
+	} else {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -211,30 +263,40 @@ parse_addr(struct caddr *addr, const char *str)
 int
 addr_inrange(struct crange *cr, struct caddr *addr)
 {
+	union inaddr	*iaddr;
+
 	if (cr == NULL || addr == NULL)
 		return (0);
 
-	return (addr->type == cr->type &&
-	    addrvals_cmp(&addr->value, &cr->first, cr->type) >= 0 &&
-	    addrvals_cmp(&addr->value, &cr->last, cr->type) <= 0);
+	iaddr = (union inaddr *)&addr->pfaddr.pfra_u;
+
+	return (addr->pfaddr.pfra_af == cr->af &&
+	    addrvals_cmp(iaddr, &cr->first, cr->af) >= 0 &&
+	    addrvals_cmp(iaddr, &cr->last, cr->af) <= 0);
 }
 
 int
 addrs_cmp(struct caddr *a1, struct caddr *a2)
 {
-	if (a1->type != a2->type)
+	uint8_t	 af1 = a1->pfaddr.pfra_af, af2 = a2->pfaddr.pfra_af;
+
+	if (af1 < af2)
+		return (-1);
+
+	if(af1 > af2)
 		return (1);
 
-	return (addrvals_cmp(&a1->value, &a2->value, a1->type));
+	return (addrvals_cmp((union inaddr *)&a1->pfaddr.pfra_u,
+	    (union inaddr *)&a2->pfaddr.pfra_u, af1));
 }
 
 int
-addrvals_cmp(union addrvalue *a1, union addrvalue *a2, enum addrtype t)
+addrvals_cmp(union inaddr *a1, union inaddr *a2, uint8_t af)
 {
-	if (t == ADDR_IPV4)
+	if (af == AF_INET)
 		return (memcmp(&a1->ipv4, &a2->ipv4, sizeof(struct in_addr)));
 
-	if (t == ADDR_IPV6)
+	if (af == AF_INET6)
 		return (memcmp(&a1->ipv6, &a2->ipv6, sizeof(struct in6_addr)));
 
 	return (a1 != a2);
@@ -243,11 +305,11 @@ addrvals_cmp(union addrvalue *a1, union addrvalue *a2, enum addrtype t)
 int
 cranges_eq(struct crange *r1, struct crange *r2)
 {
-	if (r1->type != r2->type)
+	if (r1->af != r2->af)
 		return (0);
 
-	return (addrvals_cmp(&r1->first, &r2->first, r1->type) == 0 &&
-	    addrvals_cmp(&r1->last, &r2->last, r1->type) == 0);
+	return (addrvals_cmp(&r1->first, &r2->first, r1->af) == 0 &&
+	    addrvals_cmp(&r1->last, &r2->last, r1->af) == 0);
 }
 
 char *

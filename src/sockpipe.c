@@ -21,12 +21,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <net/if.h>
-
 #include "pftbld.h"
 
 #define ERR(m)	err(1, "%s failed", m)
-#define ERRX(m)	errx(1, "%s failed", m)
 
 __dead void
 sockpipe(const char *path, int verbose)
@@ -54,33 +51,32 @@ sockpipe(const char *path, int verbose)
 		ERR("connect");
 
 	do {
-		while ((nr = read(STDIN_FILENO, buf, sizeof(buf))) == -1)
-			ERRX("stdin read");
+		if ((nr = read(STDIN_FILENO, buf, sizeof(buf))) == -1)
+			ERR("stdin read");
 		nw = 0;
 		while (nw < nr) {
-			while ((n = send(fd, &buf[nw], nr - nw, 0)) == -1)
-				ERRX("socket write");
+			if ((n = send(fd, &buf[nw], nr - nw, 0)) == -1)
+				ERR("socket write");
 			if (n == 0)
 				break;
 			nw += n;
 		}
 	} while (nr > 0);
 
-	if (nw < 1 || buf[--nw] != '\0')
-		while (send(fd, "", 1, 0) == -1)
-			ERRX("socket write");
+	if ((nw < 1 || buf[--nw] != '\0') && send(fd, "", 1, 0) == -1)
+		ERR("socket write");
 
 	if (!verbose)
 		exit(0);
 
 	do {
-		while ((nr = recv(fd, buf, sizeof(buf), 0)) == -1)
-			ERRX("socket read");
+		if ((nr = recv(fd, buf, sizeof(buf), 0)) == -1)
+			ERR("socket read");
 		nw = 0;
 		while (nw < nr) {
-			while ((n = write(STDOUT_FILENO, &buf[nw],
+			if ((n = write(STDOUT_FILENO, &buf[nw],
 			    nr - nw)) == -1)
-				ERRX("stdout write");
+				ERR("stdout write");
 			if (n == 0)
 				break;
 			nw += n;
