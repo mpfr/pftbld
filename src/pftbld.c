@@ -25,8 +25,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <net/if.h>
-
 #include "log.h"
 #include "pftbld.h"
 
@@ -135,18 +133,23 @@ handle_privreq(struct kevent *kev)
 void
 pfexec(struct pfresult *pfres, struct pfcmd *cmd)
 {
-	enum msgtype	 mt;
-	size_t		 len;
+	struct pfr_addr	*pfaddr;
+	int		 i = 0;
 	struct caddr	*ca;
+	enum msgtype	 mt;
+	size_t		 tns;
 
-	mt = MSG_EXEC_PFCMD;
-	SEND2(privfd, &mt, sizeof(mt), cmd, sizeof(*cmd));
-	len = strlen(cmd->tblname) + 1;
-	SEND2(privfd, &len, sizeof(len), cmd->tblname, len);
+	CALLOC(pfaddr, cmd->addrcnt, sizeof(*pfaddr));
 	while ((ca = STAILQ_FIRST(&cmd->addrq)) != NULL) {
-		SEND(privfd, ca, sizeof(*ca));
 		STAILQ_REMOVE_HEAD(&cmd->addrq, caddrs);
+		pfaddr[i++] = ca->pfaddr;
 	}
+	mt = MSG_EXEC_PFCMD;
+	tns = strlen(cmd->tblname) + 1;
+	ISEND(privfd, 4, &mt, sizeof(mt), cmd, sizeof(*cmd), &tns, sizeof(tns),
+	    cmd->tblname, tns);
+	SEND(privfd, pfaddr, cmd->addrcnt * sizeof(*pfaddr));
+	free(pfaddr);
 	/* wait for reply */
 	RECV(privfd, pfres, sizeof(*pfres));
 }
@@ -320,19 +323,16 @@ exec_pfcmd(int pfd)
 {
 	struct pfresult	 pfres;
 	struct pfcmd	 cmd;
-	size_t		 c;
-	struct caddr	*ca;
+	size_t		 tnamelen, pfaddrlen;
+	struct pfr_addr	*pfaddr;
 
-	RECV2(pfd, &cmd, sizeof(cmd), &c, sizeof(c));
-	MALLOC(cmd.tblname, c);
-	RECV(pfd, cmd.tblname, c);
-	STAILQ_INIT(&cmd.addrq);
-	for (c = 0; c < cmd.addrcnt; c++) {
-		MALLOC(ca, sizeof(*ca));
-		RECV(pfd, ca, sizeof(*ca));
-		STAILQ_INSERT_TAIL(&cmd.addrq, ca, caddrs);
-	}
-	fork_tinypfctl(&pfres, &cmd);
+	IRECV(pfd, 2, &cmd, sizeof(cmd), &tnamelen, sizeof(tnamelen));
+	MALLOC(cmd.tblname, tnamelen);
+	RECV(pfd, cmd.tblname, tnamelen);
+	pfaddrlen = cmd.addrcnt * sizeof(*pfaddr);
+	MALLOC(pfaddr, pfaddrlen); /* overflow check passed */
+	RECV(pfd, pfaddr, pfaddrlen);
+	fork_tinypfctl(&pfres, &cmd, pfaddr);
 	/* wait for reply */
 	SEND(pfd, &pfres, sizeof(pfres));
 }
@@ -420,7 +420,7 @@ send_verbose(int ctrlfd)
 	enum msgtype	 mt = MSG_SET_VERBOSE;
 	int		 v = log_getverbose();
 
-	SEND2(ctrlfd, &mt, sizeof(mt), &v, sizeof(v));
+	ISEND(ctrlfd, 2, &mt, sizeof(mt), &v, sizeof(v));
 	/* wait for reply */
 	RECV(ctrlfd, &mt, sizeof(mt));
 	if (mt != MSG_ACK)
@@ -495,7 +495,7 @@ send_conf(int fd)
 		NANONAP;
 
 	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
-		SEND2(fd, &inext, sizeof(inext), tgt, sizeof(*tgt));
+		ISEND(fd, 2, &inext, sizeof(inext), tgt, sizeof(*tgt));
 
 		STAILQ_FOREACH(sock, &tgt->datasocks, sockets) {
 			SEND(fd, &inext, sizeof(inext));
@@ -506,30 +506,30 @@ send_conf(int fd)
 		SEND(fd, &iend, sizeof(iend));
 
 		STAILQ_FOREACH(cr, &tgt->exclcranges, cranges)
-			SEND2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
+			ISEND(fd, 2, &inext, sizeof(inext), cr, sizeof(*cr));
 		SEND(fd, &iend, sizeof(iend));
 
 		STAILQ_FOREACH(kt, &tgt->exclkeyterms, ptrs) {
-			SEND2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
 			n = strlen(kt->p) + 1;
-			SEND2(fd, &n, sizeof(n), kt->p, n);
+			ISEND(fd, 4, &inext, sizeof(inext), kt, sizeof(*kt),
+			    &n, sizeof(n), kt->p, n);
 		}
 		SEND(fd, &iend, sizeof(iend));
 
 		STAILQ_FOREACH(tab, &tgt->cascade, tables)
-			SEND2(fd, &inext, sizeof(inext), tab, sizeof(*tab));
+			ISEND(fd, 2, &inext, sizeof(inext), tab, sizeof(*tab));
 		SEND(fd, &iend, sizeof(iend));
 	}
 	SEND(fd, &iend, sizeof(iend));
 
 	STAILQ_FOREACH(cr, &conf->exclcranges, cranges)
-		SEND2(fd, &inext, sizeof(inext), cr, sizeof(*cr));
+		ISEND(fd, 2, &inext, sizeof(inext), cr, sizeof(*cr));
 	SEND(fd, &iend, sizeof(iend));
 
 	STAILQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
-		SEND2(fd, &inext, sizeof(inext), kt, sizeof(*kt));
 		n = strlen(kt->p) + 1;
-		SEND2(fd, &n, sizeof(n), kt->p, n);
+		ISEND(fd, 4, &inext, sizeof(inext), kt, sizeof(*kt), &n,
+		    sizeof(n), kt->p, n);
 	}
 	SEND(fd, &iend, sizeof(iend));
 

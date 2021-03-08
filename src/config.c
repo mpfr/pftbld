@@ -297,7 +297,6 @@ check_targets(void)
 	char		*buf, *buf2;
 	struct target	*tgt;
 
-	SEND(sched_cfd, &mt, sizeof(mt));
 	CALLOC(buf, 1, 1);
 	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		buf2 = buf;
@@ -306,10 +305,10 @@ check_targets(void)
 		free(buf2);
 	}
 	len = strlen(buf) + 1;
-	SEND2(sched_cfd, &len, sizeof(len), buf, len);
+	ISEND(sched_cfd, 3, &mt, sizeof(mt), &len, sizeof(len), buf, len);
 	free(buf);
 	/* wait for reply */
-	RECV2(sched_cfd, &n, sizeof(n), &mt, sizeof(mt));
+	IRECV(sched_cfd, 2, &n, sizeof(n), &mt, sizeof(mt));
 	if (mt != MSG_ACK)
 		FATALX("invalid message type (%d)", mt);
 	if (n > 0)

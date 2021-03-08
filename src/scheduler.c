@@ -21,8 +21,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <net/if.h>
-
 #include "log.h"
 #include "pftbld.h"
 
@@ -519,7 +517,7 @@ recv_conf(void)
 			CHECK_NEXTITEM;
 
 			MALLOC(kt, sizeof(*kt));
-			RECV2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
+			IRECV(sched_cfd, 2, kt, sizeof(*kt), &n, sizeof(n));
 			MALLOC(kt->p, n);
 			RECV(sched_cfd, kt->p, n);
 			STAILQ_INSERT_TAIL(&tgt->exclkeyterms, kt, ptrs);
@@ -552,7 +550,7 @@ recv_conf(void)
 		CHECK_NEXTITEM;
 
 		MALLOC(kt, sizeof(*kt));
-		RECV2(sched_cfd, kt, sizeof(*kt), &n, sizeof(n));
+		IRECV(sched_cfd, 2, kt, sizeof(*kt), &n, sizeof(n));
 		MALLOC(kt->p, n);
 		RECV(sched_cfd, kt->p, n);
 		STAILQ_INSERT_TAIL(&nc->exclkeyterms, kt, ptrs);
