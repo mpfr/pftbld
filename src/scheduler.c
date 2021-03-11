@@ -175,11 +175,8 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 	struct kevent	 kev;
 	struct timespec	 ts;
 
-	PFCMD_INIT(&cmd, PFCMD_DELETE, NULL, 0);
 	cmd.addrcnt = 1;
-
 	cnt = 0;
-
 	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
@@ -201,7 +198,7 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 			first = NULL;
 		}
 
-		cmd.tblname = clt->tbl->name;
+		PFCMD_INIT(&cmd, PFCMD_DELETE, clt->tbl->name, 0);
 		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
 		pfexec(&pfres, &cmd);
 
@@ -210,7 +207,7 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 		GET_TIME(&ts);
 		timespecsub(&ts, &clt->ts, &ts);
 		age = hrage(&ts);
-		if (pfres.ndel > 0)
+		if (pfres.ndel)
 			print_ts_log(">>> Deleted [%s]:[%s]:(%ux:%s) from "
 			    "{ %s } and dropped.\n", clt->addr.str,
 			    clt->tgt->name, clt->hits, age, clt->tbl->name);
@@ -298,12 +295,10 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 	struct kevent	 kev;
 	struct timespec	 ts;
 
-	PFCMD_INIT(&cmd, PFCMD_DELETE, NULL, 0);
-	cmd.addrcnt = 1;
-
 	TAILQ_INIT(&dcq);
-	cnt = 0;
 
+	cmd.addrcnt = 1;
+	cnt = 0;
 	first = evtimer_client();
 
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
@@ -327,7 +322,7 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 			first = NULL;
 		}
 
-		cmd.tblname = clt->tbl->name;
+		PFCMD_INIT(&cmd, PFCMD_DELETE, clt->tbl->name, 0);
 		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
 		pfexec(&pfres, &cmd);
 
@@ -337,7 +332,7 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 		else
 			timespecadd(&ts, &clt->tgt->drop, &clt->to);
 		clt->exp = 1;
-		if (pfres.ndel > 0) {
+		if (pfres.ndel) {
 			timespecsub(&ts, &clt->ts, &ts);
 			age = hrage(&ts);
 			print_ts_log(">>> Deleted [%s]:[%s]:(%ux:%s) from "
@@ -482,7 +477,7 @@ recv_conf(void)
 
 	STAILQ_INIT(&nc->ctargets);
 
-	while (1) {
+	for (;;) {
 		CHECK_NEXTITEM;
 
 		MALLOC(tgt, sizeof(*tgt));
@@ -491,7 +486,7 @@ recv_conf(void)
 
 		STAILQ_INIT(&tgt->datasocks);
 
-		while (1) {
+		for (;;) {
 			CHECK_NEXTITEM;
 
 			MALLOC(sock, sizeof(*sock));
@@ -503,7 +498,7 @@ recv_conf(void)
 
 		STAILQ_INIT(&tgt->exclcranges);
 
-		while (1) {
+		for (;;) {
 			CHECK_NEXTITEM;
 
 			MALLOC(cr, sizeof(*cr));
@@ -513,7 +508,7 @@ recv_conf(void)
 
 		STAILQ_INIT(&tgt->exclkeyterms);
 
-		while (1) {
+		for (;;) {
 			CHECK_NEXTITEM;
 
 			MALLOC(kt, sizeof(*kt));
@@ -525,7 +520,7 @@ recv_conf(void)
 
 		STAILQ_INIT(&tgt->cascade);
 
-		while (1) {
+		for (;;) {
 			CHECK_NEXTITEM;
 
 			MALLOC(tbl, sizeof(*tbl));
@@ -536,7 +531,7 @@ recv_conf(void)
 
 	STAILQ_INIT(&nc->exclcranges);
 
-	while (1) {
+	for (;;) {
 		CHECK_NEXTITEM;
 
 		MALLOC(cr, sizeof(*cr));
@@ -546,7 +541,7 @@ recv_conf(void)
 
 	STAILQ_INIT(&nc->exclkeyterms);
 
-	while (1) {
+	for (;;) {
 		CHECK_NEXTITEM;
 
 		MALLOC(kt, sizeof(*kt));
@@ -781,15 +776,15 @@ handle_expire(struct kevent *kev)
 	timespecsub(&ts, &clt->ts, &ts);
 	age = hrage(&ts);
 	print_ts_log("%s [%s]:[%s]:(%ux:%s)",
-	    exp ? pfres.ndel > 0 ? ">>> Deleted" : "Hmm..." : "Dropped",
+	    exp ? pfres.ndel ? ">>> Deleted" : "Hmm..." : "Dropped",
 	    clt->addr.str, clt->tgt->name, clt->hits, age);
 	free(age);
 
 	if (exp) {
 		print_log(" %s { %s }",
-		    pfres.ndel > 0 ? "from" : "not found in", tbl->name);
+		    pfres.ndel ? "from" : "not found in", tbl->name);
 		if (drop)
-			print_log(pfres.ndel > 0 ?
+			print_log(pfres.ndel ?
 			    " and dropped" : " but dropped anyway");
 	}
 	print_log(".\n");
@@ -1076,16 +1071,17 @@ apply_pfcmds(struct pfcmdq *cmdq)
 			pfexec(&pfres, cmd);
 			switch (cmd->id) {
 			case PFCMD_ADD:
-				if (pfres.nadd > 0)
-					print_ts_log(">>> Added %d address%s"
+				if (pfres.nadd)
+					print_ts_log(">>> Added %lu address%s"
 					    " to { %s }.\n", pfres.nadd,
 					    pfres.nadd != 1 ? "es" : "",
 					    cmd->tblname);
 				break;
 			case PFCMD_DELETE:
-				if (pfres.ndel > 0)
-					print_ts_log(">>> Deleted %d address%s"
-					    " from { %s }.\n", pfres.ndel,
+				if (pfres.ndel)
+					print_ts_log(">>> Deleted %lu "
+					    "address%s from { %s }.\n",
+					    pfres.ndel,
 					    pfres.ndel != 1 ? "es" : "",
 					    cmd->tblname);
 				break;

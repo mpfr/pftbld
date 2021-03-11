@@ -127,56 +127,67 @@ recv_fd(void *data, size_t maxlen, int cfd)
 	FATALX("no file descriptor");
 }
 
-#define MSGIOV_FROM_VALIST(msg, iov, n, len)				\
+#define BASIC_SEQ_IO(a, d, b, n, m)					\
 	do {								\
-		va_list	 _ap;						\
-		int	 _i;						\
-		size_t	 _len;						\
-		memset(msg, 0, sizeof(*(msg)));				\
+		ssize_t	 _c;						\
+		size_t	 _n = 0;					\
+		while (n - _n > 0) {					\
+			if ((_c = a(d, (void *)(&((char *)(b))[_n]),	\
+			    n - _n, 0)) == -1)				\
+				FATAL(m);				\
+			if (_c == 0)					\
+				FATALX("connection closed during "m);	\
+			_n += _c;					\
+		}							\
+	} while (0)
+
+void
+send_data(int fd, void *data, size_t size)
+{
+	BASIC_SEQ_IO(send, fd, data, size, "send");
+}
+
+void
+recv_data(int fd, void *data, size_t size)
+{
+	BASIC_SEQ_IO(recv, fd, data, size, "recv");
+}
+
+#define VALIST_IOV_IO(a, d, n, f, m)					\
+	do {								\
+		struct msghdr	 _msg;					\
+		va_list		 _ap;					\
+		int		 _i;					\
+		struct iovec	 _iov[n];				\
+		size_t		 _len = 0;				\
+		ssize_t		 _c;					\
+		memset(&_msg, 0, sizeof(_msg));				\
 		va_start(_ap, n);					\
 		for (_i = 0; _i < n; _i++) {				\
-			(iov)[_i].iov_base = va_arg(_ap, void *);	\
-			_len = va_arg(_ap, size_t);			\
-			(iov)[_i].iov_len = _len;			\
-			*(len) += _len;					\
+			_iov[_i].iov_base = va_arg(_ap, void *);	\
+			_len += (_iov[_i].iov_len = va_arg(_ap, size_t)); \
 		}							\
 		va_end(_ap);						\
-		(msg)->msg_iov = iov;					\
-		(msg)->msg_iovlen = n;					\
+		_msg.msg_iov = _iov;					\
+		_msg.msg_iovlen = n;					\
+		if ((_c = a(d, &_msg, f)) == -1)			\
+			FATAL(m);					\
+		if (_c == 0)						\
+			FATALX("connection closed during "m);		\
+		if (_len - _c != 0)					\
+			FATALX(m" buffer too small");			\
 	} while (0)
 
 void
 send_valist(int fd, int n, ...)
 {
-	struct msghdr	 msg;
-	struct iovec	 iov[n];
-	size_t		 len = 0;
-	ssize_t		 ns;
-
-	MSGIOV_FROM_VALIST(&msg, iov, n, &len);
-	if ((ns = sendmsg(fd, &msg, 0)) == -1)
-		FATAL("sendmsg");
-	if (ns == 0)
-		FATALX("connection closed during sendmsg");
-	if (len - ns != 0)
-		FATALX("sendmsg buffer too small");
+	VALIST_IOV_IO(sendmsg, fd, n, 0, "sendmsg");
 }
 
 void
 recv_valist(int fd, int n, ...)
 {
-	struct msghdr	 msg;
-	struct iovec	 iov[n];
-	size_t		 len = 0;
-	ssize_t		 nr;
-
-	MSGIOV_FROM_VALIST(&msg, iov, n, &len);
-	if ((nr = recvmsg(fd, &msg, MSG_WAITALL)) == -1)
-		FATAL("recvmsg");
-	if (nr == 0)
-		FATALX("connection closed during recvmsg");
-	if (len - nr != 0)
-		FATALX("recvmsg buffer too small");
+	VALIST_IOV_IO(recvmsg, fd, n, MSG_WAITALL, "recvmsg");
 }
 
 struct crange *

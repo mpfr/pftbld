@@ -247,9 +247,10 @@ tinypfctl(int argc, char *argv[])
 {
 	int		 debug, verbose, ctrlfd, pffd;
 	struct pfcmd	 cmd;
-	size_t		 pfaddrlen;
+	size_t		 pfacnt, pfalen;
 	struct pfr_addr	*pfaddr;
 	struct pfresult	 pfres;
+	int		 r;
 
 	ETOI(debug, ENV_DEBUG);
 	ETOI(verbose, ENV_VERBOSE);
@@ -259,47 +260,59 @@ tinypfctl(int argc, char *argv[])
 	ETOI(ctrlfd, ENV_CTRLFD);
 
 	STOI(cmd.id, argv[2]);
-	cmd.tblname = argv[3];
+	(void)strlcpy(cmd.tblname, argv[3], sizeof(cmd.tblname));
 	STOI(cmd.flags, argv[4]);
 	STOLL(cmd.addrcnt, argv[5]);
 
-	DPRINTF("received cmdid:%d, tblname:'%s', flags:%u, addrcnt:%zu",
+	DPRINTF("received cmdid:%d, tblname:'%s', flags:%u, addrcnt:%lu",
 	    cmd.id, cmd.tblname, cmd.flags, cmd.addrcnt);
-	pfaddrlen = cmd.addrcnt * sizeof(*pfaddr);
-	MALLOC(pfaddr, pfaddrlen); /* overflow check passed */
-	/* wait for client addresses */
-	RECV(ctrlfd, pfaddr, pfaddrlen);
+
+	pfacnt = PFADDR_CNT(cmd.addrcnt);
+	pfalen = PFADDR_LEN(pfacnt);
+	MALLOC(pfaddr, pfalen); /* overflow checked */
 
 	memset(&pfres, 0, sizeof(pfres));
 
 	if ((pffd = open(PF_DEVICE, O_RDWR)) == -1)
 		FATAL("open");
 
-	switch (cmd.id) {
-	case PFCMD_ADD:
-		if ((pfres.nadd = pf_add_addresses(pffd, cmd.tblname, pfaddr,
-		    cmd.addrcnt)) == -1)
-			FATAL("pf_add_addresses");
-		if (cmd.addrcnt > 1 && cmd.flags)
-			FATALX("kill option on address array");
-		if (cmd.flags & FLAG_TABLE_KILL_STATES) {
-			DPRINTF("received kill states flag");
-			if ((pfres.nkill = pf_kill_states(pffd, pfaddr)) == -1)
-				FATAL("pf_kill_states");
+	for (;;) {
+		/* wait for client addresses */
+		RECV(ctrlfd, pfaddr, pfalen);
+		switch (cmd.id) {
+		case PFCMD_ADD:
+			if ((r = pf_add_addresses(pffd, cmd.tblname, pfaddr,
+			    pfacnt)) == -1)
+				FATAL("pf_add_addresses");
+			pfres.nadd += r;
+			if (pfacnt > 1 && cmd.flags)
+				FATALX("kill option on address array");
+			if (cmd.flags & FLAG_TABLE_KILL_STATES) {
+				DPRINTF("received kill states flag");
+				if ((r = pf_kill_states(pffd, pfaddr)) == -1)
+					FATAL("pf_kill_states");
+				pfres.nkill += r;
+			}
+			if (cmd.flags & FLAG_TABLE_KILL_NODES) {
+				DPRINTF("received kill nodes flag");
+				if ((r = pf_kill_nodes(pffd, pfaddr)) == -1)
+					FATAL("pf_kill_nodes");
+				pfres.snkill += r;
+			}
+			break;
+		case PFCMD_DELETE:
+			if ((r = pf_delete_addresses(pffd, cmd.tblname, pfaddr,
+			    pfacnt)) == -1)
+				FATAL("pf_delete_addresses");
+			pfres.ndel += r;
+			break;
+		default:
+			FATALX("invalid command id (%d)", cmd.id);
 		}
-		if (cmd.flags & FLAG_TABLE_KILL_NODES) {
-			DPRINTF("received kill nodes flag");
-			if ((pfres.snkill = pf_kill_nodes(pffd, pfaddr)) == -1)
-				FATAL("pf_kill_nodes");
-		}
-		break;
-	case PFCMD_DELETE:
-		if ((pfres.ndel = pf_delete_addresses(pffd, cmd.tblname,
-		    pfaddr, cmd.addrcnt)) == -1)
-			FATAL("pf_delete_addresses");
-		break;
-	default:
-		FATALX("invalid command id (%d)", cmd.id);
+		if ((cmd.addrcnt -= pfacnt) == 0)
+			break;
+		pfacnt = PFADDR_CNT(cmd.addrcnt);
+		pfalen = PFADDR_LEN(pfacnt);
 	}
 
 	close(pffd);
@@ -309,9 +322,8 @@ tinypfctl(int argc, char *argv[])
 	exit(0);
 }
 
-void
-fork_tinypfctl(struct pfresult *pfres, struct pfcmd *cmd,
-    struct pfr_addr *pfaddr)
+int
+fork_tinypfctl(struct pfcmd *cmd)
 {
 	extern const struct procfunc	 process[];
 	extern char			*__progname;
@@ -325,31 +337,22 @@ fork_tinypfctl(struct pfresult *pfres, struct pfcmd *cmd,
 	if ((pid = fork()) == -1)
 		FATAL("fork");
 
-	if (pid == 0) { /* child */
-		close(ctrlfd[0]);
-		ITOE(ENV_CTRLFD, ctrlfd[1]);
-
-		argv[0] = process[PROC_TINYPFCTL].name;
-		argv[1] = __progname;
-		ITOS(argv[2], cmd->id);
-		argv[3] = cmd->tblname;
-		ITOS(argv[4], cmd->flags);
-		LLTOS(argv[5], (long long)cmd->addrcnt);
-		argv[6] = NULL;
-
-		execvp(__progname, argv);
-		FATAL("execvp");
+	if (pid != 0) { /* parent */
+		close(ctrlfd[1]);
+		return (ctrlfd[0]);
 	}
-	/* parent */
-	close(ctrlfd[1]);
-	free(cmd->tblname);
-
-	SEND(ctrlfd[0], pfaddr, cmd->addrcnt * sizeof(*pfaddr));
-	free(pfaddr);
-	/* wait for reply */
-	RECV(ctrlfd[0], pfres, sizeof(*pfres));
-	DPRINTF("received pfresult (nadd:%d, ndel:%d, nkill:%d, snkill:%d)",
-	    pfres->nadd, pfres->ndel, pfres->nkill, pfres->snkill);
-
+	/* child */
 	close(ctrlfd[0]);
+	ITOE(ENV_CTRLFD, ctrlfd[1]);
+
+	argv[0] = process[PROC_TINYPFCTL].name;
+	argv[1] = __progname;
+	ITOS(argv[2], cmd->id);
+	argv[3] = cmd->tblname;
+	ITOS(argv[4], cmd->flags);
+	LLTOS(argv[5], (long long)cmd->addrcnt);
+	argv[6] = NULL;
+
+	execvp(__progname, argv);
+	FATAL("execvp");
 }
