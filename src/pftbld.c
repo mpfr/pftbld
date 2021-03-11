@@ -133,25 +133,55 @@ handle_privreq(struct kevent *kev)
 void
 pfexec(struct pfresult *pfres, struct pfcmd *cmd)
 {
-	struct pfr_addr	*pfaddr;
-	int		 i = 0;
-	struct caddr	*ca;
 	enum msgtype	 mt;
-	size_t		 tns;
+	int		 tfd;
+	size_t		 iovcnt, i;
+	unsigned long	 cmdacnt;
+	struct msghdr	 msg;
+	struct iovec	*iov;
+	struct caddr	*ca;
+	ssize_t		 ns;
 
-	CALLOC(pfaddr, cmd->addrcnt, sizeof(*pfaddr));
-	while ((ca = SIMPLEQ_FIRST(&cmd->addrq)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&cmd->addrq, caddrs);
-		pfaddr[i++] = ca->pfaddr;
-	}
 	mt = MSG_EXEC_PFCMD;
-	tns = strlen(cmd->tblname) + 1;
-	ISEND(privfd, 4, &mt, sizeof(mt), cmd, sizeof(*cmd), &tns, sizeof(tns),
-	    cmd->tblname, tns);
-	SEND(privfd, pfaddr, cmd->addrcnt * sizeof(*pfaddr));
-	free(pfaddr);
+	ISEND(privfd, 2, &mt, sizeof(mt), cmd, sizeof(*cmd));
+	while ((tfd = recv_fd(&mt, sizeof(mt), privfd)) == -1)
+		NANONAP;
+	if (mt != MSG_ACK)
+		FATALX("invalid message type (%d)", mt);
+
+	cmdacnt = cmd->addrcnt;
+
+	memset(&msg, 0, sizeof(msg));
+	iovcnt = IOV_CNT(cmdacnt);
+	if ((iov = reallocarray(NULL, iovcnt, sizeof(*iov))) == NULL)
+		FATAL("reallocarray");
+	for (i = 0; i < iovcnt; i++)
+		iov[i].iov_len = sizeof(struct pfr_addr);
+	msg.msg_iov = iov;
+
+	for (;;) {
+		for (i = 0; i < iovcnt; i++) {
+			if ((ca = SIMPLEQ_FIRST(&cmd->addrq)) == NULL)
+				FATALX("wrong address count");
+			SIMPLEQ_REMOVE_HEAD(&cmd->addrq, caddrs);
+			iov[i].iov_base = &ca->pfaddr;
+		}
+		msg.msg_iovlen = iovcnt;
+		if ((ns = sendmsg(tfd, &msg, 0)) == -1)
+			FATAL("sendmsg");
+		if (iovcnt * sizeof(struct pfr_addr) - ns != 0)
+			FATALX("sendmsg buffer too small");
+		if ((cmdacnt -= iovcnt) == 0)
+			break;
+		iovcnt = IOV_CNT(cmdacnt);
+	}
+
+	free(iov);
 	/* wait for reply */
-	RECV(privfd, pfres, sizeof(*pfres));
+	RECV(tfd, pfres, sizeof(*pfres));
+	close(tfd);
+	DPRINTF("received pfresult(nadd:%lu, ndel:%lu, nkill:%lu, snkill:%lu)",
+	    pfres->nadd, pfres->ndel, pfres->nkill, pfres->snkill);
 }
 
 __dead void
@@ -321,20 +351,16 @@ pftbld(int argc, char *argv[])
 static void
 exec_pfcmd(int pfd)
 {
-	struct pfresult	 pfres;
 	struct pfcmd	 cmd;
-	size_t		 tnamelen, pfaddrlen;
-	struct pfr_addr	*pfaddr;
+	int		 tfd;
+	enum msgtype	 mt;
 
-	IRECV(pfd, 2, &cmd, sizeof(cmd), &tnamelen, sizeof(tnamelen));
-	MALLOC(cmd.tblname, tnamelen);
-	RECV(pfd, cmd.tblname, tnamelen);
-	pfaddrlen = cmd.addrcnt * sizeof(*pfaddr);
-	MALLOC(pfaddr, pfaddrlen); /* overflow check passed */
-	RECV(pfd, pfaddr, pfaddrlen);
-	fork_tinypfctl(&pfres, &cmd, pfaddr);
-	/* wait for reply */
-	SEND(pfd, &pfres, sizeof(pfres));
+	RECV(pfd, &cmd, sizeof(cmd));
+	tfd = fork_tinypfctl(&cmd);
+	mt = MSG_ACK;
+	while (send_fd(tfd, &mt, sizeof(mt), pfd) == -1)
+		NANONAP;
+	close(tfd);
 }
 
 static void

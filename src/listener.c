@@ -489,7 +489,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		cmd.addrcnt = 1;
 		pfexec(&pfres, &cmd);
 		print_ts_log("%s [%s]:[%s]:(%ux",
-		    pfres.nadd > 0 ? ">>> Added" : "Aquired", clt->addr.str,
+		    pfres.nadd ? ">>> Added" : "Aquired", clt->addr.str,
 		    tgtname, clthits);
 	} else
 		print_ts_log("Skipped (%u/%u", clthits, skip);
@@ -507,7 +507,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	clt->ts = now;
 
 	if (clthits > skip) {
-		print_log(") %s { %s }", pfres.nadd > 0 ? "to" : "from",
+		print_log(") %s { %s }", pfres.nadd ? "to" : "from",
 		    tbl->name);
 
 		clt->exp = 0;
@@ -520,16 +520,16 @@ proc_data(struct inbuf *ibuf, int kqfd)
 			free(age);
 		}
 
-		if (pfres.nkill > 0 || pfres.snkill > 0) {
+		if (pfres.nkill || pfres.snkill) {
 			print_log(" and killed ");
 
-			if (pfres.nkill > 0)
-				print_log("%u state%s", pfres.nkill,
+			if (pfres.nkill)
+				print_log("%lu state%s", pfres.nkill,
 				    pfres.nkill != 1 ? "s" : "");
 
-			if (pfres.snkill > 0)
-				print_log("%s%u node%s",
-				    pfres.nkill > 0 ? " plus " : "",
+			if (pfres.snkill)
+				print_log("%s%lu node%s",
+				    pfres.nkill ? " plus " : "",
 				    pfres.snkill, pfres.snkill != 1 ? "s" : "");
 		}
 	} else {

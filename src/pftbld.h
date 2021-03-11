@@ -73,6 +73,11 @@
 #define CONF_NO_DROP		TIMESPEC_INFINITE
 #define CONF_DROP_MAX		TIMESPEC_INFINITE.tv_sec
 
+#define IOV_CNT(c)	((c) < IOV_MAX ? (c) : IOV_MAX)
+#define PFADDR_MAX	(INT_MAX / sizeof(struct pfr_addr))
+#define PFADDR_CNT(c)	((c) < PFADDR_MAX ? (c) : PFADDR_MAX)
+#define PFADDR_LEN(c)	((c) * sizeof(struct pfr_addr))
+
 #define CANONICAL_PATH_SET_0(str, path, txt, err, exit, ferr)	\
 	do {							\
 		switch (check_path(path, str, sizeof(str))) {	\
@@ -128,21 +133,8 @@
 			FATAL("strdup");	\
 	} while (0)
 
-#define SOCKIO(a, d, b, n, m)						\
-	do {								\
-		ssize_t	 _c;						\
-		size_t	 _n = 0;					\
-		while (n - _n > 0) {					\
-			if ((_c = a(d, (void *)(&((char *)(b))[_n]),	\
-			    n - _n, 0)) == -1)				\
-				FATAL(m);				\
-			if (_c == 0)					\
-				FATALX("connection closed during "m);	\
-			_n += _c;					\
-		}							\
-	} while (0)
-#define SEND(d, b, n)		SOCKIO(send, d, b, n, "send")
-#define RECV(d, b, n)		SOCKIO(recv, d, b, n, "recv")
+#define SEND(d, b, n)		send_data(d, b, n)
+#define RECV(d, b, n)		recv_data(d, b, n)
 
 #define ISEND(d, m, ...)	send_valist(d, m, __VA_ARGS__)
 #define IRECV(d, m, ...)	recv_valist(d, m, __VA_ARGS__)
@@ -259,7 +251,8 @@
 #define PFCMD_INIT(c, i, t, f)			\
 	do {					\
 		(c)->id = i;			\
-		(c)->tblname = t;		\
+		(void)strlcpy((c)->tblname, t,	\
+		    sizeof((c)->tblname));	\
 		(c)->flags = f;			\
 		SIMPLEQ_INIT(&(c)->addrq);	\
 	} while (0)
@@ -394,19 +387,19 @@ struct config {
 };
 
 struct pfresult {
-	int	 nadd;
-	int	 ndel;
-	int	 nkill;
-	int	 snkill;
+	unsigned long	 nadd;
+	unsigned long	 ndel;
+	unsigned long	 nkill;
+	unsigned long	 snkill;
 };
 
 enum pfcmdid { PFCMD_ADD = 1, PFCMD_DELETE };
 
 struct pfcmd {
 	enum pfcmdid	 id;
-	char		*tblname;
+	char		 tblname[sizeof(((struct table *)0)->name)];
 	uint8_t		 flags;
-	size_t		 addrcnt;
+	unsigned long	 addrcnt;
 	struct caddrq	 addrq;
 
 	SIMPLEQ_ENTRY(pfcmd) pfcmds;
@@ -522,13 +515,14 @@ __dead void	 sockpipe(const char *, int);
 
 /* tinypfctl.c */
 __dead void	 tinypfctl(int, char **);
-void		 fork_tinypfctl(struct pfresult *, struct pfcmd *,
-		    struct pfr_addr *);
+int		 fork_tinypfctl(struct pfcmd *);
 
 /* util.c */
 void		 drop_priv(void);
 int		 send_fd(int, void *, size_t, int);
 int		 recv_fd(void *, size_t, int);
+void		 send_data(int, void *, size_t);
+void		 recv_data(int, void *, size_t);
 void		 send_valist(int, int, ...);
 void		 recv_valist(int, int, ...);
 int		 parse_addr(struct caddr *, const char *);
