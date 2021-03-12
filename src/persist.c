@@ -56,11 +56,10 @@ load(struct target *tgt)
 			continue;
 
 		CALLOC(clt, 1, sizeof(*clt));
-		clt->tgt = tgt;
 
 		arg = replace(line, " \n", '\0');
 		if (parse_addr(&clt->addr, arg) == -1) {
-			log_warn("ignored %s line %d: invalid address '%s'",
+			log_warnx("ignored %s line %d: address '%s' invalid",
 			    file, cnt + 1, arg);
 			free(clt);
 			continue;
@@ -74,8 +73,8 @@ load(struct target *tgt)
 
 		clt->hits = strtonum(arg, 0, UINT_MAX, &errstr);
 		if (errstr != NULL) {
-			log_warn("ignored %s line %d: invalid count '%s'",
-			    file, cnt + 1, arg);
+			log_warnx("ignored %s line %d: count '%s' %s", file,
+			    cnt + 1, arg, errstr);
 			free(clt);
 			continue;
 		}
@@ -83,13 +82,14 @@ load(struct target *tgt)
 		if ((arg = shift(arg, line, llen)) != NULL)
 			clt->ts.tv_sec = strtonum(arg, 0, LLONG_MAX, &errstr);
 		if (arg == NULL || errstr != NULL) {
-			log_warn("ignored %s line %d: invalid timestamp '%s'",
-			    file, cnt + 1, arg);
+			log_warnx("ignored %s line %d: timestamp '%s' %s",
+			    file, cnt + 1, arg, errstr);
 			free(clt);
 			continue;
 		}
 
 end:
+		clt->tgt = tgt;
 		if (bind_table(clt, &cmdq)) {
 			sort_client_desc(clt);
 			cnt++;
@@ -99,7 +99,7 @@ end:
 		} else {
 			TAILQ_INSERT_TAIL(&dcq, clt, clients);
 			DPRINTF("client (%s, hits:%d, ts:%lld, exp:%d, "
-			    "to:%lld discarded", line, clt->hits,
+			    "to:%lld) discarded", line, clt->hits,
 			    clt->ts.tv_sec, clt->exp, clt->to.tv_sec);
 		}
 	}
@@ -126,9 +126,7 @@ save(struct target *tgt)
 	extern int		 privfd;
 	extern struct clientq	 cltq;
 
-
 	char		*file = tgt->persist;
-	size_t		 len;
 	enum msgtype	 mt;
 	int		 fd;
 	FILE		*fp;
@@ -139,8 +137,7 @@ save(struct target *tgt)
 		return (-1);
 
 	mt = MSG_HANDLE_PERSIST;
-	len = strlen(file) + 1;
-	ISEND(privfd, 3, &mt, sizeof(mt), &len, sizeof(len), file, len);
+	ISEND(privfd, 2, &mt, sizeof(mt), file, sizeof(tgt->persist));
 	/* wait for reply */
 	RECV(privfd, &mt, sizeof(mt));
 	if (mt != MSG_ACK)
@@ -148,6 +145,8 @@ save(struct target *tgt)
 
 	while ((fd = recv_fd(&mt, sizeof(mt), privfd)) == -1)
 		NANONAP;
+	if (mt != MSG_ACK)
+		FATALX("invalid message type (%d)", mt);
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		close(fd);
 		log_warn("failed opening persist file %s", file);
