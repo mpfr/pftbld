@@ -431,14 +431,11 @@ prefill_socketopts(struct socket *s)
 	struct stat	 sb;
 
 	STRDUP(dpath, s->path);
-	if ((dir = dirname(dpath)) == NULL) {
+	if ((dir = dirname(dpath)) == NULL || stat(dir, &sb) == -1) {
 		free(dpath);
 		return (-1);
 	}
 	free(dpath);
-	if (stat(dir, &sb) == -1)
-		return (-1);
-
 	s->owner = sb.st_uid;
 	DPRINTF("socket %s default owner id: %d", s->path, s->owner);
 	s->group = sb.st_gid;

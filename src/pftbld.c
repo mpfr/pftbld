@@ -366,38 +366,38 @@ exec_pfcmd(int pfd)
 static void
 handle_persist(int pfd)
 {
-	size_t		 len;
-	char		*path, *dpath, *dir;
-	struct stat	 dstat;
+	char		 path[sizeof(((struct target *)0)->persist)];
+	char		*dpath, *dir;
+	struct stat	 sb;
 	int		 fd;
 	enum msgtype	 mt;
 
 #define MODE_FILE_WRONLY	0200
 #define MODE_FILE_RDWR		0666
 
-	RECV(pfd, &len, sizeof(len));
-	MALLOC(path, len);
-	RECV(pfd, path, len);
+	RECV(pfd, path, sizeof(path));
 	STRDUP(dpath, path);
 	if ((dir = dirname(dpath)) == NULL) {
 		log_warn("persist directory");
 		free(dpath);
 		goto fail;
 	}
-	free(dpath);
-	if (stat(dir, &dstat) == -1) {
-		log_warn("persist directory %s permission error", dir);
+	if (stat(dir, &sb) == -1) {
+		log_warn("get permissions of persist directory %s", dir);
+		free(dpath);
 		goto fail;
 	}
+	free(dpath);
 
 	if (unlink(path) == -1 && errno != ENOENT) {
-		log_warn("persist file %s access error", path);
+		log_warn("unlink persist file %s", path);
 		goto fail;
 	}
 	if ((fd = open(path, O_CREAT | O_EXCL | O_SYNC | O_WRONLY,
-	    MODE_FILE_WRONLY)) == -1)
-		FATAL("open");
-
+	    MODE_FILE_WRONLY)) == -1) {
+		log_warn("open persist file %s", path);
+		goto fail;
+	}
 	mt = MSG_ACK;
 	SEND(pfd, &mt, sizeof(mt));
 	while (send_fd(fd, &mt, sizeof(mt), pfd) == -1)
@@ -405,10 +405,9 @@ handle_persist(int pfd)
 	/* wait for reply */
 	RECV(pfd, &mt, sizeof(mt));
 	if (mt == MSG_ACK &&
-	    (fchown(fd, dstat.st_uid, dstat.st_gid) == -1 ||
-	    fchmod(fd, MODE_FILE_RDWR & dstat.st_mode) == -1))
-		log_warn("failed setting permissions on persist file %s",
-		    path);
+	    (fchown(fd, sb.st_uid, sb.st_gid) == -1 ||
+	    fchmod(fd, MODE_FILE_RDWR & sb.st_mode) == -1))
+		log_warn("set permissions on persist file %s", path);
 	close(fd);
 	return;
 
