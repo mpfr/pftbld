@@ -32,24 +32,71 @@
 <section class="Sh">
 <h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
 <p class="Pp"><code class="Nm">pftbld.conf</code> &#x2014;
-    <span class="Nd">configuration file for
-    <a class="Xr" href="pftbld.8.html">pftbld(8)</a></span></p>
+    <span class="Nd">configuration file for the
+    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table content
+    management daemon</span></p>
 </section>
 <section class="Sh">
 <h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
 <p class="Pp"><code class="Nm">pftbld.conf</code> is the configuration file for
-    <a class="Xr" href="pftbld.8.html">pftbld(8)</a>. In its context, values of
-    type <var class="Ar">time</var> must be given as a sequence of number/unit
-    combinations, assuming that numbers are in decimal format, e.g.
-    <span class="Pa">7w3d</span> for a period of 7 weeks and 3 days. Valid units
-    are: <span class="Pa">w</span> (weeks), <span class="Pa">d</span> (days),
-    <span class="Pa">h</span> (hours), <span class="Pa">m</span> (minutes) and
-    <span class="Pa">s</span> (seconds). Values of type
-    <var class="Ar">number</var>, on the other hand, may be specified either in
-    decimal, or with a leading zero, in octal format (e.g.
-    <span class="Pa">0740</span>). Furthermore, unless a base path is provided
-    via the <code class="Fl">-b</code> option at daemon startup, only absolute
-    paths are permitted for <var class="Ar">path</var> type values.</p>
+    <a class="Xr" href="pftbld.8.html">pftbld(8)</a>.</p>
+</section>
+<section class="Sh">
+<h1 class="Sh" id="TYPES"><a class="permalink" href="#TYPES">TYPES</a></h1>
+<p class="Pp">In this context, the following rules regarding parameter value
+    types apply:</p>
+<p class="Pp"></p>
+<ul class="Bl-bullet Bd-indent Bl-compact">
+  <li>Values of type <var class="Ar">time</var> must be given as a sequence of
+      number/unit combinations, with numbers in decimal format, e.g.
+      <span class="Pa">7w3d</span> representing a period of 7 weeks and 3 days.
+      Valid units are:
+    <div class="Bd Pp Bd-indent">
+    <pre>
+w (weeks)
+d (days)
+h (hours)
+m (minutes)
+s (seconds)
+    </pre>
+    </div>
+    <p class="Pp"></p>
+  </li>
+  <li>Values of type <var class="Ar">number</var> are usually specified in
+      decimal format. If a leading zero is given, octal format is assumed (e.g.
+      <span class="Pa">0740</span>), which is typically used with the
+      <code class="Ic">socket mode</code> option.
+    <p class="Pp"></p>
+  </li>
+  <li>Values of type <var class="Ar">path</var> must be provided as absolute
+      paths unless a base path is provided via the <code class="Fl">-b</code>
+      option on daemon startup.
+    <p class="Pp"></p>
+  </li>
+  <li>Values of type <var class="Ar">address/network</var>, when from the IPv4
+      family, may be specified in short CIDR form with one to four octets and an
+      optional prefix length suffix. Omitted octets are assumed zero. In
+      general, all numbers of an IPv4 address must be specified in decimal form
+      while IPv6 addresses must consist of hexadecimal numbers except of the
+      lower four octets which may as well be presented in decimal IPv4 style, as
+      in
+    <p class="Pp"></p>
+    <div class="Bd Bd-indent"><code class="Li">::FFFF:192.168.100.1</code></div>
+    <p class="Pp">If no prefix length is specified, all 128 bits are assumed for
+        IPv6. With IPv4, the total length of octets from the most significant to
+        that with the least significant set bit is used.</p>
+    <p class="Pp">Below a few examples to illustrate the above:</p>
+    <div class="Bd Pp Bd-indent">
+    <pre>
+           11.22.33.44/32 &lt;--&gt; 11.22.33.44
+           11.22.33.0/24  &lt;--&gt; 11.22.33.0 - 11.22.33.255
+11.22 &lt;--&gt; 11.22.0.0/16   &lt;--&gt; 11.22.0.0 - 11.22.255.255
+11    &lt;--&gt; 11.0.0.0/8     &lt;--&gt; 11.0.0.0 - 11.255.255.255
+11/17 &lt;--&gt; 11.0.0/17      &lt;--&gt; 11.0.0.0 - 11.0.127.255
+    </pre>
+    </div>
+  </li>
+</ul>
 </section>
 <section class="Sh">
 <h1 class="Sh" id="GLOBAL_CONFIGURATION"><a class="permalink" href="#GLOBAL_CONFIGURATION">GLOBAL
@@ -145,7 +192,7 @@
     target.</p>
 <p class="Pp">In order to start
     <a class="Xr" href="pftbld.8.html">pftbld(8)</a>, at least one
-    <code class="Ic">target</code> entry needs to be defined.</p>
+    <code class="Ic">target</code> needs to be defined.</p>
 <dl class="Bl-tag">
   <dt id="target"><a class="permalink" href="#target"><code class="Ic">target</code></a>
     <var class="Ar">name</var> {...}</dt>
@@ -157,8 +204,8 @@
         {...}</dt>
       <dd>Specifies frame and first <code class="Ic">step</code> of a
           <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>
-          <code class="Ic">table</code> cascade every managed IP address will
-          traverse during its <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
+          <code class="Ic">table</code> cascade associated client entries will
+          traverse during their <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
           life cycle. There must be exactly one instance defined per
           <code class="Ic">target</code>, followed by a block of options
           enclosed in curly brackets:
@@ -518,7 +565,7 @@ function pftbld_drop() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">February 13, 2021</td>
+    <td class="foot-date">March 15, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

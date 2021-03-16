@@ -28,6 +28,8 @@
 #include "log.h"
 #include "pftbld.h"
 
+static int	 cidr_to_norm_addr(char *, const char *, size_t);
+static size_t	 norm_to_cidr_addr(char *, size_t, int, int);
 static char	*append_age_unit(char *, time_t *, time_t, const char *);
 static const char
 		*canonicalize_path(const char *, char *, size_t);
@@ -190,64 +192,141 @@ recv_valist(int fd, int n, ...)
 	VALIST_IOV_IO(recvmsg, fd, n, MSG_WAITALL, "recvmsg");
 }
 
+static int
+cidr_to_norm_addr(char *dst, const char *src, size_t dstsize)
+{
+	int		 bits, c, in6 = strchr(src, ':') != NULL;
+	char		*d, *e;
+	const char	*errstr, *b;
+	size_t		 len;
+
+	bits = (in6 ? sizeof(struct in6_addr) : sizeof(struct in_addr)) << 3;
+	/* prepare CIDR prefix length to be removed, if present */
+	e = (d = strchr(src, '/')) != NULL ? d : strchr(src, '\0');
+	if ((len = e - src) >= dstsize)
+		goto fail;
+
+	if (d != NULL) {
+		/* preserve CIDR prefix length to be returned later */
+		bits = strtonum(++d, 0, bits, &errstr);
+		if (errstr != NULL)
+			goto fail;
+
+	} else if (!in6) /* IPv4 only */
+		/* reduce auto CIDR prefix length by trailing zero octets */
+		while (--e >= src) {
+			while (*e == '0') /* zeros may repeat */
+				e--;
+			if (*e != '.')
+				break;
+			bits -= 8;
+		}
+
+	memcpy(dst, src, len);
+	dst[len] = '\0';
+
+	if (in6)
+		return (bits); /* leave IPv6 address as is */
+
+	/* append missing zero octets */
+	for (b = dst, c = 0;; b++, c++)
+		if ((b = strchr(b, '.')) == NULL)
+			break;
+	for (c = 3 - c; c > 0; c--) {
+		if (d == NULL) /* finalize auto IPv4 CIDR prefix length */
+			bits -= 8;
+		if (strlcat(dst, ".0", dstsize) >= dstsize)
+			goto fail;
+	}
+
+	return (bits);
+
+fail:
+	*dst = '\0';
+	return (-1);
+}
+
+static size_t
+norm_to_cidr_addr(char *addr, size_t size, int range, int bits)
+{
+	char	*z = strchr(addr, '\0');
+	size_t	 len;
+
+	/* remove dispensable zero octets */
+	while (range >= 8 && z - addr > 2 && !memcmp(z - 2, ".0", 2)) {
+		range -= 8;
+		z -= 2;
+	}
+	*z = '\0';
+
+	/* append CIDR prefix length */
+	len = z - addr;
+	len += snprintf(z, size - len, "/%d", bits);
+
+	return (len);
+}
+
 struct crange *
 parse_crange(const char *str)
 {
-	struct crange	*r;
-	int		 bits, c, nbyte;
+	char		 buf[INET6_ADDRSTRLEN];
+	int		 bits, bytes, range;
+	struct crange	*cr;
 	unsigned char	*first, *last, b;
 
-	if (str == NULL || *str == '\0')
+	if (str == NULL || *str == '\0' ||
+	    (bits = cidr_to_norm_addr(buf, str, sizeof(buf))) == -1)
 		return (NULL);
 
-	CALLOC(r, 1, sizeof(*r));
-
-	if ((bits = inet_net_pton(AF_INET, str, &r->first.ipv4,
-	    sizeof(r->first.ipv4))) != -1) {
-		if (inet_net_ntop(AF_INET, &r->first.ipv4, bits, r->str,
-		    sizeof(r->str)) == NULL)
-			FATAL("inet_net_ntop");
-		r->af = AF_INET;
-		first = (unsigned char *)&r->first.ipv4.s_addr;
-		last = (unsigned char *)&r->last.ipv4.s_addr;
-		nbyte = sizeof(struct in_addr);
-	} else if ((bits = inet_net_pton(AF_INET6, str, &r->first.ipv6,
-	    sizeof(r->first.ipv6))) != -1) {
-		if (inet_net_ntop(AF_INET6, &r->first.ipv6, bits, r->str,
-		    sizeof(r->str)) == NULL)
-			FATAL("inet_net_ntop");
-		r->af = AF_INET6;
-		first = (unsigned char *)&r->first.ipv6.s6_addr;
-		last = (unsigned char *)&r->last.ipv6.s6_addr;
-		nbyte = sizeof(struct in6_addr);
+	CALLOC(cr, 1, sizeof(*cr));
+	if (inet_pton(AF_INET, buf, &cr->first.ipv4) == 1) {
+		if (inet_ntop(AF_INET, &cr->first.ipv4, cr->str,
+		    sizeof(cr->str)) == NULL)
+			FATAL("inet_ntop");
+		cr->af = AF_INET;
+		first = (unsigned char *)&cr->first.ipv4.s_addr;
+		last = (unsigned char *)&cr->last.ipv4.s_addr;
+		bytes = sizeof(struct in_addr);
+	} else if (inet_pton(AF_INET6, buf, &cr->first.ipv6) == 1) {
+		if (inet_ntop(AF_INET6, &cr->first.ipv6, cr->str,
+		    sizeof(cr->str)) == NULL)
+			FATAL("inet_ntop");
+		cr->af = AF_INET6;
+		first = (unsigned char *)&cr->first.ipv6.s6_addr;
+		last = (unsigned char *)&cr->last.ipv6.s6_addr;
+		bytes = sizeof(struct in6_addr);
 	} else {
-		free(r);
+		free(cr);
 		return (NULL);
 	}
-	r->last = r->first;
-	for (c = (nbyte-- << 3) - bits, b = 1; c > 0; c--) {
-		first[nbyte] &= ~b;
-		last[nbyte] |= b;
-		b <<= 1;
-		if (b == 0) {
-			b = 1;
-			nbyte--;
-		}
+	range = bytes * 8 - bits;
+	if (norm_to_cidr_addr(cr->str, sizeof(cr->str), range,
+	    bits) >= sizeof(cr->str))
+		FATALX("address truncated: %s", cr->str);
+	cr->last = cr->first;
+	b = (1 << range % 8) - 1;
+	for (range /= 8; range; range--) {
+		first[--bytes] = 0x00;
+		last[bytes] = 0xff;
+	}
+	if (b) {
+		first[--bytes] &= ~b;
+		last[bytes] |= b;
 	}
 #if DEBUG
-	if (r->af == AF_INET)
-		DPRINTF("\"%s\" bits:%d range:%08X...%08X", r->str, bits,
-		    be32toh(r->first.ipv4.s_addr),
-		    be32toh(r->last.ipv4.s_addr));
+	if (cr->af == AF_INET)
+		DPRINTF("\"%s\" bits:%d range:%08X...%08X", cr->str, bits,
+		    be32toh(cr->first.ipv4.s_addr),
+		    be32toh(cr->last.ipv4.s_addr));
 	else
 		DPRINTF("\"%s\" bits:%d range:%016llX%016llX...%016llX%016llX",
-		    r->str, bits,
-		    be64toh(*(uint64_t *)r->first.ipv6.s6_addr),
-		    be64toh(*(uint64_t *)&r->first.ipv6.s6_addr[8]),
-		    be64toh(*(uint64_t *)r->last.ipv6.s6_addr),
-		    be64toh(*(uint64_t *)&r->last.ipv6.s6_addr[8]));
+		    cr->str, bits,
+		    be64toh(*(uint64_t *)cr->first.ipv6.s6_addr),
+		    be64toh(*(uint64_t *)&cr->first.ipv6.s6_addr[8]),
+		    be64toh(*(uint64_t *)cr->last.ipv6.s6_addr),
+		    be64toh(*(uint64_t *)&cr->last.ipv6.s6_addr[8]));
 #endif
-	return (r);
+	return (cr);
 }
 
 int
@@ -258,12 +337,12 @@ parse_addr(struct caddr *addr, const char *str)
 	    inet_ntop(AF_INET, &addr->pfaddr.pfra_ip4addr, addr->str,
 	    sizeof(addr->str)) != NULL) {
 		addr->pfaddr.pfra_af = AF_INET;
-		addr->pfaddr.pfra_net = 32;
+		addr->pfaddr.pfra_net = sizeof(struct in_addr) << 3;
 	} else if (inet_pton(AF_INET6, str, &addr->pfaddr.pfra_ip6addr) == 1 &&
 	    inet_ntop(AF_INET6, &addr->pfaddr.pfra_ip6addr, addr->str,
 	    sizeof(addr->str)) != NULL) {
 		addr->pfaddr.pfra_af = AF_INET6;
-		addr->pfaddr.pfra_net = 128;
+		addr->pfaddr.pfra_net = sizeof(struct in6_addr) << 3;
 	} else {
 		errno = EINVAL;
 		return (-1);
@@ -289,7 +368,8 @@ addr_inrange(struct crange *cr, struct caddr *addr)
 int
 addrs_cmp(struct caddr *a1, struct caddr *a2)
 {
-	uint8_t	 af1 = a1->pfaddr.pfra_af, af2 = a2->pfaddr.pfra_af;
+	uint8_t	 af1 = a1->pfaddr.pfra_af,
+		 af2 = a2->pfaddr.pfra_af;
 
 	if (af1 < af2)
 		return (-1);
@@ -328,12 +408,8 @@ shift(char *ptr, char *buf, size_t size)
 {
 	char	*next;
 
-	if (ptr == NULL || buf == NULL)
-		return (NULL);
-
-	next = ptr + strlen(ptr) + 1;
-
-	if (next < buf + size)
+	if (ptr != NULL && buf != NULL &&
+	    (next = strchr(ptr, '\0') + 1) < buf + size)
 		return (next);
 
 	return (NULL);
