@@ -17,7 +17,7 @@
    -->
 <head>
   <meta charset="utf-8"/>
-  <link rel="stylesheet" href="mandoc.css" type="text/css" media="all"/>
+  <link rel="stylesheet" href="../../mandoc.css" type="text/css" media="all"/>
   <title>PFTBLCTL(8)</title>
 </head>
 <body>
@@ -75,7 +75,10 @@
 <section class="Sh">
 <h1 class="Sh" id="COMMANDS"><a class="permalink" href="#COMMANDS">COMMANDS</a></h1>
 <p class="Pp">On the <span class="Pa">control socket</span>, the following
-    commands are accepted:</p>
+    commands are accepted, whereby parameters of type
+    <span class="Pa">address/network</span> are expected to be formatted as
+    outlined in
+    <a class="Lk" href="pftbld.conf.5.html#TYPES">pftbld.conf(5)</a>.</p>
 <div class="Bd-indent">
 <dl class="Bl-tag">
   <dt id="config"><a class="permalink" href="#config"><code class="Ic">config</code></a>
@@ -90,7 +93,7 @@
       <dd>Reconfigures <a class="Xr" href="pftbld.8.html">pftbld(8)</a> by
           initiating a reload of its configuration file
           <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>. Please
-          note that, figuring out whether or not reloading completed
+          note that, depending on whether or not reloading completed
           successfully after all, an appropriate message will be printed either
           into the daemon's or the system log, respectively.
         <p class="Pp">Alternative means to achieve the same goal are for example
@@ -300,7 +303,7 @@ ACK
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">February 13, 2021</td>
+    <td class="foot-date">March 16, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>

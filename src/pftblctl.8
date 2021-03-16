@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 13 2021 $
+.Dd $Mdocdate: March 16 2021 $
 .Dt PFTBLCTL 8
 .Os
 .Sh NAME
@@ -67,7 +67,10 @@ used to send data to and defaults to
 .Sh COMMANDS
 On the
 .Pa control socket ,
-the following commands are accepted:
+the following commands are accepted, whereby parameters of type
+.Pa address/network
+are expected to be formatted as outlined in
+.Lk pftbld.conf.5.html#TYPES pftbld.conf(5) .
 .Bl -tag -width Ds -offset Ds
 .It Ic config Ar option
 Runs the specified configuration
@@ -82,7 +85,7 @@ Reconfigures
 .Xr pftbld 8
 by initiating a reload of its configuration file
 .Xr pftbld.conf 5 .
-Please note that, figuring out whether or not reloading completed successfully
+Please note that, depending on whether or not reloading completed successfully
 after all, an appropriate message will be printed either into the daemon's or
 the system log, respectively.
 .Pp

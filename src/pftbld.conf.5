@@ -13,44 +13,80 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 13 2021 $
+.Dd $Mdocdate: March 15 2021 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
 .Nm pftbld.conf
-.Nd configuration file for
-.Xr pftbld 8
+.Nd configuration file for the
+.Xr pf 4
+table content management daemon
 .Sh DESCRIPTION
 .Nm
 is the configuration file for
 .Xr pftbld 8 .
-In its context, values of type
-.Ar time
-must be given as a sequence of number/unit combinations, assuming that numbers
-are in decimal format, e.g.
-.Pa 7w3d
-for a period of 7 weeks and 3 days.
-Valid units are:
-.Pa w
-(weeks),
-.Pa d
-(days),
-.Pa h
-(hours),
-.Pa m
-(minutes) and
-.Pa s
-(seconds).
+.Sh TYPES
+In this context, the following rules regarding parameter value types apply:
+.Pp
+.Bl -bullet -offset indent -compact
+.It
 Values of type
-.Ar number ,
-on the other hand, may be specified either in decimal, or with a leading zero,
-in octal format (e.g.
-.Pa 0740 Ns ).
-Furthermore, unless a base path is provided via the
-.Fl b
-option at daemon startup, only absolute paths are permitted for
+.Ar time
+must be given as a sequence of number/unit combinations, with numbers in
+decimal format, e.g.
+.Pa 7w3d
+representing a period of 7 weeks and 3 days.
+Valid units are:
+.Bd -literal -offset indent
+w (weeks)
+d (days)
+h (hours)
+m (minutes)
+s (seconds)
+.Ed
+.Pp
+.It
+Values of type
+.Ar number
+are usually specified in decimal format.
+If a leading zero is given, octal format is assumed
+.Pq e.g. Pa 0740 ,
+which is typically used with the
+.Ic socket mode
+option.
+.Pp
+.It
+Values of type
 .Ar path
-type values.
+must be provided as absolute paths unless a base path is provided via the
+.Fl b
+option on daemon startup.
+.Pp
+.It
+Values of type
+.Ar address/network ,
+when from the IPv4 family, may be specified in short CIDR form with one to four
+octets and an optional prefix length suffix.
+Omitted octets are assumed zero.
+In general, all numbers of an IPv4 address must be specified in decimal form
+while IPv6 addresses must consist of hexadecimal numbers except of the lower
+four octets which may as well be presented in decimal IPv4 style, as in
+.Pp
+.Dl ::FFFF:192.168.100.1
+.Pp
+If no prefix length is specified, all 128 bits are assumed for IPv6.
+With IPv4, the total length of octets from the most significant to that with
+the least significant set bit is used.
+.Pp
+Below a few examples to illustrate the above:
+.Bd -literal -offset indent
+           11.22.33.44/32 <--> 11.22.33.44
+           11.22.33.0/24  <--> 11.22.33.0 - 11.22.33.255
+11.22 <--> 11.22.0.0/16   <--> 11.22.0.0 - 11.22.255.255
+11    <--> 11.0.0.0/8     <--> 11.0.0.0 - 11.255.255.255
+11/17 <--> 11.0.0/17      <--> 11.0.0.0 - 11.0.127.255
+.Ed
+.El
 .Sh GLOBAL CONFIGURATION
 Here are the settings that may be applied globally:
 .Bl -tag -width Ds
@@ -167,7 +203,7 @@ In order to start
 .Xr pftbld 8 ,
 at least one
 .Ic target
-entry needs to be defined.
+needs to be defined.
 .Bl -tag -width Ds
 .It Ic target Ar name Brq ...
 The
@@ -181,7 +217,7 @@ Specifies frame and first
 of a
 .Xr pf 4
 .Ic table
-cascade every managed IP address will traverse during its
+cascade associated client entries will traverse during their
 .Xr pftbld 8
 life cycle.
 There must be exactly one instance defined per
