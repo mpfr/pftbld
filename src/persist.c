@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <errno.h>
+#include <fcntl.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -128,7 +131,7 @@ save(struct target *tgt)
 
 	char		*file = tgt->persist;
 	enum msgtype	 mt;
-	int		 fd;
+	int		 cfd, tfd;
 	FILE		*fp;
 	struct client	*clt;
 	int		 cnt;
@@ -139,19 +142,25 @@ save(struct target *tgt)
 	mt = MSG_HANDLE_PERSIST;
 	ISEND(privfd, 2, &mt, sizeof(mt), file, sizeof(tgt->persist));
 	/* wait for reply */
-	RECV(privfd, &mt, sizeof(mt));
-	if (mt != MSG_ACK)
-		return (-1);
-
-	while ((fd = recv_fd(&mt, sizeof(mt), privfd)) == -1)
+	while ((cfd = recv_fd(&mt, sizeof(mt), privfd)) == -1)
 		NANONAP;
 	if (mt != MSG_ACK)
-		FATALX("invalid message type (%d)", mt);
-	if ((fp = fdopen(fd, "w")) == NULL) {
-		close(fd);
+		FATALX_MSGTYPE(mt);
+	RECV(cfd, &mt, sizeof(mt));
+	if (mt != MSG_ACK) {
+		close(cfd);
+		return (-1);
+	}
+	while ((tfd = recv_fd(&mt, sizeof(mt), cfd)) == -1)
+		NANONAP;
+	if (mt != MSG_ACK)
+		FATALX_MSGTYPE(mt);
+	if ((fp = fdopen(tfd, "w")) == NULL) {
+		close(tfd);
 		log_warn("failed opening persist file %s", file);
 		mt = MSG_NAK;
-		SEND(privfd, &mt, sizeof(mt));
+		SEND(cfd, &mt, sizeof(mt));
+		close(cfd);
 		return (-1);
 	}
 	cnt = 0;
@@ -164,10 +173,110 @@ save(struct target *tgt)
 
 	if (ferror(fp) || fclose(fp) == EOF)
 		log_warn("persist file %s error", file);
-	close(fd);
+	close(tfd);
 
 	mt = MSG_ACK;
-	SEND(privfd, &mt, sizeof(mt));
+	SEND(cfd, &mt, sizeof(mt));
+	close(cfd);
 
 	return (cnt);
+}
+
+__dead void
+persist(int argc, char *argv[])
+{
+	int		 debug, verbose, ctrlfd, pfd;
+	char		*path, *dpath, *dir;
+	struct stat	 sb;
+	enum msgtype	 mt;
+
+#define MODE_FILE_WRONLY	0200
+#define MODE_FILE_RDWR		0666
+
+	ETOI(debug, ENV_DEBUG);
+	ETOI(verbose, ENV_VERBOSE);
+	log_init(argv[1], debug, verbose);
+	setproctitle("%s", __func__);
+
+	ETOI(ctrlfd, ENV_CTRLFD);
+
+	path = argv[2];
+	STRDUP(dpath, path);
+	if ((dir = dirname(dpath)) == NULL) {
+		log_warn("persist directory");
+		free(dpath);
+		goto fail;
+	}
+	if (stat(dir, &sb) == -1) {
+		log_warn("get permissions of persist directory %s", dir);
+		free(dpath);
+		goto fail;
+	}
+	free(dpath);
+
+	if (unveil(path, "wc") == -1 || unveil(NULL, NULL) == -1)
+		FATAL("unveil");
+	if (pledge("cpath fattr sendfd stdio wpath", NULL) == -1)
+		FATAL("pledge");
+
+	if (unlink(path) == -1 && errno != ENOENT) {
+		log_warn("unlink persist file %s", path);
+		goto fail;
+	}
+	if ((pfd = open(path, O_CREAT | O_EXCL | O_SYNC | O_WRONLY,
+	    MODE_FILE_WRONLY)) == -1) {
+		log_warn("open persist file %s", path);
+		goto fail;
+	}
+	mt = MSG_ACK;
+	SEND(ctrlfd, &mt, sizeof(mt));
+	while (send_fd(pfd, &mt, sizeof(mt), ctrlfd) == -1)
+		NANONAP;
+	/* wait for reply */
+	RECV(ctrlfd, &mt, sizeof(mt));
+	if (mt == MSG_ACK &&
+	    (fchown(pfd, sb.st_uid, sb.st_gid) == -1 ||
+	    fchmod(pfd, MODE_FILE_RDWR & sb.st_mode) == -1))
+		log_warn("set permissions on persist file %s", path);
+	close(pfd);
+	close(ctrlfd);
+	exit(0);
+
+fail:
+	mt = MSG_NAK;
+	SEND(ctrlfd, &mt, sizeof(mt));
+	close(ctrlfd);
+	exit(0);
+}
+
+int
+fork_persist(char *path)
+{
+	extern const struct procfunc	 process[];
+	extern char			*__progname;
+
+	int	 ctrlfd[2], pid;
+	char	*argv[4];
+
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, ctrlfd) == -1)
+		FATAL("socketpair");
+
+	if ((pid = fork()) == -1)
+		FATAL("fork");
+
+	if (pid != 0) { /* parent */
+		close(ctrlfd[1]);
+		return (ctrlfd[0]);
+	}
+	/* child */
+	close(ctrlfd[0]);
+	ITOE(ENV_CTRLFD, ctrlfd[1]);
+
+	argv[0] = process[PROC_PERSIST].name;
+	argv[1] = __progname;
+	argv[2] = path;
+	argv[3] = NULL;
+
+	execvp(__progname, argv);
+	FATAL("execvp");
 }

@@ -310,7 +310,7 @@ check_targets(void)
 	/* wait for reply */
 	IRECV(sched_cfd, 2, &n, sizeof(n), &mt, sizeof(mt));
 	if (mt != MSG_ACK)
-		FATALX("invalid message type (%d)", mt);
+		FATALX_MSGTYPE(mt);
 	if (n > 0)
 		log_warnx("%d client entr%s would be orphaned", n,
 		    n != 1 ? "ies" : "y");
