@@ -15,9 +15,6 @@
  */
 
 #include <err.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <libgen.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stdio.h>
@@ -52,7 +49,8 @@ const struct procfunc	 process[] = {
 	[PROC_LOGGER] = { "logger", logger },
 	[PROC_SCHEDULER] = { "scheduler", scheduler },
 	[PROC_LISTENER] = { "listener", listener },
-	[PROC_TINYPFCTL] = { "tinypfctl", tinypfctl }
+	[PROC_TINYPFCTL] = { "tinypfctl", tinypfctl },
+	[PROC_PERSIST] = { "persist", persist }
 };
 
 static __dead void
@@ -126,62 +124,8 @@ handle_privreq(struct kevent *kev)
 		shutdown_main();
 		/* NOTREACHED */
 	default:
-		FATALX("invalid message type (%d)", mt);
+		FATALX_MSGTYPE(mt);
 	}
-}
-
-void
-pfexec(struct pfresult *pfres, struct pfcmd *cmd)
-{
-	enum msgtype	 mt;
-	int		 tfd;
-	size_t		 iovcnt, i;
-	unsigned long	 cmdacnt;
-	struct msghdr	 msg;
-	struct iovec	*iov;
-	struct caddr	*ca;
-	ssize_t		 ns;
-
-	mt = MSG_EXEC_PFCMD;
-	ISEND(privfd, 2, &mt, sizeof(mt), cmd, sizeof(*cmd));
-	while ((tfd = recv_fd(&mt, sizeof(mt), privfd)) == -1)
-		NANONAP;
-	if (mt != MSG_ACK)
-		FATALX("invalid message type (%d)", mt);
-
-	cmdacnt = cmd->addrcnt;
-
-	memset(&msg, 0, sizeof(msg));
-	iovcnt = IOV_CNT(cmdacnt);
-	if ((iov = reallocarray(NULL, iovcnt, sizeof(*iov))) == NULL)
-		FATAL("reallocarray");
-	for (i = 0; i < iovcnt; i++)
-		iov[i].iov_len = sizeof(struct pfr_addr);
-	msg.msg_iov = iov;
-
-	for (;;) {
-		for (i = 0; i < iovcnt; i++) {
-			if ((ca = STAILQ_FIRST(&cmd->addrq)) == NULL)
-				FATALX("wrong address count");
-			STAILQ_REMOVE_HEAD(&cmd->addrq, caddrs);
-			iov[i].iov_base = &ca->pfaddr;
-		}
-		msg.msg_iovlen = iovcnt;
-		if ((ns = sendmsg(tfd, &msg, 0)) == -1)
-			FATAL("sendmsg");
-		if (iovcnt * sizeof(struct pfr_addr) - ns != 0)
-			FATALX("sendmsg buffer too small");
-		if ((cmdacnt -= iovcnt) == 0)
-			break;
-		iovcnt = IOV_CNT(cmdacnt);
-	}
-
-	free(iov);
-	/* wait for reply */
-	RECV(tfd, pfres, sizeof(*pfres));
-	close(tfd);
-	DPRINTF("received pfresult(nadd:%lu, ndel:%lu, nkill:%lu, snkill:%lu)",
-	    pfres->nadd, pfres->ndel, pfres->nkill, pfres->snkill);
 }
 
 __dead void
@@ -339,8 +283,8 @@ pftbld(int argc, char *argv[])
 	    &privreq_handler);
 	memset(&kev, 0, sizeof(kev));
 
-	if (pledge("chown cpath exec fattr getpw proc recvfd rpath sendfd "
-	    "unix stdio wpath", NULL) == -1)
+	if (pledge("cpath exec getpw proc recvfd rpath sendfd stdio unix",
+	    NULL) == -1)
 		FATAL("pledge");
 
 	while (kevent(kqfd, NULL, 0, &kev, 1, NULL) != -1)
@@ -352,68 +296,30 @@ static void
 exec_pfcmd(int pfd)
 {
 	struct pfcmd	 cmd;
-	int		 tfd;
+	int		 cfd;
 	enum msgtype	 mt;
 
 	RECV(pfd, &cmd, sizeof(cmd));
-	tfd = fork_tinypfctl(&cmd);
+	cfd = fork_tinypfctl(&cmd);
 	mt = MSG_ACK;
-	while (send_fd(tfd, &mt, sizeof(mt), pfd) == -1)
+	while (send_fd(cfd, &mt, sizeof(mt), pfd) == -1)
 		NANONAP;
-	close(tfd);
+	close(cfd);
 }
 
 static void
 handle_persist(int pfd)
 {
 	char		 path[sizeof(((struct target *)0)->persist)];
-	char		*dpath, *dir;
-	struct stat	 sb;
-	int		 fd;
+	int		 cfd;
 	enum msgtype	 mt;
 
-#define MODE_FILE_WRONLY	0200
-#define MODE_FILE_RDWR		0666
-
 	RECV(pfd, path, sizeof(path));
-	STRDUP(dpath, path);
-	if ((dir = dirname(dpath)) == NULL) {
-		log_warn("persist directory");
-		free(dpath);
-		goto fail;
-	}
-	if (stat(dir, &sb) == -1) {
-		log_warn("get permissions of persist directory %s", dir);
-		free(dpath);
-		goto fail;
-	}
-	free(dpath);
-
-	if (unlink(path) == -1 && errno != ENOENT) {
-		log_warn("unlink persist file %s", path);
-		goto fail;
-	}
-	if ((fd = open(path, O_CREAT | O_EXCL | O_SYNC | O_WRONLY,
-	    MODE_FILE_WRONLY)) == -1) {
-		log_warn("open persist file %s", path);
-		goto fail;
-	}
+	cfd = fork_persist(path);
 	mt = MSG_ACK;
-	SEND(pfd, &mt, sizeof(mt));
-	while (send_fd(fd, &mt, sizeof(mt), pfd) == -1)
+	while (send_fd(cfd, &mt, sizeof(mt), pfd) == -1)
 		NANONAP;
-	/* wait for reply */
-	RECV(pfd, &mt, sizeof(mt));
-	if (mt == MSG_ACK &&
-	    (fchown(fd, sb.st_uid, sb.st_gid) == -1 ||
-	    fchmod(fd, MODE_FILE_RDWR & sb.st_mode) == -1))
-		log_warn("set permissions on persist file %s", path);
-	close(fd);
-	return;
-
-fail:
-	mt = MSG_NAK;
-	SEND(pfd, &mt, sizeof(mt));
+	close(cfd);
 }
 
 static void

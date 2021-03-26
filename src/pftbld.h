@@ -65,7 +65,6 @@
 #define timespec_isinfinite(t)	timespeccmp(t, &TIMESPEC_INFINITE, ==)
 
 #define CONF_NO_BACKLOG		-1
-#define CONF_BACKLOG_MAX	INT_MAX
 #define CONF_NO_DATAMAX		-1
 #define CONF_DATAMAX_MAX	SSIZE_MAX
 #define CONF_NO_TIMEOUT		-1
@@ -77,6 +76,8 @@
 #define PFADDR_MAX	(INT_MAX / sizeof(struct pfr_addr))
 #define PFADDR_CNT(c)	((c) < PFADDR_MAX ? (c) : PFADDR_MAX)
 #define PFADDR_LEN(c)	((c) * sizeof(struct pfr_addr))
+
+#define FATALX_MSGTYPE(t)	FATALX("invalid message type (%d)", t)
 
 #define CANONICAL_PATH_SET_0(str, path, txt, err, exit, ferr)	\
 	do {							\
@@ -442,6 +443,7 @@ enum procid {
 	PROC_SCHEDULER,
 	PROC_LISTENER,
 	PROC_TINYPFCTL,
+	PROC_PERSIST,
 	NUM_PROCS /* must be last */
 };
 
@@ -495,6 +497,8 @@ void		 append_data_log(char *, size_t);
 /* persist.c */
 int		 save(struct target *);
 int		 load(struct target *);
+__dead void	 persist(int, char **);
+int		 fork_persist(char *);
 
 /* scheduler.c */
 void		 sort_client_asc(struct client *);

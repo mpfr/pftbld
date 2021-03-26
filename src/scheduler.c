@@ -454,12 +454,12 @@ static struct config *
 recv_conf(void)
 {
 
-#define CHECK_NEXTITEM					\
-	RECV(sched_cfd, &mt, sizeof(mt));		\
-	if (mt == MSG_QUEUE_ENDITEMS)			\
-		break;					\
-	if (mt != MSG_QUEUE_NEXTITEM)			\
-		FATALX("invalid message type (%d)", mt)
+#define CHECK_NEXTITEM				\
+	RECV(sched_cfd, &mt, sizeof(mt));	\
+	if (mt == MSG_QUEUE_ENDITEMS)		\
+		break;				\
+	if (mt != MSG_QUEUE_NEXTITEM)		\
+		FATALX_MSGTYPE(mt)
 
 	struct config	*nc;
 	enum msgtype	 mt;
@@ -618,7 +618,7 @@ handle_ctrl(struct kevent *kev)
 		log_setverbose(v);
 		break;
 	default:
-		FATALX("invalid message type (%d)", mt);
+		FATALX_MSGTYPE(mt);
 	}
 	mt = MSG_ACK;
 	SEND(sched_cfd, &mt, sizeof(mt));
@@ -728,7 +728,7 @@ remove:
 	/* wait for reply */
 	RECV(sock->ctrlfd, &mt, sizeof(mt));
 	if (mt != MSG_ACK)
-		FATALX("invalid message type (%d)", mt);
+		FATALX_MSGTYPE(mt);
 
 	free(ibuf->data);
 	free(ibuf);
@@ -947,7 +947,7 @@ scheduler(int argc, char *argv[])
 	ignore_handler = (struct kevcb){ &handle_ignore, &ign_to };
 	memset(&kev, 0, sizeof(kev));
 
-	if (pledge("recvfd sendfd unix stdio", NULL) == -1)
+	if (pledge("recvfd stdio unix", NULL) == -1)
 		FATAL("pledge");
 
 	print_ts_log("Startup succeeded. Listening ...\n");
@@ -1121,7 +1121,7 @@ shutdown_scheduler(void)
 			log_debug("no persist file for target [%s]",
 			    tgt->name);
 		else if ((c = save(tgt)) == -1)
-			log_warn("failed saving client addresses for target "
+			log_warnx("failed saving client addresses for target "
 			    "[%s]", tgt->name);
 		else
 			print_ts_log("%d client address%s saved for [%s].\n",
