@@ -23,10 +23,11 @@
 #include <pwd.h>
 #include <stdio.h>
 
+#include <sys/types.h>
+#include <sys/sysctl.h>
+
 #include "log.h"
 #include "pftbld.h"
-
-#define NUMROWS(tbl)	(sizeof(tbl) / sizeof(tbl[0]))
 
 #define HOSTS_FILE	"/etc/hosts"
 
@@ -36,6 +37,7 @@
 static void	yyerror(const char *, ...);
 static int	yylex(void);
 
+static int	 kern_somaxconn(void);
 static int	 load_exclude_keyterms(const char *);
 static int	 crange_inq(struct crangeq *, struct crange *);
 static int	 keyterm_inq(struct ptrq *, struct ptr *);
@@ -78,8 +80,10 @@ grammar		: /* empty */
 		;
 
 main		: BACKLOG NUMBER		{
-			if ($2 <= 0 || $2 > CONF_BACKLOG_MAX) {
-				yyerror("backlog out of bounds");
+			int	 max = kern_somaxconn();
+
+			if ($2 <= 0 || $2 > max) {
+				yyerror("backlog out of bounds (max:%d)", max);
 				YYERROR;
 			}
 			conf->backlog = $2;
@@ -370,8 +374,10 @@ sockoptsl	: ACTION actionopt	{
 			DPRINTF("action: %d", sock->action);
 		}
 		| BACKLOG NUMBER	{
-			if ($2 <= 0 || $2 > CONF_BACKLOG_MAX) {
-				yyerror("backlog out of bounds");
+			int	 max = kern_somaxconn();
+
+			if ($2 <= 0 || $2 > max) {
+				yyerror("backlog out of bounds (max:%d)", max);
 				YYERROR;
 			}
 			sock->backlog = $2;
@@ -714,6 +720,17 @@ keyterm_inq(struct ptrq *q, struct ptr *k)
 }
 
 static int
+kern_somaxconn(void)
+{
+	int	 mib[] = { CTL_KERN, KERN_SOMAXCONN }, maxconn;
+	size_t	 len = sizeof(maxconn);
+
+	if (sysctl(mib, 2, &maxconn, &len, NULL, 0) == -1)
+		FATAL("sysctl");
+	return (maxconn);
+}
+
+static int
 load_exclude_keyterms(const char *file)
 {
 	char		 cpath[PATH_MAX], *line;
@@ -920,7 +937,7 @@ eow:
 		return (0);
 	}
 	if (!nonkw)
-		for (c = NUMROWS(keywords); c > 0;) {
+		for (c = sizeof(keywords) / sizeof(keywords[0]); c > 0;) {
 			c -= 1;
 			if (!strcmp(buf, keywords[c].name))
 				return (keywords[c].token);

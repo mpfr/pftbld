@@ -242,6 +242,62 @@ pf_kill_nodes(int pffd, struct pfr_addr *addr)
 	return (psnk.psnk_killed);
 }
 
+void
+pfexec(struct pfresult *pfres, struct pfcmd *cmd)
+{
+	extern int	 privfd;
+
+	enum msgtype	 mt;
+	int		 tfd;
+	size_t		 iovcnt, i;
+	unsigned long	 cmdacnt;
+	struct msghdr	 msg;
+	struct iovec	*iov;
+	struct caddr	*ca;
+	ssize_t		 ns;
+
+	mt = MSG_EXEC_PFCMD;
+	ISEND(privfd, 2, &mt, sizeof(mt), cmd, sizeof(*cmd));
+	while ((tfd = recv_fd(&mt, sizeof(mt), privfd)) == -1)
+		NANONAP;
+	if (mt != MSG_ACK)
+		FATALX_MSGTYPE(mt);
+
+	cmdacnt = cmd->addrcnt;
+
+	memset(&msg, 0, sizeof(msg));
+	iovcnt = IOV_CNT(cmdacnt);
+	if ((iov = reallocarray(NULL, iovcnt, sizeof(*iov))) == NULL)
+		FATAL("reallocarray");
+	for (i = 0; i < iovcnt; i++)
+		iov[i].iov_len = sizeof(struct pfr_addr);
+	msg.msg_iov = iov;
+
+	for (;;) {
+		for (i = 0; i < iovcnt; i++) {
+			if ((ca = SIMPLEQ_FIRST(&cmd->addrq)) == NULL)
+				FATALX("wrong address count");
+			SIMPLEQ_REMOVE_HEAD(&cmd->addrq, caddrs);
+			iov[i].iov_base = &ca->pfaddr;
+		}
+		msg.msg_iovlen = iovcnt;
+		if ((ns = sendmsg(tfd, &msg, 0)) == -1)
+			FATAL("sendmsg");
+		if (iovcnt * sizeof(struct pfr_addr) - ns != 0)
+			FATALX("sendmsg buffer too small");
+		if ((cmdacnt -= iovcnt) == 0)
+			break;
+		iovcnt = IOV_CNT(cmdacnt);
+	}
+
+	free(iov);
+	/* wait for reply */
+	RECV(tfd, pfres, sizeof(*pfres));
+	close(tfd);
+	DPRINTF("received pfresult(nadd:%lu, ndel:%lu, nkill:%lu, snkill:%lu)",
+	    pfres->nadd, pfres->ndel, pfres->nkill, pfres->snkill);
+}
+
 __dead void
 tinypfctl(int argc, char *argv[])
 {
@@ -256,6 +312,9 @@ tinypfctl(int argc, char *argv[])
 	ETOI(verbose, ENV_VERBOSE);
 	log_init(argv[1], debug, verbose);
 	setproctitle("%s", __func__);
+
+	if (unveil(PF_DEVICE, "rw") == -1 || unveil(NULL, NULL) == -1)
+		FATAL("unveil");
 
 	ETOI(ctrlfd, ENV_CTRLFD);
 

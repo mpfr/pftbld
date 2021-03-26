@@ -40,7 +40,7 @@ drop_priv(void)
 	struct passwd	*pw;
 
 	if ((pw = getpwnam(PFTBLD_USER)) == NULL)
-		FATAL("setpwnam");
+		FATAL("getpwnam");
 	if (chroot(pw->pw_dir) == -1)
 		FATAL("chroot");
 	if (chdir("/") == -1)
