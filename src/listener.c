@@ -241,7 +241,7 @@ listener(int argc, char *argv[])
 	    &srvsock_handler);
 	memset(&kev, 0, sizeof(kev));
 
-	if (pledge("proc sendfd stdio unix", NULL) == -1)
+	if (pledge("proc recvfd sendfd stdio unix", NULL) == -1)
 		FATAL("pledge");
 
 	while (kevent(kqfd, NULL, 0, &kev, 1, NULL) != -1)
