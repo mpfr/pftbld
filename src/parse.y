@@ -230,10 +230,10 @@ targetoptsl	: CASCADE			{
 					t->hits = nt->hits;
 					STAILQ_REMOVE_AFTER(&target->cascade,
 					    t, tables);
-					free(nt);
 					DPRINTF("merged upwards %u hit%s from "
 					    "cascade step %u", nt->hits,
 					    nt->hits > 1 ? "s" : "", n);
+					free(nt);
 					continue;
 				}
 				(void)strlcpy(nt->name, t->name,
@@ -392,9 +392,7 @@ sockoptsl	: ACTION actionopt	{
 			DPRINTF("datamax: %zd", sock->datamax);
 		}
 		| GROUP NUMBER		{
-			struct group	*grp;
-
-			if ((grp = getgrgid($2)) == NULL) {
+			if (getgrgid($2) == NULL) {
 				yyerror("group id not found");
 				YYERROR;
 			}
@@ -453,9 +451,7 @@ sockoptsl	: ACTION actionopt	{
 			DPRINTF("no timeout");
 		}
 		| OWNER NUMBER		{
-			struct passwd	*pwd;
-
-			if ((pwd = getpwuid($2)) == NULL) {
+			if (getpwuid($2) == NULL) {
 				yyerror("user id not found");
 				YYERROR;
 			}

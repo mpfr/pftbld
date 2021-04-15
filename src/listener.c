@@ -977,7 +977,6 @@ perform_ctrl_save(struct statfd *sfd, char *arg, char *data, size_t datalen)
 		goto end;
 	}
 
-	cnt = 0;
 	STAILQ_FOREACH(tp, &tpq, ptrs) {
 		tgt = tp->p;
 		if (*tgt->persist == '\0')
@@ -1059,6 +1058,7 @@ perform_ctrl_status(struct statfd *sfd, char *arg, char *data, size_t datalen)
 	c = 0;
 	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
 		c++;
+	/* at least one target exists => c > 0 here */
 	CALLOC(cnt[0], c, sizeof(int));
 	CALLOC(cnt[1], c, sizeof(int));
 	TAILQ_FOREACH(clt, &cltq, clients) {
