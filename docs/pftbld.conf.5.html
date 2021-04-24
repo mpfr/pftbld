@@ -313,12 +313,10 @@ s (seconds)
       </dd>
       <dt id="skip"><a class="permalink" href="#skip"><code class="Ic">skip</code></a>
         <var class="Ar">number</var></dt>
-      <dd>Makes <a class="Xr" href="pftbld.8.html">pftbld(8)</a> skip the given
-          <var class="Ar">number</var> of appearances of an IP address on a
-          <code class="Ic">socket</code> with <code class="Ic">action add</code>
-          (the default) specified. Please note that appearances of IP addresses
-          on sockets with other actions specified will be skipped anyway without
-          being counted.</dd>
+      <dd>Makes <a class="Xr" href="pftbld.8.html">pftbld(8)</a> add the IP
+          address of a new client entry to the corresponding
+          <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table only
+          after the specified <var class="Ar">number</var> of appearances.</dd>
       <dt id="socket"><a class="permalink" href="#socket"><code class="Ic">socket</code></a>
         <var class="Ar">path</var> [{...}]</dt>
       <dd>Specifies a UNIX-domain socket at <var class="Ar">path</var> to be
@@ -565,7 +563,7 @@ function pftbld_drop() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">March 15, 2021</td>
+    <td class="foot-date">April 24, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
