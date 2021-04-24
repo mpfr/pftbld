@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 15 2021 $
+.Dd $Mdocdate: April 24 2021 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -344,15 +344,11 @@ The time stamp of the last appearance is set to the current time.
 .It Ic skip Ar number
 Makes
 .Xr pftbld 8
-skip the given
+add the IP address of a new client entry to the corresponding
+.Xr pf 4
+table only after the specified
 .Ar number
-of appearances of an IP address on a
-.Ic socket
-with
-.Ic action add
-(the default) specified.
-Please note that appearances of IP addresses on sockets with other actions
-specified will be skipped anyway without being counted.
+of appearances.
 .It Ic socket Ar path Oo Bro ... Brc Oc
 Specifies a UNIX-domain socket at
 .Ar path
