@@ -399,6 +399,8 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		if (clt->tgt == tgt && !addrs_cmp(&clt->addr, &addr))
 			break;
 
+	skip = tgt->skip;
+
 	if (action != ACTION_ADD) {
 		print_ts_log("%s :: [%s%s] <- [%s]", ACTION_TO_CSTR(action),
 		    tgtname, sockid, replace(data, "\n", '\0'));
@@ -406,6 +408,9 @@ proc_data(struct inbuf *ibuf, int kqfd)
 
 		if (ign->cnt == 0) {
 			if (clt == NULL) {
+				if (skip)
+					goto end;
+
 				print_ts_log("Hmm... [%s]:[%s] is unknown and "
 				    "hence cannot be %s.\n", addr.str, tgtname,
 				    ACTION_TO_LPSTR(action));
@@ -475,7 +480,6 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	append_data_log(data, datalen);
 
 	clthits = ++clt->hits;
-	skip = tgt->skip;
 
 	tbl = STAILQ_FIRST(&clt->tgt->cascade);
 	while (tbl != NULL && tbl->hits > 0 && clthits > tbl->hits)
