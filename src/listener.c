@@ -362,7 +362,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	    (pt = check_exclkeyterms(&conf->exclkeyterms, data)) != NULL) {
 		ign = request_ignore(&addr, tgtname, sockid, pt);
 		if (ign->cnt == 0) {
-			ASPRINTF(&ign->data, "keyterm '%s'", pt->p);
+			ASPRINTF(&ign->data, "keyterm '%s'", (char *)pt->p);
 			print_ts_log("Ignored excluded %s :: [%s%s] <- [%s]",
 			    ign->data, tgtname, sockid,
 			    replace(data, "\n", '\0'));
