@@ -14,7 +14,7 @@ Other programs usually interact with `pftbld` by sending plain text messages to 
 
 First of all, make sure you're running `OpenBSD 6.8-stable`. Otherwise, one of the following branches might be more appropriate:
 * [current](https://github.com/mpfr/pftbld)
-* [6.7-stable](https://github.com/mpfr/pftbld/tree/6.7-stable)
+* [6.9-stable](https://github.com/mpfr/pftbld/tree/6.9-stable)
 
 Then, make sure your user (e.g. `mpfr`) has sufficient `doas` permissions.
 
