@@ -13,8 +13,8 @@ Other programs usually interact with `pftbld` by sending plain text messages to 
 `pftbld` needs to be built from sources and installed manually. Luckily, this is easy and straightforward. Just follow the steps below.
 
 First of all, make sure you're running `OpenBSD-current`. Otherwise, one of the following branches might be more appropriate:
+* [6.9-stable](https://github.com/mpfr/pftbld/tree/6.9-stable)
 * [6.8-stable](https://github.com/mpfr/pftbld/tree/6.8-stable)
-* [6.7-stable](https://github.com/mpfr/pftbld/tree/6.7-stable)
 
 Then, make sure your user (e.g. `mpfr`) has sufficient `doas` permissions.
 
