@@ -91,8 +91,8 @@ parse_conf(void)
 	extern int		 yyparse(void);
 	extern int		 errors, lineno, colno;
 	extern char		 conffile[PATH_MAX];
-	extern struct crangeq	*curr_exclcrangeq;
-	extern struct ptrq	*curr_exclkeytermq;
+	extern struct crangeq	*curr_exclcrangeq, *curr_inclcrangeq;
+	extern struct ptrq	*curr_exclkeytermq, *curr_inclkeytermq;
 
 	struct crange	*self;
 	struct target	*tgt;
@@ -107,12 +107,16 @@ parse_conf(void)
 	STAILQ_INIT(&conf->ctargets);
 	STAILQ_INIT(&conf->exclcranges);
 	STAILQ_INIT(&conf->exclkeyterms);
+	STAILQ_INIT(&conf->inclcranges);
+	STAILQ_INIT(&conf->inclkeyterms);
 
 	CALLOC(self, 1, sizeof(*self));
 	STAILQ_INSERT_HEAD(&conf->exclcranges, self, cranges);
 
 	curr_exclcrangeq = &conf->exclcranges;
 	curr_exclkeytermq = &conf->exclkeyterms;
+	curr_inclcrangeq = &conf->inclcranges;
+	curr_inclkeytermq = &conf->inclkeyterms;
 
 	errors = lineno = colno = 0;
 	yyparse();
@@ -409,6 +413,15 @@ free_conf(struct config *c)
 			free(kt->p);
 			free(kt);
 		}
+		while ((cr = STAILQ_FIRST(&tgt->inclcranges)) != NULL) {
+			STAILQ_REMOVE_HEAD(&tgt->inclcranges, cranges);
+			free(cr);
+		}
+		while ((kt = STAILQ_FIRST(&tgt->inclkeyterms)) != NULL) {
+			STAILQ_REMOVE_HEAD(&tgt->inclkeyterms, ptrs);
+			free(kt->p);
+			free(kt);
+		}
 		free(tgt);
 	}
 	while ((cr = STAILQ_FIRST(&c->exclcranges)) != NULL) {
@@ -417,6 +430,15 @@ free_conf(struct config *c)
 	}
 	while ((kt = STAILQ_FIRST(&c->exclkeyterms)) != NULL) {
 		STAILQ_REMOVE_HEAD(&c->exclkeyterms, ptrs);
+		free(kt->p);
+		free(kt);
+	}
+	while ((cr = STAILQ_FIRST(&c->inclcranges)) != NULL) {
+		STAILQ_REMOVE_HEAD(&c->inclcranges, cranges);
+		free(cr);
+	}
+	while ((kt = STAILQ_FIRST(&c->inclkeyterms)) != NULL) {
+		STAILQ_REMOVE_HEAD(&c->inclkeyterms, ptrs);
 		free(kt->p);
 		free(kt);
 	}
@@ -477,16 +499,33 @@ print_conf(struct statfd *sfd)
 		free(age);
 	}
 
-	cr = STAILQ_FIRST(&conf->exclcranges);
-	if ((cr != NULL && *cr->str != '\0') ||
+	cr = STAILQ_FIRST(&conf->exclcranges); /* self-exclude */
+	if ((cr = STAILQ_NEXT(cr, cranges)) != NULL ||
 	    !STAILQ_EMPTY(&conf->exclkeyterms)) {
 		msg_send(sfd, "exclude {\n");
 
-		if (cr != NULL)
-			while ((cr = STAILQ_NEXT(cr, cranges)) != NULL)
-				msg_send(sfd, "\tnet \"%s\"\n", cr->str);
+		while (cr != NULL) {
+			msg_send(sfd, "\tnet \"%s\"\n", cr->str);
+			cr = STAILQ_NEXT(cr, cranges);
+		}
 
 		STAILQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
+			estr = esc(kt->p);
+			msg_send(sfd, "\tkeyterm \"%s\"\n", estr);
+			free(estr);
+		}
+
+		msg_send(sfd, "}\n");
+	}
+
+	if (!STAILQ_EMPTY(&conf->inclcranges) ||
+	    !STAILQ_EMPTY(&conf->inclkeyterms)) {
+		msg_send(sfd, "include {\n");
+
+		STAILQ_FOREACH(cr, &conf->inclcranges, cranges)
+			msg_send(sfd, "\tnet \"%s\"\n", cr->str);
+
+		STAILQ_FOREACH(kt, &conf->inclkeyterms, ptrs) {
 			estr = esc(kt->p);
 			msg_send(sfd, "\tkeyterm \"%s\"\n", estr);
 			free(estr);
@@ -591,6 +630,22 @@ print_conf(struct statfd *sfd)
 				msg_send(sfd, "\t\tnet \"%s\"\n", cr->str);
 
 			STAILQ_FOREACH(kt, &tgt->exclkeyterms, ptrs) {
+				estr = esc(kt->p);
+				msg_send(sfd, "\t\tkeyterm \"%s\"\n", estr);
+				free(estr);
+			}
+
+			msg_send(sfd, "\t}\n");
+		}
+
+		if (!STAILQ_EMPTY(&tgt->inclcranges) ||
+		    !STAILQ_EMPTY(&tgt->inclkeyterms)) {
+			msg_send(sfd, "\tinclude {\n");
+
+			STAILQ_FOREACH(cr, &tgt->inclcranges, cranges)
+				msg_send(sfd, "\t\tnet \"%s\"\n", cr->str);
+
+			STAILQ_FOREACH(kt, &tgt->inclkeyterms, ptrs) {
 				estr = esc(kt->p);
 				msg_send(sfd, "\t\tkeyterm \"%s\"\n", estr);
 				free(estr);

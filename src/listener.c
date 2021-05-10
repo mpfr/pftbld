@@ -50,10 +50,10 @@
 
 static void	 handle_ctrl(struct kevent *);
 static void	 handle_srvsock(struct kevent *);
-static struct ptr
-		*check_exclkeyterms(struct ptrq *, char *);
 static struct crange
-		*check_exclcranges(struct crangeq *, struct caddr *);
+		*check_cranges(struct crangeq *, struct caddr *);
+static struct ptr
+		*check_keyterms(struct ptrq *, const char *);
 static char	*enq_target_address_params(char *, char *, size_t,
 		    struct ptrq *, struct crangeq *);
 static void	 free_target_address_queues(struct crangeq *, struct ptrq *);
@@ -294,24 +294,24 @@ fork_listener(struct socket *sockcfg, char *tgtname)
 	FATAL("execvp");
 }
 
-static struct ptr *
-check_exclkeyterms(struct ptrq *ktq, char *buf)
-{
-	struct ptr	*kt;
-
-	STAILQ_MATCH(kt, ktq, ptrs, strstr(buf, kt->p) != NULL);
-
-	return (kt);
-}
-
 static struct crange *
-check_exclcranges(struct crangeq *crq, struct caddr *addr)
+check_cranges(struct crangeq *crq, struct caddr *addr)
 {
 	struct crange	*cr;
 
 	STAILQ_MATCH(cr, crq, cranges, addr_inrange(cr, addr));
 
 	return (cr);
+}
+
+static struct ptr *
+check_keyterms(struct ptrq *ktq, const char *buf)
+{
+	struct ptr	*kt;
+
+	STAILQ_MATCH(kt, ktq, ptrs, strstr(buf, kt->p) != NULL);
+
+	return (kt);
 }
 
 void
@@ -325,7 +325,6 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	struct ptr	*pt;
 	struct ignore	*ign;
 	struct socket	*sock;
-	enum pfaction	 action;
 	struct crangeq	 crq;
 	struct ptrq	 tpq;
 	struct crange	*cr;
@@ -333,7 +332,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	struct timespec	 now, tsdiff;
 	struct table	*tbl;
 	ssize_t		 datalen;
-	unsigned int	 clthits, skip;
+	unsigned int	 clthits;
 	struct pfcmd	 cmd;
 	struct pfresult	 pfres;
 	struct kevent	 kev;
@@ -358,8 +357,22 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	if ((tgt = find_target_byname(&conf->ctargets, tgtname)) == NULL)
 		FATALX("invalid target [%s]", tgtname);
 
-	if ((pt = check_exclkeyterms(&tgt->exclkeyterms, data)) != NULL ||
-	    (pt = check_exclkeyterms(&conf->exclkeyterms, data)) != NULL) {
+	if ((sock = find_socket_byid(&tgt->datasocks, sockid)) == NULL)
+		FATALX("invalid socket [%s]", sockid);
+
+	ign = NULL;
+
+	if ((pt = check_keyterms(&tgt->inclkeyterms, data)) != NULL ||
+	    (pt = check_keyterms(&conf->inclkeyterms, data)) != NULL) {
+		ign = request_ignore(&addr, tgtname, sockid, &sock->action);
+		if (ign->cnt == 0)
+			ASPRINTF(&ign->data, "included keyterm '%s' ",
+			    (char *)pt->p);
+		goto chkaddr;
+	}
+
+	if ((pt = check_keyterms(&tgt->exclkeyterms, data)) != NULL ||
+	    (pt = check_keyterms(&conf->exclkeyterms, data)) != NULL) {
 		ign = request_ignore(&addr, tgtname, sockid, pt);
 		if (ign->cnt == 0) {
 			ASPRINTF(&ign->data, "keyterm '%s'", (char *)pt->p);
@@ -372,8 +385,27 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		goto end;
 	}
 
-	if ((cr = check_exclcranges(&tgt->exclcranges, &addr)) != NULL ||
-	    (cr = check_exclcranges(&conf->exclcranges, &addr)) != NULL) {
+chkaddr:
+	if ((cr = check_cranges(&tgt->inclcranges, &addr)) != NULL ||
+	    (cr = check_cranges(&conf->inclcranges, &addr)) != NULL) {
+		if (ign != NULL) /* already has include keyterm match */
+			goto next;
+
+		ign = request_ignore(&addr, tgtname, sockid, &sock->action);
+		if (ign->cnt == 0) {
+			if (addrvals_cmp(&cr->first, &cr->last, cr->af))
+				ASPRINTF(&ign->data, "included network <%s> ",
+				    cr->str);
+			else
+				ASPRINTF(&ign->data, "included address ");
+		}
+		goto next;
+	}
+
+	if ((cr = check_cranges(&tgt->exclcranges, &addr)) != NULL ||
+	    (cr = check_cranges(&conf->exclcranges, &addr)) != NULL) {
+		if (ign != NULL) /* override include keyterms match */
+			cancel_ignore(ign);
 		ign = request_ignore(&addr, tgtname, sockid, cr);
 		if (ign->cnt == 0) {
 			replace(data, "\n", '\0');
@@ -387,33 +419,30 @@ proc_data(struct inbuf *ibuf, int kqfd)
 			GET_TIME(&ign->ts);
 		}
 		goto end;
-	}
 
-	if ((sock = find_socket_byid(&tgt->datasocks, sockid)) == NULL)
-		FATALX("invalid socket [%s]", sockid);
+	} else if (ign != NULL)
+		goto next;
 
 	ign = request_ignore(&addr, tgtname, sockid, &sock->action);
-	action = sock->action;
 
+next:
 	TAILQ_FOREACH(clt, &cltq, clients)
 		if (clt->tgt == tgt && !addrs_cmp(&clt->addr, &addr))
 			break;
 
-	skip = tgt->skip;
-
-	if (action != ACTION_ADD) {
-		print_ts_log("%s :: [%s%s] <- [%s]", ACTION_TO_CSTR(action),
+	if (sock->action != ACTION_ADD) {
+		print_ts_log("%s %s:: [%s%s] <- [%s]",
+		    ACTION_TO_CSTR(sock->action), ign->data ? ign->data : "",
 		    tgtname, sockid, replace(data, "\n", '\0'));
 		append_data_log(data, datalen);
+		free(ign->data);
+		ign->data = NULL;
 
 		if (ign->cnt == 0) {
 			if (clt == NULL) {
-				if (skip)
-					goto end;
-
 				print_ts_log("Hmm... [%s]:[%s] is unknown and "
 				    "hence cannot be %s.\n", addr.str, tgtname,
-				    ACTION_TO_LPSTR(action));
+				    ACTION_TO_LPSTR(sock->action));
 				goto end;
 			}
 
@@ -425,7 +454,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 			MALLOC(pt, sizeof(*pt));
 			pt->p = tgt;
 			STAILQ_INSERT_TAIL(&tpq, pt, ptrs);
-			switch (action) {
+			switch (sock->action) {
 			case ACTION_DELETE:
 				switch (expire_clients(&crq, &tpq)) {
 				case 0:
@@ -450,7 +479,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 					    addr.str, tgtname);
 				break;
 			default:
-				FATALX("invalid action (%d)", action);
+				FATALX("invalid action (%d)", sock->action);
 			}
 			free_target_address_queues(&crq, &tpq);
 		}
@@ -475,9 +504,11 @@ proc_data(struct inbuf *ibuf, int kqfd)
 		TAILQ_REMOVE(&cltq, clt, clients);
 	}
 
-	print_ts_log("Add :: [%s%s] <- [%s]",
+	print_ts_log("Add %s:: [%s%s] <- [%s]", ign->data ? ign->data : "",
 	    tgtname, sockid, replace(data, "\n", '\0'));
 	append_data_log(data, datalen);
+	free(ign->data);
+	ign->data = NULL;
 
 	clthits = ++clt->hits;
 
@@ -487,16 +518,16 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	if (tbl == NULL)
 		FATALX("open cascade");
 
-	if (clthits > skip) {
+	if (clthits > tgt->skip) {
 		PFCMD_INIT(&cmd, PFCMD_ADD, tbl->name, tbl->flags);
 		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
 		cmd.addrcnt = 1;
 		pfexec(&pfres, &cmd);
 		print_ts_log("%s [%s]:[%s]:(%ux",
-		    pfres.nadd ? ">>> Added" : "Aquired", clt->addr.str,
+		    pfres.nadd ? ">>> Added" : "Acquired", clt->addr.str,
 		    tgtname, clthits);
 	} else
-		print_ts_log("Skipped (%u/%u", clthits, skip);
+		print_ts_log("Skipped (%u/%u", clthits, tgt->skip);
 
 	GET_TIME(&now);
 
@@ -510,7 +541,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	clt->tbl = tbl;
 	clt->ts = now;
 
-	if (clthits > skip) {
+	if (clthits > tgt->skip) {
 		print_log(") %s { %s }", pfres.nadd ? "to" : "from",
 		    tbl->name);
 
@@ -552,18 +583,27 @@ proc_data(struct inbuf *ibuf, int kqfd)
 
 	sort_client_asc(clt);
 
-	if (clt == TAILQ_FIRST(&cltq)) {
+	if (clt == TAILQ_FIRST(&cltq)) { /* client is new first */
 		if (first != NULL)
 			EV_MOD(kqfd, &kev, (unsigned long)first, EVFILT_TIMER,
 			    EV_DELETE, 0, 0, NULL);
-		if (!clt->exp && !timespec_isinfinite(&tbl->expire))
+		if (!timespec_isinfinite(&clt->to)) {
+			timespecsub(&clt->to, &now, &tsdiff);
 			EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER,
-			    EV_ADD, 0, tbl->expire.tv_sec * 1000,
+			    EV_ADD, 0, TIMESPEC_TO_MSEC(&tsdiff),
 			    &expire_handler);
-		else if (clt->exp && !timespec_isinfinite(&tbl->drop))
+		}
+	} else if (clt == first) { /* client was first but no longer is */
+		if (!timespec_isinfinite(&clt->to))
 			EV_MOD(kqfd, &kev, (unsigned long)clt, EVFILT_TIMER,
-			    EV_ADD, 0, tbl->drop.tv_sec * 1000,
+			    EV_DELETE, 0, 0, NULL);
+		first = TAILQ_FIRST(&cltq);
+		if (!timespec_isinfinite(&first->to)) {
+			timespecsub(&first->to, &now, &tsdiff);
+			EV_MOD(kqfd, &kev, (unsigned long)first, EVFILT_TIMER,
+			    EV_ADD, 0, TIMESPEC_TO_MSEC(&tsdiff),
 			    &expire_handler);
+		}
 	}
 
 	GET_TIME(&ign->ts);
