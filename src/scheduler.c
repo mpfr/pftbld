@@ -124,6 +124,9 @@ update_conf(struct config *nc)
 		SIMPLEQ_FOREACH(sock, &tgt->datasocks, sockets)
 			close(sock->ctrlfd);
 
+	self = SIMPLEQ_FIRST(&nc->exclcranges);
+	SIMPLEQ_REMOVE_HEAD(&nc->exclcranges, cranges);
+	free(self);
 	self = SIMPLEQ_FIRST(&conf->exclcranges);
 	SIMPLEQ_REMOVE_HEAD(&conf->exclcranges, cranges);
 	SIMPLEQ_INSERT_HEAD(&nc->exclcranges, self, cranges);
@@ -518,6 +521,28 @@ recv_conf(void)
 			SIMPLEQ_INSERT_TAIL(&tgt->exclkeyterms, kt, ptrs);
 		}
 
+		SIMPLEQ_INIT(&tgt->inclcranges);
+
+		for (;;) {
+			CHECK_NEXTITEM;
+
+			MALLOC(cr, sizeof(*cr));
+			RECV(sched_cfd, cr, sizeof(*cr));
+			SIMPLEQ_INSERT_TAIL(&tgt->inclcranges, cr, cranges);
+		}
+
+		SIMPLEQ_INIT(&tgt->inclkeyterms);
+
+		for (;;) {
+			CHECK_NEXTITEM;
+
+			MALLOC(kt, sizeof(*kt));
+			IRECV(sched_cfd, 2, kt, sizeof(*kt), &n, sizeof(n));
+			MALLOC(kt->p, n);
+			RECV(sched_cfd, kt->p, n);
+			SIMPLEQ_INSERT_TAIL(&tgt->inclkeyterms, kt, ptrs);
+		}
+
 		SIMPLEQ_INIT(&tgt->cascade);
 
 		for (;;) {
@@ -549,6 +574,28 @@ recv_conf(void)
 		MALLOC(kt->p, n);
 		RECV(sched_cfd, kt->p, n);
 		SIMPLEQ_INSERT_TAIL(&nc->exclkeyterms, kt, ptrs);
+	}
+
+	SIMPLEQ_INIT(&nc->inclcranges);
+
+	for (;;) {
+		CHECK_NEXTITEM;
+
+		MALLOC(cr, sizeof(*cr));
+		RECV(sched_cfd, cr, sizeof(*cr));
+		SIMPLEQ_INSERT_TAIL(&nc->inclcranges, cr, cranges);
+	}
+
+	SIMPLEQ_INIT(&nc->inclkeyterms);
+
+	for (;;) {
+		CHECK_NEXTITEM;
+
+		MALLOC(kt, sizeof(*kt));
+		IRECV(sched_cfd, 2, kt, sizeof(*kt), &n, sizeof(n));
+		MALLOC(kt->p, n);
+		RECV(sched_cfd, kt->p, n);
+		SIMPLEQ_INSERT_TAIL(&nc->inclkeyterms, kt, ptrs);
 	}
 
 #undef CHECK_NEXTITEM
@@ -802,7 +849,7 @@ static void
 handle_ignore(struct kevent *kev)
 {
 	struct ignore	*ign;
-	struct timespec	 ts, *timeout = (struct timespec *)kev->udata;
+	struct timespec	 ts, *timeout = kev->udata;
 
 	EV_MOD(kqfd, kev, kev->ident, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
 
@@ -868,6 +915,21 @@ start_ignore(struct ignore *ign)
 	ign->cnt++;
 	EV_MOD(kqfd, &kev, (unsigned long)ign, EVFILT_TIMER, EV_ADD, 0,
 	    IGNORE_TIMEOUT, &ignore_handler);
+}
+
+void
+cancel_ignore(struct ignore *ign)
+{
+	struct kevent	 kev;
+
+	if (ign->cnt)
+		EV_MOD(kqfd, &kev, (unsigned long)ign, EVFILT_TIMER, EV_DELETE,
+		    0, 0, NULL);
+	TAILQ_REMOVE(&ignq, ign, ignores);
+	free(ign->tgtname);
+	free(ign->sockid);
+	free(ign->data);
+	free(ign);
 }
 
 __dead void

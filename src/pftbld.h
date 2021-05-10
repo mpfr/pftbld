@@ -354,6 +354,8 @@ struct target {
 	struct socketq	 datasocks;
 	struct crangeq	 exclcranges;
 	struct ptrq	 exclkeyterms;
+	struct crangeq	 inclcranges;
+	struct ptrq	 inclkeyterms;
 	struct tableq	 cascade;
 
 	SIMPLEQ_ENTRY(target) targets;
@@ -384,6 +386,8 @@ struct config {
 	struct targetq	 ctargets;
 	struct crangeq	 exclcranges;
 	struct ptrq	 exclkeyterms;
+	struct crangeq	 inclcranges;
+	struct ptrq	 inclkeyterms;
 	uint8_t		 flags;
 };
 
@@ -509,6 +513,7 @@ unsigned int	 expire_clients(struct crangeq *, struct ptrq *);
 unsigned int	 expire_clients_r(struct crangeq *, struct ptrq *);
 struct ignore	*request_ignore(struct caddr *, char *, char *, void *);
 void		 start_ignore(struct ignore *);
+void		 cancel_ignore(struct ignore *);
 __dead void	 scheduler(int, char **);
 void		 fork_scheduler(void);
 int		 bind_table(struct client *, struct pfcmdq *);

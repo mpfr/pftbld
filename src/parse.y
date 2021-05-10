@@ -34,14 +34,14 @@
 #define YY_CANONICAL_PATH_SET(str, path, txt, err, exit)	\
 	CANONICAL_PATH_SET(str, path, txt, err yyerror, exit)
 
-static void	yyerror(const char *, ...);
-static int	yylex(void);
+static void	 yyerror(const char *, ...);
+static int	 yylex(void);
 
 static int	 kern_somaxconn(void);
-static int	 load_exclude_keyterms(const char *);
 static int	 crange_inq(struct crangeq *, struct crange *);
 static int	 keyterm_inq(struct ptrq *, struct ptr *);
-static int	 load_exclude_cranges(const char *);
+static int	 load_cranges(const char *, struct crangeq *);
+static int	 load_keyterms(const char *, struct ptrq *);
 
 typedef struct {
 	union {
@@ -60,14 +60,15 @@ static struct socket	*sock;
 static struct table	*table, *ptable;
 static uint8_t		 flags;
 
-struct crangeq	*curr_exclcrangeq;
-struct ptrq	*curr_exclkeytermq;
+struct crangeq	*curr_exclcrangeq, *curr_inclcrangeq;
+struct ptrq	*curr_exclkeytermq, *curr_inclkeytermq;
 
 %}
 
 %token	ACTION ADD BACKLOG CASCADE DATAMAX DELETE DROP EXCLUDE EXPIRE GROUP
-%token	HITS ID KEEP KEYTERM KEYTERMFILE KILL LOCALHOSTS LOG MODE NET NETFILE
-%token	NO NODES OWNER PERSIST SKIP SOCKET STATES STEP TABLE TARGET TIMEOUT
+%token	HITS ID INCLUDE KEEP KEYTERM KEYTERMFILE KILL LOCALHOSTS LOG MODE NET
+%token	NETFILE NO NODES OWNER PERSIST SKIP SOCKET STATES STEP TABLE TARGET
+%token	TIMEOUT
 %token	<v.number>	NUMBER
 %token	<v.string>	STRING
 %token	<v.time>	TIME
@@ -106,6 +107,7 @@ main		: BACKLOG NUMBER		{
 			DPRINTF("global drop time: %lld", conf->drop.tv_sec);
 		}
 		| exclude
+		| include
 		| LOG STRING			{
 			YY_CANONICAL_PATH_SET(conf->log, $2, "log file",
 			    free($2);, YYERROR);
@@ -162,10 +164,14 @@ main		: BACKLOG NUMBER		{
 			SIMPLEQ_INIT(&target->datasocks);
 			SIMPLEQ_INIT(&target->exclcranges);
 			SIMPLEQ_INIT(&target->exclkeyterms);
+			SIMPLEQ_INIT(&target->inclcranges);
+			SIMPLEQ_INIT(&target->inclkeyterms);
 			SIMPLEQ_INIT(&target->cascade);
 			DPRINTF("current target is [%s]", target->name);
 			curr_exclcrangeq = &target->exclcranges;
 			curr_exclkeytermq = &target->exclkeyterms;
+			curr_inclcrangeq = &target->inclcranges;
+			curr_inclkeytermq = &target->inclkeyterms;
 		} '{' optnl targetopts_l '}'	{
 			if (SIMPLEQ_EMPTY(&target->datasocks)) {
 				yyerror("no sockets defined for target [%s]",
@@ -179,6 +185,8 @@ main		: BACKLOG NUMBER		{
 			}
 			curr_exclcrangeq = &conf->exclcranges;
 			curr_exclkeytermq = &conf->exclkeyterms;
+			curr_inclcrangeq = &conf->inclcranges;
+			curr_inclkeytermq = &conf->inclkeyterms;
 		}
 		;
 
@@ -213,7 +221,8 @@ targetoptsl	: CASCADE			{
 					YYERROR;
 				}
 				if (nt->hits == 0)
-					DPRINTF("cascade closed by step %u", n);
+					DPRINTF("cascade closed by step %u",
+					    n);
 				else if (nt->hits <= t->hits) {
 					yyerror("cascade step %u must catch "
 					    "more than %u hit%s", n, t->hits,
@@ -257,6 +266,7 @@ targetoptsl	: CASCADE			{
 			DPRINTF("drop time: %lld", target->drop.tv_sec);
 		}
 		| exclude
+		| include
 		| NO DROP			{
 			target->drop = CONF_NO_DROP;
 			DPRINTF("no drop");
@@ -499,8 +509,32 @@ excludeopts_l	: excludeoptsl optcommanl excludeopts_l
 		| excludeoptsl optnl
 		;
 
-excludeoptsl	: LOCALHOSTS		{
-			if (load_exclude_cranges(HOSTS_FILE) == -1)
+excludeoptsl	: KEYTERM STRING	{
+			struct ptr	*k;
+
+			MALLOC(k, sizeof(*k));
+			STRDUP(k->p, $2);
+			free($2);
+			if (keyterm_inq(curr_exclkeytermq, k)) {
+				DPRINTF("exclude keyterm '%s' already "
+				    "enqueued", k->p);
+				free(k->p);
+				free(k);
+			} else {
+				SIMPLEQ_INSERT_TAIL(curr_exclkeytermq, k,
+				    ptrs);
+				DPRINTF("enqueued exclude keyterm '%s'", k->p);
+			}
+		}
+		| KEYTERMFILE STRING	{
+			if (load_keyterms($2, curr_exclkeytermq) == -1) {
+				free($2);
+				YYERROR;
+			}
+			free($2);
+		}
+		| LOCALHOSTS		{
+			if (load_cranges(HOSTS_FILE, curr_exclcrangeq) == -1)
 				YYERROR;
 		}
 		| NET STRING		{
@@ -513,37 +547,77 @@ excludeoptsl	: LOCALHOSTS		{
 			}
 			free($2);
 			if (crange_inq(curr_exclcrangeq, r)) {
-				DPRINTF("range [%s] already enqueued", r->str);
+				DPRINTF("exclude range [%s] already enqueued",
+				    r->str);
 				free(r);
 			} else {
 				SIMPLEQ_INSERT_TAIL(curr_exclcrangeq, r,
 				    cranges);
-				DPRINTF("enqueued range [%s]", r->str);
+				DPRINTF("enqueued exclude range [%s]", r->str);
 			}
 		}
 		| NETFILE STRING	{
-			if (load_exclude_cranges($2) == -1) {
+			if (load_cranges($2, curr_exclcrangeq) == -1) {
 				free($2);
 				YYERROR;
 			}
 			free($2);
 		}
-		| KEYTERM STRING	{
+		;
+
+include		: INCLUDE '{' optnl includeopts_l '}'
+		| INCLUDE includeoptsl
+		;
+
+includeopts_l	: includeoptsl optcommanl includeopts_l
+		| includeoptsl optnl
+		;
+
+includeoptsl	: KEYTERM STRING	{
 			struct ptr	*k;
 
 			MALLOC(k, sizeof(*k));
 			STRDUP(k->p, $2);
 			free($2);
-			if (keyterm_inq(curr_exclkeytermq, k)) {
-				DPRINTF("keyterm '%s' already enqueued", k->p);
+			if (keyterm_inq(curr_inclkeytermq, k)) {
+				DPRINTF("include keyterm '%s' already "
+				    "enqueued", k->p);
 				free(k->p);
 				free(k);
-			} else
-				SIMPLEQ_INSERT_TAIL(curr_exclkeytermq, k,
+			} else {
+				SIMPLEQ_INSERT_TAIL(curr_inclkeytermq, k,
 				    ptrs);
+				DPRINTF("enqueued include keyterm '%s'", k->p);
+			}
 		}
 		| KEYTERMFILE STRING	{
-			if (load_exclude_keyterms($2) == -1) {
+			if (load_keyterms($2, curr_inclkeytermq) == -1) {
+				free($2);
+				YYERROR;
+			}
+			free($2);
+		}
+		| NET STRING		{
+			struct crange	*r;
+
+			if ((r = parse_crange($2)) == NULL) {
+				free($2);
+				yyerror("invalid include net");
+				YYERROR;
+			}
+			free($2);
+			if (crange_inq(curr_inclcrangeq, r)) {
+				DPRINTF("include range [%s] already enqueued",
+				    r->str);
+				free(r);
+			} else {
+				SIMPLEQ_INSERT_TAIL(curr_inclcrangeq, r,
+				    cranges);
+				DPRINTF("enqueued include range [%s]", r->str);
+			}
+		}
+		| NETFILE STRING	{
+			if (load_cranges($2, curr_inclcrangeq) == -1) {
 				free($2);
 				YYERROR;
 			}
@@ -669,6 +743,7 @@ static const struct keyword {
 	{ "group",	GROUP },
 	{ "hits",	HITS },
 	{ "id",		ID },
+	{ "include",	INCLUDE },
 	{ "keep",	KEEP },
 	{ "keyterm",	KEYTERM },
 	{ "keytermfile", KEYTERMFILE },
@@ -690,6 +765,17 @@ static const struct keyword {
 	{ "target",	TARGET },
 	{ "timeout",	TIMEOUT }
 };
+
+static int
+kern_somaxconn(void)
+{
+	int	 mib[] = { CTL_KERN, KERN_SOMAXCONN }, maxconn;
+	size_t	 len = sizeof(maxconn);
+
+	if (sysctl(mib, 2, &maxconn, &len, NULL, 0) == -1)
+		FATAL("sysctl");
+	return (maxconn);
+}
 
 static int
 crange_inq(struct crangeq *q, struct crange *r)
@@ -716,18 +802,56 @@ keyterm_inq(struct ptrq *q, struct ptr *k)
 }
 
 static int
-kern_somaxconn(void)
+load_cranges(const char *file, struct crangeq *crq)
 {
-	int	 mib[] = { CTL_KERN, KERN_SOMAXCONN }, maxconn;
-	size_t	 len = sizeof(maxconn);
+	char		 cpath[PATH_MAX], *line;
+	FILE		*fp;
+	struct crange	*r;
+	size_t		 len;
+	ssize_t		 n;
+	int		 cnt;
 
-	if (sysctl(mib, 2, &maxconn, &len, NULL, 0) == -1)
-		FATAL("sysctl");
-	return (maxconn);
+	YY_CANONICAL_PATH_SET(cpath, file, "networks file",, return (-1));
+
+	if ((fp = fopen(cpath, "r")) == NULL) {
+		yyerror("failed opening addresses file");
+		return (-1);
+	}
+
+	line = NULL;
+	len = 0;
+	cnt = 0;
+
+	while ((n = getline(&line, &len, fp)) != -1) {
+		if (n == 1 || *line == '#')
+			continue;
+
+		if ((r = parse_crange(replace(line, " \t\n", '\0'))) == NULL) {
+			yyerror("invalid net '%s' in '%s'", line, file);
+			cnt = -1;
+			break;
+		}
+		if (crange_inq(crq, r)) {
+			DPRINTF("range [%s] already enqueued", r->str);
+			free(r);
+		} else {
+			SIMPLEQ_INSERT_TAIL(crq, r, cranges);
+			DPRINTF("enqueued range [%s]", r->str);
+			cnt++;
+		}
+	}
+	free(line);
+
+	if (ferror(fp))
+		log_warn("addresses file error");
+	if (fclose(fp) == EOF)
+		log_warn("addresses file close");
+
+	return (cnt);
 }
 
 static int
-load_exclude_keyterms(const char *file)
+load_keyterms(const char *file, struct ptrq *ktq)
 {
 	char		 cpath[PATH_MAX], *line;
 	FILE		*fp;
@@ -739,7 +863,7 @@ load_exclude_keyterms(const char *file)
 	YY_CANONICAL_PATH_SET(cpath, file, "keyterms file",, return (-1));
 
 	if ((fp = fopen(cpath, "r")) == NULL) {
-		yyerror("failed opening exclude keyterms file");
+		yyerror("failed opening keyterms file");
 		return (-1);
 	}
 
@@ -754,72 +878,23 @@ load_exclude_keyterms(const char *file)
 		CALLOC(k, 1, sizeof(*k));
 		if ((k->p = strndup(line, n - 1)) == NULL)
 			FATAL("strndup(%s, %ld)", line, n - 1);
-		if (keyterm_inq(curr_exclkeytermq, k)) {
+		if (keyterm_inq(ktq, k)) {
 			DPRINTF("keyterm '%s' already enqueued", k->p);
 			free(k->p);
 			free(k);
 			continue;
 		}
 
-		SIMPLEQ_INSERT_TAIL(curr_exclkeytermq, k, ptrs);
+		SIMPLEQ_INSERT_TAIL(ktq, k, ptrs);
 		DPRINTF("enqueued keyterm '%s'", k->p);
 		cnt++;
 	}
 	free(line);
 
 	if (ferror(fp))
-		log_warn("exclude keyterms file error");
+		log_warn("keyterms file error");
 	if (fclose(fp) == EOF)
-		log_warn("exclude keyterms file close");
-
-	return (cnt);
-}
-
-static int
-load_exclude_cranges(const char *file)
-{
-	char		 cpath[PATH_MAX], *line;
-	FILE		*fp;
-	struct crange	*r;
-	size_t		 len;
-	ssize_t		 n;
-	int		 cnt;
-
-	YY_CANONICAL_PATH_SET(cpath, file, "networks file",, return (-1));
-
-	if ((fp = fopen(cpath, "r")) == NULL) {
-		yyerror("failed opening exclude addresses file");
-		return (-1);
-	}
-
-	len = 0;
-	line = NULL;
-	cnt = 0;
-
-	while ((n = getline(&line, &len, fp)) != -1) {
-		if (n == 1 || *line == '#')
-			continue;
-
-		if ((r = parse_crange(replace(line, " \t\n", '\0'))) == NULL) {
-			yyerror("invalid net '%s' in '%s'", line, file);
-			cnt = -1;
-			break;
-		}
-		if (crange_inq(curr_exclcrangeq, r)) {
-			DPRINTF("range [%s] already enqueued", r->str);
-			free(r);
-		} else {
-			SIMPLEQ_INSERT_TAIL(curr_exclcrangeq, r, cranges);
-			DPRINTF("enqueued range [%s]", r->str);
-			cnt++;
-		}
-	}
-	free(line);
-
-	if (ferror(fp))
-		log_warn("exclude addresses file error");
-	if (fclose(fp) == EOF)
-		log_warn("exclude addresses file close");
+		log_warn("keyterms file close");
 
 	return (cnt);
 }
