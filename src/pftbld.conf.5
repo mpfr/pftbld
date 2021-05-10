@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: April 24 2021 $
+.Dd $Mdocdate: May 10 2021 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -131,9 +131,17 @@ value, IP addresses will be kept forever.
 .It Ic exclude Ar option | Brq ...
 Specifies exclusion criteria for incoming data.
 Multiple criterias may be either specified one at a time or enclosed in curly
-brackets.
+braces.
 Valid options are:
 .Bl -tag -width Ds
+.It Ic keyterm Ar string
+Skip processing of incoming data containing the given
+.Ar string .
+.It Ic keytermfile Ar path
+Read
+.Ic keyterm
+strings line by line from the file at
+.Ar path .
 .It Ic localhosts
 Exclude all IP addresses found in the local host name lookup file
 .Pa /etc/hosts
@@ -154,14 +162,49 @@ The file must be fomatted as outlined in
 Any content other than an
 .Pa address/network
 at the beginning of each line will be ignored.
+.El
+.It Ic include Ar option | Brq ...
+Specifies inclusion criteria for incoming data overriding exclusion criteria
+specified by
+.Ic exclude .
+Please note that in case client data has a match in some
+.Ic include keyterm ,
+it still might be excluded by a matching
+.Ic exclude net
+criteria.
+Multiple criterias may be either specified one at a time or enclosed in curly
+braces.
+Valid options are:
+.Bl -tag -width Ds
 .It Ic keyterm Ar string
-Skip processing of incoming data containing the given
-.Ar string .
+Make sure processing of incoming data containing the given
+.Ar string
+takes place even if a matching
+.Ic exclude keyterm
+criteria is defined.
 .It Ic keytermfile Ar path
 Read
 .Ic keyterm
 strings line by line from the file at
 .Ar path .
+.It Ic net Ar address/network
+Make sure the specified
+.Ar address/network
+(e.g.
+.Ar 192.168.100/24 )
+will be processed even if a matching
+.Ic exclude net
+criteria is defined.
+.It Ic netfile Ar path
+Read
+.Ic net
+entries line by line from the file at
+.Ar path .
+The file must be fomatted as outlined in
+.Xr hosts 5 .
+Any content other than an
+.Pa address/network
+at the beginning of each line will be ignored.
 .El
 .It Oo Ic no Oc Ic log Ar path
 Make
@@ -209,7 +252,7 @@ needs to be defined.
 The
 .Pa name
 must be an explicit identifier, ideally reflecting the corresponding service
-name, followed by a block of options enclosed in curly brackets:
+name, followed by a block of options enclosed in curly braces:
 .Bl -tag -width Ds
 .It Ic cascade Brq ...
 Specifies frame and first
@@ -222,7 +265,7 @@ cascade associated client entries will traverse during their
 life cycle.
 There must be exactly one instance defined per
 .Ic target ,
-followed by a block of options enclosed in curly brackets:
+followed by a block of options enclosed in curly braces:
 .Bl -tag -width Ds
 .It Oo Ic no Oc Ic drop Ar time
 Overrides any
@@ -256,7 +299,7 @@ stop evaluating the appearance count of an IP address.
 Set/Unset kill options used when adding an address to a
 .Ic table .
 Multiple options may be either specified one at a time or enclosed in curly
-brackets.
+braces.
 Valid options are:
 .Bl -tag -width Ds
 .It Ic nodes
@@ -280,7 +323,7 @@ The next step in the cascade followed by at least one
 .Ar option
 (except
 .Ic step
-itself), multiple options enclosed in curly brackets.
+itself), multiple options enclosed in curly braces.
 If there is no
 .Ic table
 .Ar option
@@ -311,8 +354,14 @@ option.
 .It Ic exclude Ar option | Brq ...
 Allows for
 .Ic target
-specific exclusion criteria additional (and evaluated prior) to the global
+specific exclusion criteria additional (and evaluated prior) to global
 .Ic exclude
+settings.
+.It Ic include Ar option | Brq ...
+Allows for
+.Ic target
+specific inclusion criteria additional (and evaluated prior) to global
+.Ic include
 settings.
 .It Ic persist Ar path
 Specifies a file at
@@ -358,7 +407,7 @@ to
 .Xr pftbld 8 .
 At least one data socket must be specified per
 .Ic target ,
-followed by an optional block of parameters enclosed in curly brackets:
+followed by an optional block of parameters enclosed in curly braces:
 .Bl -tag -width Ds
 .It Ic action add | delete | drop
 Specifies how to process IP addresses received through the parent

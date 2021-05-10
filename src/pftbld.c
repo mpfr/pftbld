@@ -138,7 +138,7 @@ pftbld(int argc, char *argv[])
 	struct kevent	 kev;
 	int		 kqfd, c, pfd[2];
 	int		 debug = 0, verbose = 0, noaction = 0, unload = 0;
-	char		*sockfile = SOCK_FILE;
+	char		*conffileopt = NULL, *sockfile = SOCK_FILE;
 	struct statfd	*sfd;
 	struct target	*tgt;
 	struct socket	*sock;
@@ -154,8 +154,7 @@ pftbld(int argc, char *argv[])
 			debug = 1;
 			break;
 		case 'f':
-			CANONICAL_PATH_SET(conffile, optarg,
-			    "configuration file", warnx, exit(1));
+			conffileopt = optarg;
 			break;
 		case 'n':
 			noaction = 1;
@@ -189,6 +188,10 @@ pftbld(int argc, char *argv[])
 			usage();
 		}
 	}
+
+	if (conffileopt != NULL)
+		CANONICAL_PATH_SET(conffile, conffileopt, "configuration file",
+		    warnx, exit(1));
 
 	log_init(__progname, debug ? debug : 1, verbose);
 
@@ -447,6 +450,17 @@ send_conf(int fd)
 		}
 		SEND(fd, &iend, sizeof(iend));
 
+		STAILQ_FOREACH(cr, &tgt->inclcranges, cranges)
+			ISEND(fd, 2, &inext, sizeof(inext), cr, sizeof(*cr));
+		SEND(fd, &iend, sizeof(iend));
+
+		STAILQ_FOREACH(kt, &tgt->inclkeyterms, ptrs) {
+			n = strlen(kt->p) + 1;
+			ISEND(fd, 4, &inext, sizeof(inext), kt, sizeof(*kt),
+			    &n, sizeof(n), kt->p, n);
+		}
+		SEND(fd, &iend, sizeof(iend));
+
 		STAILQ_FOREACH(tab, &tgt->cascade, tables)
 			ISEND(fd, 2, &inext, sizeof(inext), tab, sizeof(*tab));
 		SEND(fd, &iend, sizeof(iend));
@@ -458,6 +472,17 @@ send_conf(int fd)
 	SEND(fd, &iend, sizeof(iend));
 
 	STAILQ_FOREACH(kt, &conf->exclkeyterms, ptrs) {
+		n = strlen(kt->p) + 1;
+		ISEND(fd, 4, &inext, sizeof(inext), kt, sizeof(*kt), &n,
+		    sizeof(n), kt->p, n);
+	}
+	SEND(fd, &iend, sizeof(iend));
+
+	STAILQ_FOREACH(cr, &conf->inclcranges, cranges)
+		ISEND(fd, 2, &inext, sizeof(inext), cr, sizeof(*cr));
+	SEND(fd, &iend, sizeof(iend));
+
+	STAILQ_FOREACH(kt, &conf->inclkeyterms, ptrs) {
 		n = strlen(kt->p) + 1;
 		ISEND(fd, 4, &inext, sizeof(inext), kt, sizeof(*kt), &n,
 		    sizeof(n), kt->p, n);

@@ -51,14 +51,12 @@
       number/unit combinations, with numbers in decimal format, e.g.
       <span class="Pa">7w3d</span> representing a period of 7 weeks and 3 days.
       Valid units are:
-    <div class="Bd Pp Bd-indent">
-    <pre>
-w (weeks)
+    <div class="Bd Pp Bd-indent Li">
+    <pre>w (weeks)
 d (days)
 h (hours)
 m (minutes)
-s (seconds)
-    </pre>
+s (seconds)</pre>
     </div>
     <p class="Pp"></p>
   </li>
@@ -86,14 +84,12 @@ s (seconds)
         IPv6. With IPv4, the total length of octets from the most significant to
         that with the least significant set bit is used.</p>
     <p class="Pp">Below a few examples to illustrate the above:</p>
-    <div class="Bd Pp Bd-indent">
-    <pre>
-           11.22.33.44/32 &lt;--&gt; 11.22.33.44
+    <div class="Bd Pp Bd-indent Li">
+    <pre>           11.22.33.44/32 &lt;--&gt; 11.22.33.44
            11.22.33.0/24  &lt;--&gt; 11.22.33.0 - 11.22.33.255
 11.22 &lt;--&gt; 11.22.0.0/16   &lt;--&gt; 11.22.0.0 - 11.22.255.255
 11    &lt;--&gt; 11.0.0.0/8     &lt;--&gt; 11.0.0.0 - 11.255.255.255
-11/17 &lt;--&gt; 11.0.0/17      &lt;--&gt; 11.0.0.0 - 11.0.127.255
-    </pre>
+11/17 &lt;--&gt; 11.0.0/17      &lt;--&gt; 11.0.0.0 - 11.0.127.255</pre>
     </div>
   </li>
 </ul>
@@ -134,9 +130,17 @@ s (seconds)
   <dt id="exclude"><a class="permalink" href="#exclude"><code class="Ic">exclude</code></a>
     <var class="Ar">option</var> | {...}</dt>
   <dd>Specifies exclusion criteria for incoming data. Multiple criterias may be
-      either specified one at a time or enclosed in curly brackets. Valid
-      options are:
+      either specified one at a time or enclosed in curly braces. Valid options
+      are:
     <dl class="Bl-tag">
+      <dt id="keyterm"><a class="permalink" href="#keyterm"><code class="Ic">keyterm</code></a>
+        <var class="Ar">string</var></dt>
+      <dd>Skip processing of incoming data containing the given
+          <var class="Ar">string</var>.</dd>
+      <dt id="keytermfile"><a class="permalink" href="#keytermfile"><code class="Ic">keytermfile</code></a>
+        <var class="Ar">path</var></dt>
+      <dd>Read <code class="Ic">keyterm</code> strings line by line from the
+          file at <var class="Ar">path</var>.</dd>
       <dt id="localhosts"><a class="permalink" href="#localhosts"><code class="Ic">localhosts</code></a></dt>
       <dd>Exclude all IP addresses found in the local host name lookup file
           <span class="Pa">/etc/hosts</span> from being processed.</dd>
@@ -151,14 +155,39 @@ s (seconds)
           <a class="Xr" href="http://man.openbsd.org/hosts.5">hosts(5)</a>. Any
           content other than an <span class="Pa">address/network</span> at the
           beginning of each line will be ignored.</dd>
-      <dt id="keyterm"><a class="permalink" href="#keyterm"><code class="Ic">keyterm</code></a>
+    </dl>
+  </dd>
+  <dt id="include"><a class="permalink" href="#include"><code class="Ic">include</code></a>
+    <var class="Ar">option</var> | {...}</dt>
+  <dd>Specifies inclusion criteria for incoming data overriding exclusion
+      criteria specified by <code class="Ic">exclude</code>. Please note that in
+      case client data has a match in some <code class="Ic">include
+      keyterm</code>, it still might be excluded by a matching
+      <code class="Ic">exclude net</code> criteria. Multiple criterias may be
+      either specified one at a time or enclosed in curly braces. Valid options
+      are:
+    <dl class="Bl-tag">
+      <dt id="keyterm~2"><a class="permalink" href="#keyterm~2"><code class="Ic">keyterm</code></a>
         <var class="Ar">string</var></dt>
-      <dd>Skip processing of incoming data containing the given
-          <var class="Ar">string</var>.</dd>
-      <dt id="keytermfile"><a class="permalink" href="#keytermfile"><code class="Ic">keytermfile</code></a>
+      <dd>Make sure processing of incoming data containing the given
+          <var class="Ar">string</var> takes place even if a matching
+          <code class="Ic">exclude keyterm</code> criteria is defined.</dd>
+      <dt id="keytermfile~2"><a class="permalink" href="#keytermfile~2"><code class="Ic">keytermfile</code></a>
         <var class="Ar">path</var></dt>
       <dd>Read <code class="Ic">keyterm</code> strings line by line from the
           file at <var class="Ar">path</var>.</dd>
+      <dt id="net~2"><a class="permalink" href="#net~2"><code class="Ic">net</code></a>
+        <var class="Ar">address/network</var></dt>
+      <dd>Make sure the specified <var class="Ar">address/network</var> (e.g.
+          <var class="Ar">192.168.100/24</var>) will be processed even if a
+          matching <code class="Ic">exclude net</code> criteria is defined.</dd>
+      <dt id="netfile~2"><a class="permalink" href="#netfile~2"><code class="Ic">netfile</code></a>
+        <var class="Ar">path</var></dt>
+      <dd>Read <code class="Ic">net</code> entries line by line from the file at
+          <var class="Ar">path</var>. The file must be fomatted as outlined in
+          <a class="Xr" href="http://man.openbsd.org/hosts.5">hosts(5)</a>. Any
+          content other than an <span class="Pa">address/network</span> at the
+          beginning of each line will be ignored.</dd>
     </dl>
   </dd>
   <dt>[<code class="Ic">no</code>] <code class="Ic">log</code>
@@ -198,7 +227,7 @@ s (seconds)
     <var class="Ar">name</var> {...}</dt>
   <dd>The <span class="Pa">name</span> must be an explicit identifier, ideally
       reflecting the corresponding service name, followed by a block of options
-      enclosed in curly brackets:
+      enclosed in curly braces:
     <dl class="Bl-tag">
       <dt id="cascade"><a class="permalink" href="#cascade"><code class="Ic">cascade</code></a>
         {...}</dt>
@@ -208,7 +237,7 @@ s (seconds)
           traverse during their <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
           life cycle. There must be exactly one instance defined per
           <code class="Ic">target</code>, followed by a block of options
-          enclosed in curly brackets:
+          enclosed in curly braces:
         <dl class="Bl-tag">
           <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
             <var class="Ar">time</var></dt>
@@ -239,8 +268,8 @@ s (seconds)
             <var class="Ar">option</var> | {...}</dt>
           <dd>Set/Unset kill options used when adding an address to a
               <code class="Ic">table</code>. Multiple options may be either
-              specified one at a time or enclosed in curly brackets. Valid
-              options are:
+              specified one at a time or enclosed in curly braces. Valid options
+              are:
             <dl class="Bl-tag">
               <dt id="nodes"><a class="permalink" href="#nodes"><code class="Ic">nodes</code></a></dt>
               <dd>Refers to a reported address' <span class="Pa">source
@@ -260,7 +289,7 @@ s (seconds)
           <dd>The next step in the cascade followed by at least one
               <code class="Ic">cascade</code> <var class="Ar">option</var>
               (except <code class="Ic">step</code> itself), multiple options
-              enclosed in curly brackets. If there is no
+              enclosed in curly braces. If there is no
               <code class="Ic">table</code> <var class="Ar">option</var>
               specified for a <code class="Ic">step</code>, it is inherited from
               its predecessor. Steps are traversed in the order of their
@@ -286,8 +315,13 @@ s (seconds)
       <dt id="exclude~2"><a class="permalink" href="#exclude~2"><code class="Ic">exclude</code></a>
         <var class="Ar">option</var> | {...}</dt>
       <dd>Allows for <code class="Ic">target</code> specific exclusion criteria
-          additional (and evaluated prior) to the global
+          additional (and evaluated prior) to global
           <code class="Ic">exclude</code> settings.</dd>
+      <dt id="include~2"><a class="permalink" href="#include~2"><code class="Ic">include</code></a>
+        <var class="Ar">option</var> | {...}</dt>
+      <dd>Allows for <code class="Ic">target</code> specific inclusion criteria
+          additional (and evaluated prior) to global
+          <code class="Ic">include</code> settings.</dd>
       <dt id="persist"><a class="permalink" href="#persist"><code class="Ic">persist</code></a>
         <var class="Ar">path</var></dt>
       <dd>Specifies a file at <var class="Ar">path</var> in which managed IP
@@ -323,7 +357,7 @@ s (seconds)
           used for sending target specific <span class="Pa">data strings</span>
           to <a class="Xr" href="pftbld.8.html">pftbld(8)</a>. At least one data
           socket must be specified per <code class="Ic">target</code>, followed
-          by an optional block of parameters enclosed in curly brackets:
+          by an optional block of parameters enclosed in curly braces:
         <dl class="Bl-tag">
           <dt id="action"><a class="permalink" href="#action"><code class="Ic">action
             add</code></a> |
@@ -402,9 +436,8 @@ s (seconds)
     <a class="Xr" href="http://man.openbsd.org/chroot.8">chroot(8)</a> directory
     of the <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a>
     server, allowing for instant reporting of offending clients.</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-exclude {
+<div class="Bd Pp Bd-indent Li">
+<pre>exclude {
 	localhosts
 	net &quot;10.0.0/24&quot;
 }
@@ -435,8 +468,7 @@ target &quot;www&quot; {
 			kill nodes
 		}
 	}
-}
-</pre>
+}</pre>
 </div>
 <p class="Pp">The first 4 times an address (outside the
     <span class="Pa">10.0.0/24</span> network and the hosts found in
@@ -452,19 +484,15 @@ target &quot;www&quot; {
     entries.</p>
 <p class="Pp">The <a class="Xr" href="pftbld.8.html">pftbld(8)</a> binary in
     pipe mode may be used for testing:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-# echo -n &quot;11.22.33.44&quot; | pftbld -p /var/www/run/pftbld-www.sock
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre># echo -n &quot;11.22.33.44&quot; | pftbld -p /var/www/run/pftbld-www.sock</pre>
 </div>
 <p class="Pp">Alternatively, the same result can be achieved by utilizing
     <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a> along with
     <code class="Fl">-q</code> suppressing the server acknowledge that would be
     printed to <span class="Pa">stdout</span> otherwise:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-# pftblctl -q -s /var/www/run/pftbld-www.sock 11.22.33.44
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre># pftblctl -q -s /var/www/run/pftbld-www.sock 11.22.33.44</pre>
 </div>
 <p class="Pp">If everything went right, two entries were appended to the default
     log file <span class="Pa">/var/log/pftbld.log</span>. The first telling that
@@ -478,28 +506,23 @@ target &quot;www&quot; {
     <span class="Pa">attackers</span> table) can be achieved by sending a
     <span class="Pa">drop</span> command to the <span class="Pa">control
     socket</span>:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-# pftblctl drop 11.22.33.44
-1 client entry dropped.
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre># pftblctl drop 11.22.33.44
+1 client entry dropped.</pre>
 </div>
 <p class="Pp">In order to keep offending clients away from
     <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a>,
     appropriate entries in
     <a class="Xr" href="http://man.openbsd.org/pf.conf.5">pf.conf(5)</a> are
     required. Here's an example:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-table &lt;attackers&gt; persist
-block in quick log proto tcp from &lt;attackers&gt; to port { www https }
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre>table &lt;attackers&gt; persist
+block in quick log proto tcp from &lt;attackers&gt; to port { www https }</pre>
 </div>
 <p class="Pp">On a FastCGI supported web server, the following PHP code snippet
     allows for automatic notifications:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-function pftbld_feed() {
+<div class="Bd Pp Bd-indent Li">
+<pre>function pftbld_feed() {
 	$sock = socket_create(AF_UNIX, SOCK_STREAM, 0);
 	if ($sock === false)
 		return;
@@ -509,17 +532,15 @@ function pftbld_feed() {
 		    &quot;{$_SERVER['REQUEST_URI']}\n&quot;.
 		    &quot;{$_SERVER['HTTP_USER_AGENT']}&quot;);
 	socket_close($sock);
-}
-</pre>
+}</pre>
 </div>
 <p class="Pp">In case a web application should be capable to, for instance, drop
     client entries from <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
     autonomously, at first an additional <code class="Ic">socket</code> entry,
     this time with the <code class="Ic">action drop</code> option is required in
     the configuration:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-target &quot;www&quot; {
+<div class="Bd Pp Bd-indent Li">
+<pre>target &quot;www&quot; {
 	...
 	socket &quot;/var/www/run/pftbld-www-drop.sock&quot; {
 		action drop
@@ -527,13 +548,11 @@ target &quot;www&quot; {
 		group &quot;www&quot;
 	}
 	...
-}
-</pre>
+}</pre>
 </div>
 <p class="Pp">Now, the above PHP code may simply be reused as follows:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-function pftbld_drop() {
+<div class="Bd Pp Bd-indent Li">
+<pre>function pftbld_drop() {
 	$sock = socket_create(AF_UNIX, SOCK_STREAM, 0);
 	if ($sock === false)
 		return;
@@ -543,8 +562,7 @@ function pftbld_drop() {
 		    &quot;{$_SERVER['REMOTE_ADDR']}\n&quot;.
 		    &quot;client ok&quot;);
 	socket_close($sock);
-}
-</pre>
+}</pre>
 </div>
 </section>
 <section class="Sh">
@@ -563,7 +581,7 @@ function pftbld_drop() {
 </div>
 <table class="foot">
   <tr>
-    <td class="foot-date">April 24, 2021</td>
+    <td class="foot-date">May 10, 2021</td>
     <td class="foot-os">OpenBSD</td>
   </tr>
 </table>
