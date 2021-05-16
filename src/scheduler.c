@@ -40,7 +40,8 @@ static void	 handle_ctrl(struct kevent *);
 static void	 handle_inbfd(struct kevent *);
 static void	 handle_inbuf(struct kevent *);
 static void	 handle_expire(struct kevent *);
-static void	 handle_ignore(struct kevent *);
+static void	 handle_idle(struct kevent *);
+static void	 flushall_idlewatches(void);
 static void	 append_client(struct pfcmdq *, struct client *, enum pfcmdid);
 static __dead void
 		 shutdown_scheduler(void);
@@ -51,11 +52,11 @@ int		 sched_cfd, sched_ifd;
 pid_t		 sched_pid;
 struct clientq	 cltq;
 struct config	*nconf = NULL;
-struct kevcb	 expire_handler, ignore_handler;
+struct kevcb	 expire_handler;
 
-static struct inbufq	 inbq;
-static int		 kqfd;
-static struct ignoreq	 ignq;
+static struct inbufq		 inbq;
+static int			 kqfd;
+static struct idlewatchq	 iwq;
 
 static struct client *
 evtimer_client(void)
@@ -83,9 +84,9 @@ static void
 update_conf(struct config *nc)
 {
 	struct client	*clt;
+	struct kevent	 kev;
 	struct pfcmdq	 cmdq;
 	struct clientq	 cqc, dcq;
-	struct kevent	 kev;
 	struct target	*tgt;
 	struct crange	*self;
 	struct socket	*sock;
@@ -118,6 +119,8 @@ update_conf(struct config *nc)
 
 	if ((clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
+
+	flushall_idlewatches();
 
 	close(conf->ctrlsock.ctrlfd);
 	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
@@ -201,11 +204,12 @@ drop_clients(struct crangeq *crq, struct ptrq *tpq)
 			first = NULL;
 		}
 
+		TAILQ_REMOVE(&cltq, clt, clients);
+		flush_idlewatches(&clt->addr, clt->tgt->name);
+
 		PFCMD_INIT(&cmd, PFCMD_DELETE, clt->tbl->name, 0);
 		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
 		pfexec(&pfres, &cmd);
-
-		TAILQ_REMOVE(&cltq, clt, clients);
 
 		GET_TIME(&ts);
 		timespecsub(&ts, &clt->ts, &ts);
@@ -266,6 +270,7 @@ drop_clients_r(struct crangeq *crq, struct ptrq *tpq)
 		}
 
 		TAILQ_REMOVE(&cltq, clt, clients);
+		flush_idlewatches(&clt->addr, clt->tgt->name);
 		append_client(&cmdq, clt, PFCMD_DELETE);
 		TAILQ_INSERT_TAIL(&dcq, clt, clients);
 		cnt++;
@@ -307,6 +312,7 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if (clt->exp)
 			continue;
+
 		if (!STAILQ_EMPTY(tpq)) {
 			STAILQ_MATCH(tp, tpq, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
@@ -324,6 +330,8 @@ expire_clients(struct crangeq *crq, struct ptrq *tpq)
 			    EV_DELETE, 0, 0, NULL);
 			first = NULL;
 		}
+
+		flush_idlewatches(&clt->addr, clt->tgt->name);
 
 		PFCMD_INIT(&cmd, PFCMD_DELETE, clt->tbl->name, 0);
 		STAILQ_INSERT_TAIL(&cmd.addrq, &clt->addr, caddrs);
@@ -381,6 +389,7 @@ expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 	TAILQ_FOREACH_SAFE(clt, &cltq, clients, nc) {
 		if (clt->exp )
 			continue;
+
 		if (!STAILQ_EMPTY(tpq)) {
 			STAILQ_MATCH(tp, tpq, ptrs, clt->tgt == tp->p);
 			if (tp == NULL)
@@ -400,6 +409,7 @@ expire_clients_r(struct crangeq *crq, struct ptrq *tpq)
 		}
 
 		TAILQ_REMOVE(&cltq, clt, clients);
+		flush_idlewatches(&clt->addr, clt->tgt->name);
 		TAILQ_INSERT_TAIL(&dcq, clt, clients);
 		cnt++;
 	}
@@ -469,6 +479,7 @@ recv_conf(void)
 	size_t		 n;
 	struct socket	*sock;
 	struct target	*tgt;
+	struct timespec	*its;
 	struct crange	*cr;
 	struct ptr	*kt;
 	struct table	*tbl;
@@ -486,6 +497,12 @@ recv_conf(void)
 		MALLOC(tgt, sizeof(*tgt));
 		RECV(sched_cfd, tgt, sizeof(*tgt));
 		STAILQ_INSERT_TAIL(&nc->ctargets, tgt, targets);
+
+		/* initialize idle handler */
+		MALLOC(its, sizeof(*its));
+		MSEC_TO_TIMESPEC(its,
+		    tgt->idlemin != CONF_NO_IDLEMIN ? tgt->idlemin : 0);
+		tgt->idlehandler = (struct kevcb){ &handle_idle, its };
 
 		STAILQ_INIT(&tgt->datasocks);
 
@@ -846,97 +863,129 @@ handle_expire(struct kevent *kev)
 }
 
 static void
-handle_ignore(struct kevent *kev)
+handle_idle(struct kevent *kev)
 {
-	struct ignore	*ign;
-	struct timespec	 ts, *timeout = kev->udata;
+	struct idlewatch	*iw;
+	struct timespec		 ts, *timeout = kev->udata;
 
 	EV_MOD(kqfd, kev, kev->ident, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
 
-	ign = (struct ignore *)kev->ident;
-	TAILQ_REMOVE(&ignq, ign, ignores);
+	iw = (struct idlewatch *)kev->ident;
+	TAILQ_REMOVE(&iwq, iw, idlewatches);
 
-	if (--ign->cnt == 0)
+	if (--iw->cnt == 0)
 		goto end;
 
 	GET_TIME(&ts);
-	timespecsub(&ts, &ign->ts, &ts);
+	timespecsub(&ts, &iw->ts, &ts);
 	if (timeout != NULL)
 		timespecsub(&ts, timeout, &ts);
-	print_ts_log("[%lld ms] Ignored %u ", TIMESPEC_TO_MSEC(&ts), ign->cnt);
-	if (ign->data == NULL)
-		print_log("duplicate %s request%s",
-		    ACTION_TO_LSTR(*(enum pfaction *)ign->ident),
-		    ign->cnt == 1 ? "" : "s");
+	print_ts_log("[%lld ms] Ignored %u ", TIMESPEC_TO_MSEC(&ts), iw->cnt);
+	if (iw->data == NULL)
+		print_log("%s request duplicate%s", ACTION_TO_LSTR(iw->action),
+		    iw->cnt == 1 ? "" : "s");
 	else
-		print_log("more time%s excluded %s", ign->cnt == 1 ? "" : "s",
-		    ign->data);
-	print_log(" :: [%s%s] <- [%s].\n", ign->tgtname, ign->sockid,
-	    ign->addr.str);
+		print_log("more time%s excluded %s", iw->cnt == 1 ? "" : "s",
+		    iw->data);
+	print_log(" :: [%s%s] <- [%s].\n", iw->tgtname, iw->sockid,
+	    iw->addr.str);
 
 end:
-	free(ign->tgtname);
-	free(ign->sockid);
-	free(ign->data);
-	free(ign);
+	free(iw->tgtname);
+	free(iw->sockid);
+	free(iw->data);
+	free(iw);
 }
 
-struct ignore *
-request_ignore(struct caddr *addr, char *tgtname, char *sockid, void *ident)
+struct idlewatch *
+request_idlewatch(struct caddr *addr, char *tgtname, char *sockid,
+    enum pfaction action)
 {
-	struct ignore	*ign;
-	struct kevent	 kev;
+	struct idlewatch	*iw;
+	struct kevent		 kev;
 
-	TAILQ_FOREACH(ign, &ignq, ignores)
-		if (ign->ident == ident && !addrs_cmp(&ign->addr, addr) &&
-		    !strcmp(ign->tgtname, tgtname) && !strcmp(ign->sockid,
-		    sockid)) {
-			EV_MOD(kqfd, &kev, (unsigned long)ign, EVFILT_TIMER,
+	TAILQ_FOREACH(iw, &iwq, idlewatches)
+		if (iw->action == action &&
+		    !addrs_cmp(&iw->addr, addr) &&
+		    !strcmp(iw->tgtname, tgtname) &&
+		    !strcmp(iw->sockid, sockid)) {
+			EV_MOD(kqfd, &kev, (unsigned long)iw, EVFILT_TIMER,
 			    EV_DELETE, 0, 0, NULL);
-			return (ign);
+			return (iw);
 		}
 
-	MALLOC(ign, sizeof(*ign));
-	ign->ident = ident;
-	ign->addr = *addr;
-	STRDUP(ign->tgtname, tgtname);
-	STRDUP(ign->sockid, sockid);
-	ign->data = NULL;
-	ign->cnt = 0;
-	TAILQ_INSERT_TAIL(&ignq, ign, ignores);
-	return (ign);
+	MALLOC(iw, sizeof(*iw));
+	iw->addr = *addr;
+	STRDUP(iw->tgtname, tgtname);
+	STRDUP(iw->sockid, sockid);
+	iw->data = NULL;
+	iw->action = action;
+	iw->cnt = 0;
+	TAILQ_INSERT_TAIL(&iwq, iw, idlewatches);
+	return (iw);
 }
 
 void
-start_ignore(struct ignore *ign)
+start_idlewatch(struct idlewatch *iw, struct target *tgt)
 {
 	struct kevent	 kev;
 
-	ign->cnt++;
-	EV_MOD(kqfd, &kev, (unsigned long)ign, EVFILT_TIMER, EV_ADD, 0,
-	    IGNORE_TIMEOUT, &ignore_handler);
+	if (tgt->idlemin != CONF_NO_IDLEMIN) {
+		iw->cnt++;
+		EV_MOD(kqfd, &kev, (unsigned long)iw, EVFILT_TIMER, EV_ADD, 0,
+		    tgt->idlemin, &tgt->idlehandler);
+	} else
+		cancel_idlewatch(iw);
 }
 
 void
-cancel_ignore(struct ignore *ign)
+cancel_idlewatch(struct idlewatch *iw)
 {
 	struct kevent	 kev;
 
-	if (ign->cnt)
-		EV_MOD(kqfd, &kev, (unsigned long)ign, EVFILT_TIMER, EV_DELETE,
+	if (iw->cnt)
+		EV_MOD(kqfd, &kev, (unsigned long)iw, EVFILT_TIMER, EV_DELETE,
 		    0, 0, NULL);
-	TAILQ_REMOVE(&ignq, ign, ignores);
-	free(ign->tgtname);
-	free(ign->sockid);
-	free(ign->data);
-	free(ign);
+	TAILQ_REMOVE(&iwq, iw, idlewatches);
+	free(iw->tgtname);
+	free(iw->sockid);
+	free(iw->data);
+	free(iw);
+}
+
+void
+flush_idlewatches(struct caddr *addr, const char *tgtname)
+{
+	struct kevent		 kev;
+	struct idlewatch	*iw, *tiw;
+
+	kev.udata = NULL;
+	TAILQ_FOREACH_SAFE(iw, &iwq, idlewatches, tiw)
+		if (iw->cnt && !addrs_cmp(&iw->addr, addr) &&
+		    !strcmp(iw->tgtname, tgtname)) {
+			kev.ident = (unsigned long)iw;
+			handle_idle(&kev);
+		}
+}
+
+static void
+flushall_idlewatches(void)
+{
+	struct kevent		 kev;
+	struct idlewatch	*iw;
+
+	kev.udata = NULL;
+	while ((iw = TAILQ_FIRST(&iwq)) != NULL)
+		if (iw->cnt) {
+			kev.ident = (unsigned long)iw;
+			handle_idle(&kev);
+		} else
+			cancel_idlewatch(iw);
 }
 
 __dead void
 scheduler(int argc, char *argv[])
 {
-	static struct timespec	 ign_to = { 0, IGNORE_TIMEOUT * 1000000L };
-
 	extern int	 privfd, logfd;
 
 	int		 debug, verbose, c;
@@ -972,7 +1021,7 @@ scheduler(int argc, char *argv[])
 
 	TAILQ_INIT(&cltq);
 	TAILQ_INIT(&inbq);
-	TAILQ_INIT(&ignq);
+	TAILQ_INIT(&iwq);
 
 	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
 		if (*tgt->persist == '\0') {
@@ -982,8 +1031,8 @@ scheduler(int argc, char *argv[])
 		}
 		print_ts_log("Restoring data for [%s] ...\n", tgt->name);
 		if ((c = load(tgt)) == -1)
-			log_debug("persist file %s for target [%s] not found",
-			    tgt->persist, tgt->name);
+			print_ts_log("Cancelled. Persist file not yet "
+			    "available.\n");
 		else
 			print_ts_log("%d client address%s loaded.\n", c,
 			    c != 1 ? "es" : "");
@@ -1006,10 +1055,9 @@ scheduler(int argc, char *argv[])
 	expire_handler = (struct kevcb){ &handle_expire, NULL };
 	if ((clt = evtimer_client()) != NULL)
 		evtimer_start(kqfd, &kev, clt, &expire_handler);
-	ignore_handler = (struct kevcb){ &handle_ignore, &ign_to };
 	memset(&kev, 0, sizeof(kev));
 
-	if (pledge("recvfd stdio unix", NULL) == -1)
+	if (pledge("stdio unix recvfd", NULL) == -1)
 		FATAL("pledge");
 
 	print_ts_log("Startup succeeded. Listening ...\n");
@@ -1161,8 +1209,6 @@ shutdown_scheduler(void)
 {
 	extern int	 privfd;
 
-	struct ignore	*ign;
-	struct kevent	 kev;
 	struct target	*tgt;
 	int		 c;
 	struct pfcmdq	 cmdq;
@@ -1172,13 +1218,9 @@ shutdown_scheduler(void)
 	if (conf == NULL || STAILQ_EMPTY(&conf->ctargets))
 		goto end;
 
-	kev.udata = NULL;
-	while ((ign = TAILQ_FIRST(&ignq)) != NULL) {
-		kev.ident = (unsigned long)ign;
-		handle_ignore(&kev);
-	}
+	flushall_idlewatches();
 
-	STAILQ_FOREACH(tgt, &conf->ctargets, targets) {
+	STAILQ_FOREACH(tgt, &conf->ctargets, targets)
 		if (*tgt->persist == '\0')
 			log_debug("no persist file for target [%s]",
 			    tgt->name);
@@ -1188,7 +1230,6 @@ shutdown_scheduler(void)
 		else
 			print_ts_log("%d client address%s saved for [%s].\n",
 			    c, c != 1 ? "es" : "", tgt->name);
-	}
 
 	if (conf->flags & FLAG_GLOBAL_UNLOAD) {
 		STAILQ_INIT(&cmdq);
