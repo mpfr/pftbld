@@ -149,7 +149,7 @@ handle_srvsock(struct kevent *kev)
 		return;
 	}
 	/* child */
-	if (pledge("sendfd stdio", NULL) == -1)
+	if (pledge("stdio sendfd", NULL) == -1)
 		FATAL("pledge");
 
 	while (send_fd(datafd, &ibuftmpl, sizeof(ibuftmpl), sched_ifd) == -1)
@@ -241,7 +241,7 @@ listener(int argc, char *argv[])
 	    &srvsock_handler);
 	memset(&kev, 0, sizeof(kev));
 
-	if (pledge("proc recvfd sendfd stdio unix", NULL) == -1)
+	if (pledge("stdio unix sendfd recvfd proc", NULL) == -1)
 		FATAL("pledge");
 
 	while (kevent(kqfd, NULL, 0, &kev, 1, NULL) != -1)
@@ -317,25 +317,25 @@ check_keyterms(struct ptrq *ktq, const char *buf)
 void
 proc_data(struct inbuf *ibuf, int kqfd)
 {
-	const char	 ack[] = REPLY_ACK, nak[] = REPLY_NAK;
-	int		 datafd = ibuf->datafd;
-	struct target	*tgt;
-	char		*tgtname, *sockid, *data, *age;
-	struct caddr	 addr;
-	struct ptr	*pt;
-	struct ignore	*ign;
-	struct socket	*sock;
-	struct crangeq	 crq;
-	struct ptrq	 tpq;
-	struct crange	*cr;
-	struct client	*clt, *first;
-	struct timespec	 now, tsdiff;
-	struct table	*tbl;
-	ssize_t		 datalen;
-	unsigned int	 clthits;
-	struct pfcmd	 cmd;
-	struct pfresult	 pfres;
-	struct kevent	 kev;
+	const char		 ack[] = REPLY_ACK, nak[] = REPLY_NAK;
+	int			 datafd = ibuf->datafd;
+	struct target		*tgt;
+	char			*tgtname, *sockid, *data, *age;
+	struct caddr		 addr;
+	struct ptr		*pt;
+	struct idlewatch	*iw;
+	struct socket		*sock;
+	struct crangeq		 crq;
+	struct ptrq		 tpq;
+	struct crange		*cr;
+	struct client		*clt, *first;
+	struct timespec		 now, tsdiff;
+	struct table		*tbl;
+	ssize_t			 datalen;
+	unsigned int		 clthits;
+	struct pfcmd		 cmd;
+	struct pfresult		 pfres;
+	struct kevent		 kev;
 
 	if ((data = strchr(ibuf->data, '\n')) != NULL)
 		*data = '\0';
@@ -360,69 +360,71 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	if ((sock = find_socket_byid(&tgt->datasocks, sockid)) == NULL)
 		FATALX("invalid socket [%s]", sockid);
 
-	ign = NULL;
+	iw = NULL;
 
 	if ((pt = check_keyterms(&tgt->inclkeyterms, data)) != NULL ||
 	    (pt = check_keyterms(&conf->inclkeyterms, data)) != NULL) {
-		ign = request_ignore(&addr, tgtname, sockid, &sock->action);
-		if (ign->cnt == 0)
-			ASPRINTF(&ign->data, "included keyterm '%s' ", pt->p);
+		iw = request_idlewatch(&addr, tgtname, sockid, sock->action);
+		if (iw->cnt == 0)
+			ASPRINTF(&iw->data, "included keyterm '%s' ",
+			    (char *)pt->p);
 		goto chkaddr;
 	}
 
 	if ((pt = check_keyterms(&tgt->exclkeyterms, data)) != NULL ||
 	    (pt = check_keyterms(&conf->exclkeyterms, data)) != NULL) {
-		ign = request_ignore(&addr, tgtname, sockid, pt);
-		if (ign->cnt == 0) {
-			ASPRINTF(&ign->data, "keyterm '%s'", pt->p);
+		iw = request_idlewatch(&addr, tgtname, sockid, sock->action);
+		if (iw->cnt == 0) {
+			ASPRINTF(&iw->data, "keyterm '%s'", (char *)pt->p);
 			print_ts_log("Ignored excluded %s :: [%s%s] <- [%s]",
-			    ign->data, tgtname, sockid,
+			    iw->data, tgtname, sockid,
 			    replace(data, "\n", '\0'));
 			append_data_log(data, datalen);
-			GET_TIME(&ign->ts);
+			GET_TIME(&iw->ts);
 		}
+		start_idlewatch(iw, tgt);
 		goto end;
 	}
 
 chkaddr:
 	if ((cr = check_cranges(&tgt->inclcranges, &addr)) != NULL ||
 	    (cr = check_cranges(&conf->inclcranges, &addr)) != NULL) {
-		if (ign != NULL) /* already has include keyterm match */
+		if (iw != NULL) /* already has include keyterm match */
 			goto next;
 
-		ign = request_ignore(&addr, tgtname, sockid, &sock->action);
-		if (ign->cnt == 0) {
+		iw = request_idlewatch(&addr, tgtname, sockid, sock->action);
+		if (iw->cnt == 0) {
 			if (addrvals_cmp(&cr->first, &cr->last, cr->af))
-				ASPRINTF(&ign->data, "included network <%s> ",
+				ASPRINTF(&iw->data, "included network <%s> ",
 				    cr->str);
 			else
-				ASPRINTF(&ign->data, "included address ");
+				ASPRINTF(&iw->data, "included address ");
 		}
 		goto next;
 	}
 
 	if ((cr = check_cranges(&tgt->exclcranges, &addr)) != NULL ||
 	    (cr = check_cranges(&conf->exclcranges, &addr)) != NULL) {
-		if (ign != NULL) /* override include keyterms match */
-			cancel_ignore(ign);
-		ign = request_ignore(&addr, tgtname, sockid, cr);
-		if (ign->cnt == 0) {
+		if (iw != NULL) /* override include keyterms match */
+			cancel_idlewatch(iw);
+		iw = request_idlewatch(&addr, tgtname, sockid, sock->action);
+		if (iw->cnt == 0) {
 			replace(data, "\n", '\0');
 			if (addrvals_cmp(&cr->first, &cr->last, cr->af))
-				ASPRINTF(&ign->data, "network <%s>", cr->str);
+				ASPRINTF(&iw->data, "network <%s>", cr->str);
 			else
-				ASPRINTF(&ign->data, "address");
+				ASPRINTF(&iw->data, "address");
 			print_ts_log("Ignored excluded %s :: [%s%s] <- [%s]",
-			    ign->data, tgtname, sockid, data);
+			    iw->data, tgtname, sockid, data);
 			append_data_log(data, datalen);
-			GET_TIME(&ign->ts);
+			GET_TIME(&iw->ts);
 		}
+		start_idlewatch(iw, tgt);
 		goto end;
+	}
 
-	} else if (ign != NULL)
-		goto next;
-
-	ign = request_ignore(&addr, tgtname, sockid, &sock->action);
+	if (iw == NULL)
+		iw = request_idlewatch(&addr, tgtname, sockid, sock->action);
 
 next:
 	TAILQ_FOREACH(clt, &cltq, clients)
@@ -430,40 +432,40 @@ next:
 			break;
 
 	if (sock->action != ACTION_ADD) {
+		if (iw->cnt > 0) {
+			start_idlewatch(iw, tgt);
+			goto end;
+		}
+
 		print_ts_log("%s %s:: [%s%s] <- [%s]",
-		    ACTION_TO_CSTR(sock->action), ign->data ? ign->data : "",
+		    ACTION_TO_CSTR(sock->action), iw->data ? iw->data : "",
 		    tgtname, sockid, replace(data, "\n", '\0'));
 		append_data_log(data, datalen);
-		free(ign->data);
-		ign->data = NULL;
+		free(iw->data);
+		iw->data = NULL;
 
-		if (ign->cnt == 0) {
-			if (clt == NULL) {
-				print_ts_log("Hmm... [%s]:[%s] is unknown and "
-				    "hence cannot be %s.\n", addr.str, tgtname,
-				    ACTION_TO_LPSTR(sock->action));
-				goto end;
-			}
+		if (clt == NULL) {
+			print_ts_log("Hmm... [%s]:[%s] is unknown and hence "
+			    "cannot be %s.\n", addr.str, tgtname,
+			    ACTION_TO_LPSTR(sock->action));
+			flush_idlewatches(&addr, tgtname);
+			GET_TIME(&iw->ts);
+			start_idlewatch(iw, tgt);
+			goto end;
+		}
 
-			SIMPLEQ_INIT(&crq);
-			MALLOC(cr, sizeof(*cr));
-			CADDR_TO_CRANGE(cr, &addr);
-			SIMPLEQ_INSERT_TAIL(&crq, cr, cranges);
-			SIMPLEQ_INIT(&tpq);
-			MALLOC(pt, sizeof(*pt));
-			pt->p = tgt;
-			SIMPLEQ_INSERT_TAIL(&tpq, pt, ptrs);
-			switch (sock->action) {
-			case ACTION_DELETE:
-				switch (expire_clients(&crq, &tpq)) {
-				case 0:
-					break;
-				case 1:
-					goto end;
-				default:
-					FATALX("delete failed on [%s]:[%s]",
-					    addr.str, tgtname);
-				}
+		SIMPLEQ_INIT(&crq);
+		MALLOC(cr, sizeof(*cr));
+		CADDR_TO_CRANGE(cr, &addr);
+		SIMPLEQ_INSERT_TAIL(&crq, cr, cranges);
+		SIMPLEQ_INIT(&tpq);
+		MALLOC(pt, sizeof(*pt));
+		pt->p = tgt;
+		SIMPLEQ_INSERT_TAIL(&tpq, pt, ptrs);
+		switch (sock->action) {
+		case ACTION_DELETE:
+			switch (expire_clients(&crq, &tpq)) {
+			case 0:
 				GET_TIME(&tsdiff);
 				timespecsub(&tsdiff, &clt->ts, &tsdiff);
 				age = hrage(&tsdiff);
@@ -471,17 +473,32 @@ next:
 				    "found in { %s }.\n", addr.str, tgtname,
 				    clt->hits, age, clt->tbl->name);
 				free(age);
-				break;
-			case ACTION_DROP:
-				if (drop_clients(&crq, &tpq) == 0)
-					FATALX("drop failed on [%s]:[%s]",
-					    addr.str, tgtname);
+				/* FALLTHROUGH */
+			case 1:
 				break;
 			default:
-				FATALX("invalid action (%d)", sock->action);
+				FATALX("delete failed on [%s]:[%s]", addr.str,
+				    tgtname);
 			}
-			free_target_address_queues(&crq, &tpq);
+			break;
+		case ACTION_DROP:
+			if (drop_clients(&crq, &tpq) == 0)
+				FATALX("drop failed on [%s]:[%s]", addr.str,
+				    tgtname);
+			break;
+		default:
+			FATALX("invalid action (%d)", sock->action);
 		}
+		free_target_address_queues(&crq, &tpq);
+		GET_TIME(&iw->ts);
+		start_idlewatch(iw, tgt);
+		goto end;
+	}
+
+	/* ACTION_ADD */
+
+	if (iw->cnt > 0) {
+		start_idlewatch(iw, tgt);
 		goto end;
 	}
 
@@ -497,17 +514,14 @@ next:
 	} else {
 		DPRINTF("found enqueued client (%s, %s, %d)", clt->addr.str,
 		    tgtname, clt->hits);
-		if (ign->cnt > 0)
-			goto end;
-
 		TAILQ_REMOVE(&cltq, clt, clients);
 	}
 
-	print_ts_log("Add %s:: [%s%s] <- [%s]", ign->data ? ign->data : "",
+	print_ts_log("Add %s:: [%s%s] <- [%s]", iw->data ? iw->data : "",
 	    tgtname, sockid, replace(data, "\n", '\0'));
 	append_data_log(data, datalen);
-	free(ign->data);
-	ign->data = NULL;
+	free(iw->data);
+	iw->data = NULL;
 
 	clthits = ++clt->hits;
 
@@ -582,6 +596,10 @@ next:
 
 	sort_client_asc(clt);
 
+	flush_idlewatches(&addr, tgtname);
+	GET_TIME(&iw->ts);
+	start_idlewatch(iw, tgt);
+
 	if (clt == TAILQ_FIRST(&cltq)) { /* client is new first */
 		if (first != NULL)
 			EV_MOD(kqfd, &kev, (unsigned long)first, EVFILT_TIMER,
@@ -605,10 +623,7 @@ next:
 		}
 	}
 
-	GET_TIME(&ign->ts);
-
 end:
-	start_ignore(ign);
 	send(datafd, ack, sizeof(ack), MSG_NOSIGNAL);
 	close(datafd);
 }
@@ -641,17 +656,17 @@ free_target_address_queues(struct crangeq *crq, struct ptrq *tpq)
 	struct ptr	*tp;
 	struct crange	*cr;
 
-	while ((tp = SIMPLEQ_FIRST(tpq)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(tpq, ptrs);
-		free(tp);
-	}
-	if (crq == NULL)
-		return;
+	if (crq != NULL)
+		while ((cr = SIMPLEQ_FIRST(crq)) != NULL) {
+			SIMPLEQ_REMOVE_HEAD(crq, cranges);
+			free(cr);
+		}
 
-	while ((cr = SIMPLEQ_FIRST(crq)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(crq, cranges);
-		free(cr);
-	}
+	if (tpq != NULL)
+		while ((tp = SIMPLEQ_FIRST(tpq)) != NULL) {
+			SIMPLEQ_REMOVE_HEAD(tpq, ptrs);
+			free(tp);
+		}
 }
 
 void

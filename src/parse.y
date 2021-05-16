@@ -66,9 +66,9 @@ struct ptrq	*curr_exclkeytermq, *curr_inclkeytermq;
 %}
 
 %token	ACTION ADD BACKLOG CASCADE DATAMAX DELETE DROP EXCLUDE EXPIRE GROUP
-%token	HITS ID INCLUDE KEEP KEYTERM KEYTERMFILE KILL LOCALHOSTS LOG MODE NET
-%token	NETFILE NO NODES OWNER PERSIST SKIP SOCKET STATES STEP TABLE TARGET
-%token	TIMEOUT
+%token	HITS ID IDLEMIN INCLUDE KEEP KEYTERM KEYTERMFILE KILL LOCALHOSTS LOG
+%token	MODE NET NETFILE NO NODES OWNER PERSIST SKIP SOCKET STATES STEP TABLE
+%token	TARGET TIMEOUT
 %token	<v.number>	NUMBER
 %token	<v.string>	STRING
 %token	<v.time>	TIME
@@ -107,6 +107,14 @@ main		: BACKLOG NUMBER		{
 			DPRINTF("global drop time: %lld", conf->drop.tv_sec);
 		}
 		| exclude
+		| IDLEMIN NUMBER		{
+			if ($2 <= 0 || $2 > CONF_IDLEMIN_MAX) {
+				yyerror("global idlemin out of bounds");
+				YYERROR;
+			}
+			conf->idlemin = $2;
+			DPRINTF("global idlemin: %d", conf->idlemin);
+		}
 		| include
 		| LOG STRING			{
 			YY_CANONICAL_PATH_SET(conf->log, $2, "log file",
@@ -127,6 +135,10 @@ main		: BACKLOG NUMBER		{
 		| NO DROP			{
 			conf->drop = CONF_NO_DROP;
 			DPRINTF("no global drop");
+		}
+		| NO IDLEMIN			{
+			conf->idlemin = CONF_NO_IDLEMIN;
+			DPRINTF("no global idlemin");
 		}
 		| NO LOG			{
 			conf->flags |= FLAG_GLOBAL_NOLOG;
@@ -266,10 +278,22 @@ targetoptsl	: CASCADE			{
 			DPRINTF("drop time: %lld", target->drop.tv_sec);
 		}
 		| exclude
+		| IDLEMIN NUMBER		{
+			if ($2 <= 0 || $2 > CONF_IDLEMIN_MAX) {
+				yyerror("idlemin out of bounds");
+				YYERROR;
+			}
+			target->idlemin = $2;
+			DPRINTF("idlemin: %d", target->idlemin);
+		}
 		| include
 		| NO DROP			{
 			target->drop = CONF_NO_DROP;
 			DPRINTF("no drop");
+		}
+		| NO IDLEMIN			{
+			target->idlemin = CONF_NO_IDLEMIN;
+			DPRINTF("no idlemin");
 		}
 		| PERSIST STRING		{
 			YY_CANONICAL_PATH_SET(target->persist, $2,
@@ -743,6 +767,7 @@ static const struct keyword {
 	{ "group",	GROUP },
 	{ "hits",	HITS },
 	{ "id",		ID },
+	{ "idlemin",	IDLEMIN },
 	{ "include",	INCLUDE },
 	{ "keep",	KEEP },
 	{ "keyterm",	KEYTERM },

@@ -216,7 +216,7 @@ persist(int argc, char *argv[])
 
 	if (unveil(path, "wc") == -1 || unveil(NULL, NULL) == -1)
 		FATAL("unveil");
-	if (pledge("cpath fattr sendfd stdio wpath", NULL) == -1)
+	if (pledge("stdio wpath cpath fattr sendfd", NULL) == -1)
 		FATAL("pledge");
 
 	if (unlink(path) == -1 && errno != ENOENT) {

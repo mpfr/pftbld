@@ -286,7 +286,7 @@ pftbld(int argc, char *argv[])
 	    &privreq_handler);
 	memset(&kev, 0, sizeof(kev));
 
-	if (pledge("cpath exec getpw inet proc recvfd rpath sendfd stdio unix",
+	if (pledge("stdio rpath cpath inet unix getpw sendfd recvfd proc exec",
 	    NULL) == -1)
 		FATAL("pledge");
 

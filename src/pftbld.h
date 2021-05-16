@@ -36,6 +36,7 @@
 #define DEFAULT_DATAMAX	2048
 #define DEFAULT_TIMEOUT	10000
 #define DEFAULT_SOCKMOD	0660
+#define DEFAULT_IDLEMIN	250
 
 #define ENV_DEBUG	"DEBUG"
 #define ENV_VERBOSE	"VERBOSE"
@@ -48,7 +49,6 @@
 #define TS_SIZE		27
 #define REPLY_ACK	"ACK\n"
 #define REPLY_NAK	"NAK\n"
-#define IGNORE_TIMEOUT	250
 
 #define FLAG_GLOBAL_NOLOG		0x01
 #define FLAG_GLOBAL_UNLOAD		0x02
@@ -60,9 +60,14 @@
 
 #define TIMESPEC_SEC_ROUND(t)	((t)->tv_sec + (t)->tv_nsec / 1000000000L + \
 				    ((t)->tv_nsec % 1000000000L >= 500000000L))
-#define TIMESPEC_TO_MSEC(t)	((t)->tv_sec * 1000 + (t)->tv_nsec / 1000000L)
 #define TIMESPEC_INFINITE	(const struct timespec){ LLONG_MAX, LONG_MAX }
 #define timespec_isinfinite(t)	timespeccmp(t, &TIMESPEC_INFINITE, ==)
+#define TIMESPEC_TO_MSEC(t)	((t)->tv_sec * 1000 + (t)->tv_nsec / 1000000L)
+#define MSEC_TO_TIMESPEC(t, m)				\
+	do {						\
+		(t)->tv_sec = (m) / 1000;		\
+		(t)->tv_nsec = (m) % 1000 * 1000000L;	\
+	} while (0)
 
 #define CONF_NO_BACKLOG		-1
 #define CONF_NO_DATAMAX		-1
@@ -71,6 +76,8 @@
 #define CONF_TIMEOUT_MAX	LLONG_MAX
 #define CONF_NO_DROP		TIMESPEC_INFINITE
 #define CONF_DROP_MAX		TIMESPEC_INFINITE.tv_sec
+#define CONF_NO_IDLEMIN		-1
+#define CONF_IDLEMIN_MAX	SHRT_MAX
 
 #define IOV_CNT(c)	((c) < IOV_MAX ? (c) : IOV_MAX)
 #define PFADDR_MAX	(INT_MAX / sizeof(struct pfr_addr))
@@ -322,9 +329,9 @@ enum pfaction {
 	ACTION_DROP
 };
 #define ACTION_TO_STR(a, s_add, s_delete, s_drop)	\
-	(a == ACTION_ADD ? s_add :			\
-	 a == ACTION_DELETE ? s_delete :		\
-	 a == ACTION_DROP ? s_drop : "")
+	((a) == ACTION_ADD ? s_add :			\
+	 (a) == ACTION_DELETE ? s_delete :		\
+	 (a) == ACTION_DROP ? s_drop : "")
 #define ACTION_TO_LSTR(a)	ACTION_TO_STR(a, "add", "delete", "drop")
 #define ACTION_TO_CSTR(a)	ACTION_TO_STR(a, "Add", "Delete", "Drop")
 #define ACTION_TO_LPSTR(a)	ACTION_TO_STR(a, "added", "deleted", "dropped")
@@ -351,6 +358,8 @@ struct target {
 	char		 persist[PATH_MAX];
 	struct timespec	 drop;
 	unsigned int	 skip;
+	short		 idlemin;
+	struct kevcb	 idlehandler;
 	struct socketq	 datasocks;
 	struct crangeq	 exclcranges;
 	struct ptrq	 exclkeyterms;
@@ -383,6 +392,7 @@ struct config {
 	ssize_t		 datamax;
 	time_t		 timeout;
 	struct timespec	 drop;
+	short		 idlemin;
 	struct targetq	 ctargets;
 	struct crangeq	 exclcranges;
 	struct ptrq	 exclkeyterms;
@@ -456,18 +466,18 @@ struct statfd {
 	struct stat	 sb;
 };
 
-struct ignore {
+struct idlewatch {
 	struct caddr	 addr;
 	char		*tgtname;
 	char		*sockid;
-	void		*ident;
 	char		*data;
+	enum pfaction	 action;
 	unsigned int	 cnt;
 	struct timespec	 ts;
 
-	TAILQ_ENTRY(ignore) ignores;
+	TAILQ_ENTRY(idlewatch) idlewatches;
 };
-TAILQ_HEAD(ignoreq, ignore);
+TAILQ_HEAD(idlewatchq, idlewatch);
 
 /* pftbld.c */
 void		 pfexec(struct pfresult *, struct pfcmd *);
@@ -511,9 +521,12 @@ unsigned int	 drop_clients(struct crangeq *, struct ptrq *);
 unsigned int	 drop_clients_r(struct crangeq *, struct ptrq *);
 unsigned int	 expire_clients(struct crangeq *, struct ptrq *);
 unsigned int	 expire_clients_r(struct crangeq *, struct ptrq *);
-struct ignore	*request_ignore(struct caddr *, char *, char *, void *);
-void		 start_ignore(struct ignore *);
-void		 cancel_ignore(struct ignore *);
+struct idlewatch
+		*request_idlewatch(struct caddr *, char *, char *,
+		    enum pfaction);
+void		 start_idlewatch(struct idlewatch *, struct target *);
+void		 cancel_idlewatch(struct idlewatch *);
+void		 flush_idlewatches(struct caddr *, const char *);
 __dead void	 scheduler(int, char **);
 void		 fork_scheduler(void);
 int		 bind_table(struct client *, struct pfcmdq *);
