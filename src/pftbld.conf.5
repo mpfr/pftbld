@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: May 10 2021 $
+.Dd $Mdocdate: May 14 2021 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -159,10 +159,26 @@ entries line by line from the file at
 .Ar path .
 The file must be fomatted as outlined in
 .Xr hosts 5 .
-Any content other than an
+Lines not starting with a valid
 .Pa address/network
-at the beginning of each line will be ignored.
+are logged and ignored.
 .El
+.It Oo Ic no Oc Ic idlemin Ar milliseconds
+Specifies the minimum time that must elapse between successive occurrences of
+an IP address on a
+.Pa data socket
+in order to be recognized and counted as separate.
+Faster recurrences are considered duplicates and are ignored.
+This prevents appearance counters from being increased before the system is
+able to process and respond to incoming data.
+Although the maximum number of
+.Ar milliseconds
+is 32767, values greater than 1000 are rather uncommon.
+Duplicate detection may be disabled by specifying the
+.Ic no
+keyword instead of the number of
+.Ar milliseconds .
+Defaults to 250 milliseconds.
 .It Ic include Ar option | Brq ...
 Specifies inclusion criteria for incoming data overriding exclusion criteria
 specified by
@@ -202,9 +218,9 @@ entries line by line from the file at
 .Ar path .
 The file must be fomatted as outlined in
 .Xr hosts 5 .
-Any content other than an
+Lines not starting with a valid
 .Pa address/network
-at the beginning of each line will be ignored.
+are logged and ignored.
 .El
 .It Oo Ic no Oc Ic log Ar path
 Make
@@ -357,6 +373,10 @@ Allows for
 specific exclusion criteria additional (and evaluated prior) to global
 .Ic exclude
 settings.
+.It Oo Ic no Oc Ic idlemin Ar milliseconds
+Overrides the global
+.Ic idlemin
+option.
 .It Ic include Ar option | Brq ...
 Allows for
 .Ic target

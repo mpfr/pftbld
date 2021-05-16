@@ -149,6 +149,10 @@ parse_conf(void)
 		conf->drop = TIMESPEC_INFINITE;
 		DPRINTF("assuming no global drop");
 	}
+	if (!conf->idlemin) {
+		conf->idlemin = DEFAULT_IDLEMIN;
+		DPRINTF("using global default idlemin (%d)", conf->idlemin);
+	}
 	if (!conf->timeout) {
 		conf->timeout = DEFAULT_TIMEOUT;
 		DPRINTF("using global default timeout (%lld)", conf->timeout);
@@ -171,12 +175,24 @@ parse_conf(void)
 			tgt->drop = conf->drop;
 #if DEBUG
 			if (timespec_isinfinite(&conf->drop))
-				DPRINTF("assuming no drop for target [%s]",
-				    tgt->name);
+				DPRINTF("assuming global no drop for "
+				    "target [%s]", tgt->name);
 			else
 				DPRINTF("assuming global drop (%lld) for "
 				    "target [%s]", tgt->drop.tv_sec,
 				    tgt->name);
+#endif
+		}
+
+		if (!tgt->idlemin) {
+			tgt->idlemin = conf->idlemin;
+#if DEBUG
+			if (tgt->idlemin == CONF_NO_IDLEMIN)
+				DPRINTF("assuming global no idlemin for "
+				    "target [%s]", tgt->name);
+			else
+				DPRINTF("assuming global idlemin (%d) for "
+				    "target [%s]", tgt->idlemin, tgt->name);
 #endif
 		}
 
@@ -185,36 +201,36 @@ parse_conf(void)
 				sock->backlog = conf->backlog;
 #if DEBUG
 				if (sock->backlog == CONF_NO_BACKLOG)
-					DPRINTF("assuming no backlog for "
-					    "socket %s", sock->path);
+					DPRINTF("assuming global no backlog "
+					    "for socket %s", sock->path);
 				else
-					DPRINTF("assuming socket %s backlog "
-					    "(%d)", sock->path,
-					    sock->backlog);
+					DPRINTF("assuming global backlog (%d) "
+					    "for socket %s", sock->backlog,
+					    sock->path);
 #endif
 			}
 			if (!sock->datamax) {
 				sock->datamax = conf->datamax;
 #if DEBUG
 				if (sock->datamax == CONF_NO_DATAMAX)
-					DPRINTF("assuming no datamax for "
-					    "socket %s", sock->path);
+					DPRINTF("assuming global no datamax "
+					    "for socket %s", sock->path);
 				else
-					DPRINTF("assuming socket %s datamax "
-					    "(%zd)", sock->path,
-					    sock->datamax);
+					DPRINTF("assuming global datamax "
+					    "(%zd) socket %s", sock->datamax,
+					    sock->path);
 #endif
 			}
 			if (!sock->timeout) {
 				sock->timeout = conf->timeout;
 #if DEBUG
 				if (sock->timeout == CONF_NO_TIMEOUT)
-					DPRINTF("assuming no timeout for "
-					    "socket %s", sock->path);
+					DPRINTF("assuming global no timeout "
+					    "for socket %s", sock->path);
 				else
-					DPRINTF("assuming socket %s timeout "
-					    "(%lld)", sock->path,
-					    sock->timeout);
+					DPRINTF("assuming global timeout "
+					    "(%lld) socket %s", sock->timeout,
+					    sock->path);
 #endif
 			}
 		}
@@ -228,9 +244,10 @@ parse_conf(void)
 			if (!timespecisset(&tbl->drop)) {
 				tbl->drop = tgt->drop;
 #if DEBUG
-				if (timespec_isinfinite(&tgt->drop))
-					DPRINTF("assuming no drop for "
-					    "table <%s>", tbl->name);
+				if (timespec_isinfinite(&tbl->drop))
+					DPRINTF("assuming target [%s] no drop "
+					    "for table <%s>", tgt->name,
+					    tbl->name);
 				else
 					DPRINTF("assuming target [%s] drop "
 					    "(%lld) for table <%s>", tgt->name,
@@ -240,6 +257,22 @@ parse_conf(void)
 			if (timespeccmp(&tbl->expire, &tbl->drop, >)) {
 				log_warnx("target [%s]: table <%s> cannot "
 				    "expire after drop", tgt->name, tbl->name);
+				errors++;
+				break;
+			}
+			if (!timespec_isinfinite(&tbl->expire) &&
+			    tgt->idlemin > TIMESPEC_TO_MSEC(&tbl->expire)) {
+				log_warnx("target [%s]: expire of table <%s> "
+				    "must not be less than idlemin",
+				    tgt->name, tbl->name);
+				errors++;
+				break;
+			}
+			if (!timespec_isinfinite(&tbl->drop) &&
+			    tgt->idlemin > TIMESPEC_TO_MSEC(&tbl->drop)) {
+				log_warnx("target [%s]: drop of table <%s> "
+				    "must not be less than idlemin",
+				    tgt->name, tbl->name);
 				errors++;
 				break;
 			}
@@ -422,6 +455,7 @@ free_conf(struct config *c)
 			free(kt->p);
 			free(kt);
 		}
+		free(tgt->idlehandler.args);
 		free(tgt);
 	}
 	while ((cr = STAILQ_FIRST(&c->exclcranges)) != NULL) {
@@ -517,6 +551,11 @@ print_conf(struct statfd *sfd)
 
 		msg_send(sfd, "}\n");
 	}
+
+	if (conf->idlemin == CONF_NO_IDLEMIN)
+		msg_send(sfd, "no idlemin\n");
+	else
+		msg_send(sfd, "idlemin %d\n", conf->idlemin);
 
 	if (!STAILQ_EMPTY(&conf->inclcranges) ||
 	    !STAILQ_EMPTY(&conf->inclkeyterms)) {
@@ -636,6 +675,13 @@ print_conf(struct statfd *sfd)
 			}
 
 			msg_send(sfd, "\t}\n");
+		}
+
+		if (conf->idlemin != tgt->idlemin) {
+			if (tgt->idlemin == CONF_NO_IDLEMIN)
+				msg_send(sfd, "\tno idlemin\n");
+			else
+				msg_send(sfd, "\tidlemin %d\n", tgt->idlemin);
 		}
 
 		if (!STAILQ_EMPTY(&tgt->inclcranges) ||
