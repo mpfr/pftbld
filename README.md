@@ -144,7 +144,7 @@ $ doas make uninstall
 rm /etc/rc.d/pftbld /usr/local/man/man{5,8}/pftbl* /usr/local/sbin/pftbl*
 userdel _pftbld
 groupdel _pftbld
---> configuration has changes, not touching /etc/pftbld
+(configuration has changes, not touching /etc/pftbld)
 ```
 
 Configuration and source directory need to be removed manually, if no longer needed.
