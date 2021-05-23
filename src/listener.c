@@ -537,7 +537,7 @@ next:
 		cmd.addrcnt = 1;
 		pfexec(&pfres, &cmd);
 		print_ts_log("%s [%s]:[%s]:(%ux",
-		    pfres.nadd ? ">>> Added" : "Acquired", clt->addr.str,
+		    pfres.nadd ? ">>> Added" : "Renewed", clt->addr.str,
 		    tgtname, clthits);
 	} else
 		print_ts_log("Skipped (%u/%u", clthits, tgt->skip);
