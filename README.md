@@ -6,7 +6,14 @@ For further information, please have a look at the manpages of [pftbld(8)](https
 
 ## How to interface
 
-Other programs usually interact with `pftbld` by sending plain text messages to specified UNIX-domain sockets. Most common case probably is [httpd(8)](http://man.openbsd.org/httpd) through FastCGI as outlined in [pftbld.conf(5)](https://mpfr.github.io/pftbld/pftbld.conf.5.html#EXAMPLES). The most native and therefore most recommended option, however, is offered through the [httpd-plus](https://github.com/mpfr/httpd-plus#notify-on-block) add-on package, allowing the two daemons to perfectly complement each other.
+Other programs usually interact with `pftbld` by sending plain text messages to specified UNIX-domain sockets.
+
+The most common cases probably are:
+* [httpd(8)](http://man.openbsd.org/httpd)
+	* via FastCGI as outlined in [pftbld.conf(5)](https://mpfr.github.io/pftbld/pftbld.conf.5.html#EXAMPLES)
+	* natively through the [httpd-plus](https://github.com/mpfr/httpd-plus#notify-on-block) add-on package
+* [sshd(8)](http://man.openbsd.org/sshd)
+	* by means of [saltan(8)](https://github.com/mpfr/saltan) which is tracking the authentication log file
 
 ## How to install
 
