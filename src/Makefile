@@ -42,7 +42,7 @@ uninstall:
 	-rm /etc/rc.d/pftbld ${MANDIR}{5,8}/pftbl* ${BINDIR}/pftbl*
 	-userdel ${USER}
 	-groupdel ${USER}
-	@-if test -z "$$(diff -x pftbld.rc -aqr ${.CURDIR}/../pkg ${CONFDIR})"; then echo "rm -r ${CONFDIR}" && rm -r ${CONFDIR}; else echo "(configuration has changes, not touching ${CONFDIR})"; fi
+	@-if test -d ${CONFDIR}; then if test -z "$$(diff -x pftbld.rc -aqr ${.CURDIR}/../pkg ${CONFDIR})"; then echo "rm -r ${CONFDIR}" && rm -r ${CONFDIR}; else echo "(configuration has changes, not touching ${CONFDIR})"; fi; fi
 
 reinstall: uninstall fullinstall
 
