@@ -754,6 +754,8 @@ perform_ctrl_delete(struct statfd *sfd, char *arg, char *data, size_t datalen,
 	struct crangeq	 crq;
 	int		 recap;
 	unsigned int	 cnt;
+	struct ptr	*tgt;
+	struct crange	*cr;
 
 	if (arg == NULL)
 		return (1);
@@ -781,9 +783,16 @@ perform_ctrl_delete(struct statfd *sfd, char *arg, char *data, size_t datalen,
 	if (cnt == 0)
 		msg_send(sfd, "No client entries found.\n");
 	else {
-		if (recap)
-			print_ts_log("%d client entr%s %s.\n", cnt,
+		if (recap) {
+			print_ts_log("%d client entr%s %s from ", cnt,
 			    cnt != 1 ? "ies" : "y", action);
+			SIMPLEQ_FOREACH(tgt, &tpq, ptrs)
+				print_log("[%s]",
+				    ((struct target *)tgt->p)->name);
+			SIMPLEQ_FOREACH(cr, &crq, cranges)
+				print_log("[%s]", cr->str);
+			print_log(".\n");
+		}
 		msg_send(sfd, "%d client entr%s %s.\n", cnt,
 		    cnt != 1 ? "ies" : "y", action);
 	}
