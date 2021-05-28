@@ -23,6 +23,9 @@ afterinstall:
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		${.CURDIR}/pftblctl.sh ${DESTDIR}${BINDIR}/pftblctl
 
+uninstall:
+	-rm ${BINDIR}/pftbl* ${MANDIR}{5,8}/pftbl*
+
 CONFFILE=	pftbld.conf
 
 .if exists(${.CURDIR}/../pkg/pftbld.rc) && exists(${.CURDIR}/../pkg/${CONFFILE})
@@ -33,20 +36,18 @@ USER=		_pftbld
 fullinstall: install
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		${.CURDIR}/../pkg/pftbld.rc /etc/rc.d/pftbld
-	@if test "$$(userinfo -e ${USER}; echo $$?)" = "0"; then echo "userdel ${USER}" && userdel ${USER}; fi
-	@if test "$$(groupinfo -e ${USER}; echo $$?)" = "0"; then echo "groupdel ${USER}" && groupdel ${USER}; fi
-	useradd -c "pftbld unprivileged user" -d /var/empty -g =uid -r 100..999 -s /sbin/nologin ${USER}
-	@-if test -f ${CONFDIR}/${CONFFILE}; then echo "(configuration exists, not touching ${CONFDIR}/${CONFFILE})"; else mkdir -p ${CONFDIR} && echo "cp ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}" && cp ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}; fi
+	@-if test "$$(userinfo -e ${USER}; echo $$?)" != '0'; then echo "useradd -c 'pftbld unprivileged user' -d /var/empty -g =uid -r 100..999 -s /sbin/nologin ${USER}" && useradd -c 'pftbld unprivileged user' -d /var/empty -g =uid -r 100..999 -s /sbin/nologin ${USER}; elif test "$$(groupinfo -e ${USER}; echo $$?)" != '0'; then echo "groupadd ${USER}" && groupadd ${USER}; fi
+	@-if test -f ${CONFDIR}/${CONFFILE}; then echo "(configuration file exists, not touching ${CONFDIR}/${CONFFILE})"; else mkdir -p ${CONFDIR} && echo "cp ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}" && cp ${.CURDIR}/../pkg/${CONFFILE} ${CONFDIR}; fi
 
-uninstall:
-	-rm /etc/rc.d/pftbld ${MANDIR}{5,8}/pftbl* ${BINDIR}/pftbl*
+fulluninstall: uninstall
+	-rm /etc/rc.d/pftbld
 	-userdel ${USER}
 	-groupdel ${USER}
-	@-if test -d ${CONFDIR}; then if test -z "$$(diff -x pftbld.rc -aqr ${.CURDIR}/../pkg ${CONFDIR})"; then echo "rm -r ${CONFDIR}" && rm -r ${CONFDIR}; else echo "(configuration has changes, not touching ${CONFDIR})"; fi; fi
+	@-if test -d ${CONFDIR}; then if test -z "$$(diff -x pftbld.rc -aqr ${.CURDIR}/../pkg ${CONFDIR})"; then echo "rm -r ${CONFDIR}" && rm -r ${CONFDIR}; else echo "(configuration directory has changed, not touching ${CONFDIR})"; fi; fi
 
-reinstall: uninstall fullinstall
+reinstall: fulluninstall fullinstall
 
-update: all install
+update: all fullinstall
 
 .endif
 

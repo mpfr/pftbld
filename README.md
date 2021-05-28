@@ -83,7 +83,7 @@ cc -O2 -pipe  -Wall -I/home/mpfr/pftbld-6.8-stable/src -Wstrict-prototypes ...
 cc   -o pftbld parse.o config.o listener.o log.o logger.o persist.o ...
 ```
 
-Install the daemon, related binaries, manpages, service script, the daemon's user/group and a sample configuration file.
+Install daemon, manpages, service script, the daemon's user/group and a sample configuration file.
 
 ```
 $ doas make fullinstall
@@ -100,11 +100,12 @@ cp /home/mpfr/pftbld-6.8-stable/src/../pkg/pftbld.conf /etc/pftbld
 > For further usage, the following list of available installation targets might be helpful:
 > target name | description
 > ----------- | -----------
-> `fullinstall` | installs the daemon's binaries, manpages, service script, user/group and a sample configuration file if not yet present
-> `install` | installs the daemon's binaries and manpages only
-> `reinstall` | runs `uninstall`, then `fullinstall`
-> `uninstall` | removes everything installed by `fullinstall`, except leaving the configuation file untouched if it has changes
-> `update` | compiles the sources and installs binaries and manpages, intended to be used when updating an existing installation
+> `fullinstall` | installs daemon, manpages, service script, user/group and a sample configuration file if a configuration file not yet exists
+> `fulluninstall` | deletes everything installed by `fullinstall` but leaves the configuation file untouched if it was changed
+> `install` | installs daemon and manpages only
+> `reinstall` | runs `fulluninstall`, then `fullinstall`
+> `uninstall` | deletes daemon and manpages
+> `update` | compiles the sources and runs `fullinstall`
 
 Activate the service script.
 
@@ -143,15 +144,16 @@ Deactivate the service script.
 $ doas rcctl disable pftbld
 ```
 
-Uninstall the daemon, related binaries, manpages, service script, the daemon's user/group.
+Uninstall daemon, manpages, service script and the daemon's user/group.
 
 ```
 $ cd ~/pftbld-6.8-stable/src
-$ doas make uninstall
-rm /etc/rc.d/pftbld /usr/local/man/man{5,8}/pftbl* /usr/local/sbin/pftbl*
+$ doas make fulluninstall
+rm /usr/local/sbin/pftbl* /usr/local/man/man{5,8}/pftbl*
+rm /etc/rc.d/pftbld
 userdel _pftbld
 groupdel _pftbld
-(configuration has changes, not touching /etc/pftbld)
+(configuration directory has changed, not touching /etc/pftbld)
 ```
 
 Configuration and source directory need to be removed manually, if no longer needed.
