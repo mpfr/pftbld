@@ -1,6 +1,6 @@
 #!/bin/ksh
 #
-# Copyright (c) 2020 Matthias Pressfreund
+# Copyright (c) 2020, 2021 Matthias Pressfreund
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -43,9 +43,8 @@ done
 [[ -S ${CTRLSOCK} ]] || err "no socket found at '${CTRLSOCK}'"
 shift $((OPTIND-1))
 
-while [[ -n "$1" ]]; do
-	[[ -n "${cmd}" ]] && cmd="${cmd}\n$1" || cmd="$1"
-	shift
+for a in "$@"; do
+	[[ -n "${cmd}" ]] && cmd="${cmd}\n${a}" || cmd="${a}"
 done
 
 [[ -n "${cmd}" ]] || usage
