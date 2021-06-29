@@ -2,7 +2,7 @@
 
 `pftbld(8)` is a lightweight [OpenBSD](https://www.openbsd.org) daemon written to automate [pf(4) table](http://man.openbsd.org/pf.conf#TABLES) content management and is typically used for building and maintaining dynamic firewall blocklists.
 
-For further information, please have a look at the manpages of [pftbld(8)](https://mpfr.github.io/pftbld/pftbld.8.html), its configuration file [pftbld.conf(5)](https://mpfr.github.io/pftbld/pftbld.conf.5.html), and its control tool [pftblctl(8)](https://mpfr.github.io/pftbld/pftblctl.8.html).
+For further information, please have a look at the manpages of [pftbld(8)](https://mpfr.net/man/pftbld/current/pftbld.8.html), its configuration file [pftbld.conf(5)](https://mpfr.net/man/pftbld/current/pftbld.conf.5.html), and its control tool [pftblctl(8)](https://mpfr.net/man/pftbld/current/pftblctl.8.html).
 
 ## How to interface
 
@@ -10,7 +10,7 @@ Other programs usually interact with `pftbld` by sending plain text messages to 
 
 The most common cases probably are:
 * [httpd(8)](http://man.openbsd.org/httpd)
-	* via FastCGI as outlined in [pftbld.conf(5)](https://mpfr.github.io/pftbld/pftbld.conf.5.html#EXAMPLES)
+	* via FastCGI as outlined in [pftbld.conf(5)](https://mpfr.net/man/pftbld/current/pftbld.conf.5.html#EXAMPLES)
 	* natively through the [httpd-plus](https://github.com/mpfr/httpd-plus#notify-on-block) add-on package
 * [sshd(8)](http://man.openbsd.org/sshd)
 	* by means of [saltan(8)](https://github.com/mpfr/saltan) which is tracking the authentication log file
@@ -42,7 +42,6 @@ pftbld-current
 pftbld-current/LICENSE
 pftbld-current/README.md
 pftbld-current/docs
-pftbld-current/docs/mandoc.css
 pftbld-current/docs/pftblctl.8.html
 pftbld-current/docs/pftbld.8.html
 pftbld-current/docs/pftbld.conf.5.html
@@ -113,7 +112,7 @@ Activate the service script.
 $ doas rcctl enable pftbld
 ```
 
-Adapt the [sample](pkg/pftbld.conf) [configuration file](https://mpfr.github.io/pftbld/pftbld.conf.5.html) at `/etc/pftbld/pftbld.conf` to your needs. When you're done, make sure to get the result verified.
+Adapt the [sample](pkg/pftbld.conf) [configuration file](https://mpfr.net/man/pftbld/current/pftbld.conf.5.html) at `/etc/pftbld/pftbld.conf` to your needs. Make sure your configuration is valid.
 
 ```
 $ doas vi /etc/pftbld/pftbld.conf
