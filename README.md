@@ -42,7 +42,6 @@ pftbld-6.9-stable
 pftbld-6.9-stable/LICENSE
 pftbld-6.9-stable/README.md
 pftbld-6.9-stable/docs
-pftbld-6.9-stable/docs/mandoc.css
 pftbld-6.9-stable/docs/pftblctl.8.html
 pftbld-6.9-stable/docs/pftbld.8.html
 pftbld-6.9-stable/docs/pftbld.conf.5.html
@@ -113,7 +112,7 @@ Activate the service script.
 $ doas rcctl enable pftbld
 ```
 
-Adapt the [sample](pkg/pftbld.conf) configuration file at `/etc/pftbld/pftbld.conf` to your needs. When you're done, make sure to get the result verified.
+Adapt the [sample](pkg/pftbld.conf) [configuration file](https://mpfr.net/man/pftbld/6.9-stable/pftbld.conf.5.html) at `/etc/pftbld/pftbld.conf` to your needs. Make sure your configuration is valid.
 
 ```
 $ doas vi /etc/pftbld/pftbld.conf
