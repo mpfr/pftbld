@@ -38,11 +38,12 @@ sockpipe(const char *path, int verbose)
 	    errx(1, "internal error"));
 	ssa_un.sun_family = AF_UNIX;
 
-	if (pledge("stdio unix unveil", NULL) == -1)
-		ERR("pledge");
 
-	if (unveil(ssa_un.sun_path, "r") == -1 || unveil(NULL, NULL) == -1)
+	if (unveil(ssa_un.sun_path, "r") == -1)
 		ERR("unveil");
+
+	if (pledge("stdio unix", NULL) == -1)
+		ERR("pledge");
 
 	if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
 		ERR("socket");
