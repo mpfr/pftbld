@@ -313,7 +313,9 @@ tinypfctl(int argc, char *argv[])
 	log_init(argv[1], debug, verbose);
 	setproctitle("%s", __func__);
 
-	if (unveil(PF_DEVICE, "rw") == -1 || unveil(NULL, NULL) == -1)
+	if (unveil(PF_DEVICE, "rw") == -1)
+		FATAL("unveil");
+	if (unveil(NULL, NULL) == -1)
 		FATAL("unveil");
 
 	ETOI(ctrlfd, ENV_CTRLFD);
