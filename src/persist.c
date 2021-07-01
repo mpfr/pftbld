@@ -214,8 +214,9 @@ persist(int argc, char *argv[])
 	}
 	free(dpath);
 
-	if (unveil(path, "wc") == -1 || unveil(NULL, NULL) == -1)
+	if (unveil(path, "wc") == -1)
 		FATAL("unveil");
+
 	if (pledge("stdio wpath cpath fattr sendfd", NULL) == -1)
 		FATAL("pledge");
 
