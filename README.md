@@ -11,9 +11,9 @@ Other programs usually interact with `pftbld` by sending plain text messages to 
 The most common cases probably are:
 * [httpd(8)](http://man.openbsd.org/httpd)
 	* via FastCGI as outlined in [pftbld.conf(5)](https://mpfr.net/man/pftbld/6.9-stable/pftbld.conf.5.html#EXAMPLES)
-	* natively through the [httpd-plus](https://github.com/mpfr/httpd-plus#notify-on-block) add-on package
+	* natively through the [httpd-plus](https://github.com/mpfr/httpd-plus/tree/6.9-stable#notify-on-block) add-on package
 * [sshd(8)](http://man.openbsd.org/sshd)
-	* by means of [saltan(8)](https://github.com/mpfr/saltan) which is tracking the authentication log file
+	* by means of [saltan(8)](https://github.com/mpfr/saltan/tree/6.9-stable) which is tracking the authentication log file
 
 ## How to install
 
@@ -21,7 +21,7 @@ The most common cases probably are:
 
 First of all, make sure you're running `OpenBSD 6.9-stable`. Otherwise, one of the following branches might be more appropriate:
 * [current](https://github.com/mpfr/pftbld)
-* [6.8-stable](https://github.com/mpfr/pftbld/tree/6.8-stable)
+* [7.0-stable](https://github.com/mpfr/pftbld/tree/7.0-stable)
 
 Then, make sure your user (e.g. `mpfr`) has sufficient `doas` permissions.
 
