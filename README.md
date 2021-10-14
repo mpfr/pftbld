@@ -1,4 +1,4 @@
-| :warning: With the release of OpenBSD version 7.0, this branch will reach its end of life and will no longer be maintained.
+| :warning: With the release of OpenBSD version 7.0 on Oct 14, 2021, this branch has reached its end of life and is no longer being maintained.
 | --- |
 
 # pftbld(8)
@@ -14,9 +14,9 @@ Other programs usually interact with `pftbld` by sending plain text messages to 
 The most common cases probably are:
 * [httpd(8)](http://man.openbsd.org/httpd)
 	* via FastCGI as outlined in [pftbld.conf(5)](https://mpfr.net/man/pftbld/6.8-stable/pftbld.conf.5.html#EXAMPLES)
-	* natively through the [httpd-plus](https://github.com/mpfr/httpd-plus#notify-on-block) add-on package
+	* natively through the [httpd-plus](https://github.com/mpfr/httpd-plus/tree/6.8-stable#notify-on-block) add-on package
 * [sshd(8)](http://man.openbsd.org/sshd)
-	* by means of [saltan(8)](https://github.com/mpfr/saltan) which is tracking the authentication log file
+	* by means of [saltan(8)](https://github.com/mpfr/saltan/tree/6.8-stable) which is tracking the authentication log file
 
 ## How to install
 
