@@ -154,27 +154,21 @@
     is to be matched against the <code class="Ic">exclude keyterms</code>
     specified in the configuration before they are written to the log file.</p>
 <p class="Pp">Here's an example:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-# msg=&quot;11.22.33.44\nGET /test.php 404&quot;
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre># msg=&quot;11.22.33.44\nGET /test.php 404&quot;</pre>
 </div>
 <p class="Pp">Sending the above message to a <span class="Pa">data
     socket</span>, in this case located at
     <span class="Pa">/var/www/run/pftbld-www.sock</span>,</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-# echo -n &quot;${msg}&quot; | pftbld -p /var/www/run/pftbld-www.sock
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre># echo -n &quot;${msg}&quot; | pftbld -p /var/www/run/pftbld-www.sock</pre>
 </div>
 <p class="Pp">which is connected to the <span class="Pa">www</span> target, will
     cause two log entries:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-[...] Add :: [www] &lt;- [11.22.33.44][GET /test.php 404]
+<div class="Bd Pp Bd-indent Li">
+<pre>[...] Add :: [www] &lt;- [11.22.33.44][GET /test.php 404]
 [...] &gt;&gt;&gt; Added [11.22.33.44]:[www]:(2x:3h16m25s) \
-to { attackers } for 1h.
-</pre>
+to { attackers } for 1h.</pre>
 </div>
 <p class="Pp">The first entry documents the incoming message including all
     optional parts. The following entry lets us know that this is the second
@@ -183,10 +177,8 @@ to { attackers } for 1h.
     learn that the address was added to the <span class="Pa">attackers</span>
     table where it will remain for 1 hour before being deleted causing another
     log entry:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-[...] &gt;&gt;&gt; Deleted [11.22.33.44]:[www]:(2x:1h) from { attackers }.
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre>[...] &gt;&gt;&gt; Deleted [11.22.33.44]:[www]:(2x:1h) from { attackers }.</pre>
 </div>
 <p class="Pp">Although sending messages to a <span class="Pa">control
     socket</span> basically works the same way, using the
