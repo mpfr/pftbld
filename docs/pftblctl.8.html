@@ -237,9 +237,8 @@
 <section class="Sh">
 <h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
 <p class="Pp">Here's an example for a <code class="Ic">status</code> report:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-# pftblctl status
+<div class="Bd Pp Bd-indent Li">
+<pre># pftblctl status
 Self-exclude: [129.128.5/24]
 Verbosity level: 0
 Client count:
@@ -247,42 +246,33 @@ Client count:
 Next scheduled event:
 	[11.22.33.44]:[www]:(2x:50m12s)
 		expires from { attackers } in 9m48s,
-		on [21/Jul/2020:11:22:56 +0200]
-</pre>
+		on [21/Jul/2020:11:22:56 +0200]</pre>
 </div>
 <p class="Pp">Figuring out how many managed clients from the
     <span class="Pa">192/8</span> network received at least 2 times on the
     <span class="Pa">www</span> target are currently present in a
     <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table may be
     accomplished like this:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-# pftblctl list active addresses hits 2- from www 192/8 | wc -l
-       3
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre># pftblctl list active addresses hits 2- from www 192/8 | wc -l
+       3</pre>
 </div>
 <p class="Pp">The next example shows a <span class="Pa">control</span> command
     deleting the address <span class="Pa">11.22.33.44</span> for the
     <span class="Pa">www</span> target from memory:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-# pftblctl drop 11.22.33.44 www
-1 client entry dropped.
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre># pftblctl drop 11.22.33.44 www
+1 client entry dropped.</pre>
 </div>
 <p class="Pp">The corresponding log entry might look like this:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-[...] [11.22.33.44]:[www]:(2x:1h3m17s) dropped.
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre>[...] [11.22.33.44]:[www]:(2x:1h3m17s) dropped.</pre>
 </div>
 <p class="Pp">Last but not least, <code class="Nm">pftblctl</code> may also be
     used to send client data to the server:</p>
-<div class="Bd Pp Bd-indent">
-<pre>
-# pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44 &quot;Test 1&quot;
-ACK
-</pre>
+<div class="Bd Pp Bd-indent Li">
+<pre># pftblctl -s /var/www/run/pftbld-www.sock 11.22.33.44 &quot;Test 1&quot;
+ACK</pre>
 </div>
 <p class="Pp">Also note the server acknowledge being printed to
     <span class="Pa">stdout</span> indicating that the daemon has successfully
