@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2022 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1084,8 +1084,9 @@ fork_scheduler(void)
 	int	 ctrlfd[2], inbfd[2];
 	char	*argv[3];
 
-	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, ctrlfd) == -1 ||
-	    socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, inbfd) == -1)
+	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, ctrlfd) == -1)
+		FATAL("socketpair");
+	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, inbfd) == -1)
 		FATAL("socketpair");
 
 	if ((sched_pid = fork()) == -1)

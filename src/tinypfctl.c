@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2022 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -301,12 +301,11 @@ pfexec(struct pfresult *pfres, struct pfcmd *cmd)
 __dead void
 tinypfctl(int argc, char *argv[])
 {
-	int		 debug, verbose, ctrlfd, pffd;
+	int		 debug, verbose, ctrlfd, pffd, r;
 	struct pfcmd	 cmd;
 	size_t		 pfacnt, pfalen;
 	struct pfr_addr	*pfaddr;
 	struct pfresult	 pfres;
-	int		 r;
 
 	ETOI(debug, ENV_DEBUG);
 	ETOI(verbose, ENV_VERBOSE);
