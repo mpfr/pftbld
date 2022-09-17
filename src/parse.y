@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2022 Matthias Pressfreund
  * Copyright (c) 2015 Ted Unangst <tedu@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -541,12 +541,13 @@ excludeoptsl	: KEYTERM STRING	{
 			free($2);
 			if (keyterm_inq(curr_exclkeytermq, k)) {
 				DPRINTF("exclude keyterm '%s' already "
-				    "enqueued", k->p);
+				    "enqueued", (char *)k->p);
 				free(k->p);
 				free(k);
 			} else {
 				STAILQ_INSERT_TAIL(curr_exclkeytermq, k, ptrs);
-				DPRINTF("enqueued exclude keyterm '%s'", k->p);
+				DPRINTF("enqueued exclude keyterm '%s'",
+				    (char *)k->p);
 			}
 		}
 		| KEYTERMFILE STRING	{
@@ -604,12 +605,13 @@ includeoptsl	: KEYTERM STRING	{
 			free($2);
 			if (keyterm_inq(curr_inclkeytermq, k)) {
 				DPRINTF("include keyterm '%s' already "
-				    "enqueued", k->p);
+				    "enqueued", (char *)k->p);
 				free(k->p);
 				free(k);
 			} else {
 				STAILQ_INSERT_TAIL(curr_inclkeytermq, k, ptrs);
-				DPRINTF("enqueued include keyterm '%s'", k->p);
+				DPRINTF("enqueued include keyterm '%s'",
+				    (char *)k->p);
 			}
 		}
 		| KEYTERMFILE STRING	{
@@ -902,14 +904,14 @@ load_keyterms(const char *file, struct ptrq *ktq)
 		if ((k->p = strndup(line, n - 1)) == NULL)
 			FATAL("strndup(%s, %ld)", line, n - 1);
 		if (keyterm_inq(ktq, k)) {
-			DPRINTF("keyterm '%s' already enqueued", k->p);
+			DPRINTF("keyterm '%s' already enqueued", (char *)k->p);
 			free(k->p);
 			free(k);
 			continue;
 		}
 
 		STAILQ_INSERT_TAIL(ktq, k, ptrs);
-		DPRINTF("enqueued keyterm '%s'", k->p);
+		DPRINTF("enqueued keyterm '%s'", (char *)k->p);
 		cnt++;
 	}
 	free(line);
