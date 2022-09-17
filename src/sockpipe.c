@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2022 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,7 +39,7 @@ sockpipe(const char *path, int verbose)
 	ssa_un.sun_family = AF_UNIX;
 
 
-	if (unveil(ssa_un.sun_path, "r") == -1)
+	if (unveil(ssa_un.sun_path, "w") == -1)
 		ERR("unveil");
 
 	if (pledge("stdio unix", NULL) == -1)
