@@ -1,3 +1,6 @@
+| :warning: With the release of OpenBSD version 7.3, this branch will reach its end of life and will no longer be maintained.
+| --- |
+
 # pftbld(8)
 
 `pftbld(8)` is a lightweight [OpenBSD](https://www.openbsd.org) daemon written to automate [pf(4) table](http://man.openbsd.org/pf.conf#TABLES) content management and is typically used for building and maintaining dynamic firewall blocklists.
