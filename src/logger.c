@@ -196,7 +196,7 @@ fork_logger(void)
 }
 
 void
-kill_logger()
+kill_logger(void)
 {
 	term_logger();
 	dispatch_logger();
