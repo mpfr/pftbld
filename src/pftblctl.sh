@@ -1,6 +1,6 @@
 #!/bin/ksh
 #
-# Copyright (c) 2020, 2021 Matthias Pressfreund
+# Copyright (c) 2020 - 2023 Matthias Pressfreund
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -32,15 +32,15 @@ PFTBLD='/usr/local/sbin/pftbld'
 [[ -x ${PFTBLD} ]] || err 'pftbld binary missing or not executable'
 
 QUIET=0
-CTRLSOCK='/var/run/pftbld.sock'
+SOCKET='/var/run/pftbld.sock'
 while getopts qs: arg; do
 	case ${arg} in
 	q)	QUIET=$((QUIET+1));;
-	s)	CTRLSOCK=$OPTARG;;
+	s)	SOCKET=$OPTARG;;
 	*)	usage;;
 	esac
 done
-[[ -S ${CTRLSOCK} ]] || err "no socket found at '${CTRLSOCK}'"
+[[ -S ${SOCKET} ]] || err "no socket found at '${SOCKET}'"
 shift $((OPTIND-1))
 
 for a in "$@"; do
@@ -52,4 +52,4 @@ done
 ((QUIET < 2)) && VERBOSE='v'
 ((QUIET == 1)) && exec 1>/dev/null
 
-echo -n "${cmd}" | ${PFTBLD} -${VERBOSE}p ${CTRLSOCK}
+echo -n "${cmd}" | ${PFTBLD} -${VERBOSE}p ${SOCKET}

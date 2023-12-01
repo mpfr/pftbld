@@ -1,5 +1,5 @@
 .\"
-.\" Copyright (c) 2020, 2021 Matthias Pressfreund
+.\" Copyright (c) 2020 - 2023 Matthias Pressfreund
 .\"
 .\" Permission to use, copy, modify, and distribute this software for any
 .\" purpose with or without fee is hereby granted, provided that the above
@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: February 13 2021 $
+.Dd $Mdocdate: December 1 2023 $
 .Dt PFTBLD 8
 .Os
 .Sh NAME
@@ -42,7 +42,7 @@ What typically happens to a submitted IP address is pretty simple:
 .It
 The address is immediately added to a
 .Xr pf 4
-table according to the daemon's configuration for and the frequency of its
+table according to the daemon's configuration and the frequency of its
 appearance on the respective socket.
 .It
 After an expiry time also specified in the configuration, the address is
@@ -59,10 +59,10 @@ any other kind of filtering or translation purposes.
 .Pp
 As
 .Nm
-can persist managed addresses and meta-data, it is capable of restoring its
-runtime status and corresponding
+can persist managed addresses and meta-data, it is able to restore its runtime
+state and corresponding
 .Xr pf 4
-tables through system reboots and migrations.
+tables after system reboots and migrations.
 .Pp
 Client programs may directly or indirectly (i.e. through some other tool)
 connect and write to the daemon's UNIX-domain sockets.
@@ -194,8 +194,7 @@ which is connected to the
 target, will cause two log entries:
 .Bd -literal -offset indent
 [...] Add :: [www] <- [11.22.33.44][GET /test.php 404]
-[...] >>> Added [11.22.33.44]:[www]:(2x:3h16m25s) \\
-to { attackers } for 1h.
+[...] >>> Added [11.22.33.44]:[www]:(2x:3h16m25s) to { attackers } for 1h.
 .Ed
 .Pp
 The first entry documents the incoming message including all optional parts.
