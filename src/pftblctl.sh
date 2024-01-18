@@ -1,6 +1,6 @@
 #!/bin/ksh
 #
-# Copyright (c) 2020 - 2023 Matthias Pressfreund
+# Copyright (c) 2020 - 2024 Matthias Pressfreund
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,8 @@
 
 usage()
 {
-	usage="${0##*/} [-q] [-s socket] command/address [argument ...]"
-	echo "usage: ${usage}" >&2
+	echo "usage: ${0##*/} [-q] [-s <socket>] <command/address>" \
+	    '[<argument> ...]' >&2
 	exit 1
 }
 
