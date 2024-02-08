@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2022 Matthias Pressfreund
+ * Copyright (c) 2020 - 2024 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -61,7 +61,6 @@ pf_table_prepare(const char *name)
 	}
 	if ((io = calloc(1, sizeof(*io))) == NULL) {
 		free(tbl);
-		free(io);
 		return (NULL);
 	}
 	io->pfrio_buffer = tbl;
