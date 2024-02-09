@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2022 Matthias Pressfreund
+ * Copyright (c) 2020 - 2024 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,7 +30,7 @@ sockpipe(const char *path, int verbose)
 {
 	int			 fd;
 	struct sockaddr_un	 ssa_un;
-	char			 buf[BUFSIZ];
+	char			 buf[BUFSIZ], *bx;
 	ssize_t			 nr, nw, n;
 
 	memset(&ssa_un, 0, sizeof(ssa_un));
@@ -51,6 +51,8 @@ sockpipe(const char *path, int verbose)
 	if (connect(fd, (struct sockaddr *)&ssa_un, sizeof(ssa_un)) == -1)
 		ERR("connect");
 
+	bx = buf;
+
 	do {
 		if ((nr = read(STDIN_FILENO, buf, sizeof(buf))) == -1)
 			ERR("stdin read");
@@ -61,11 +63,12 @@ sockpipe(const char *path, int verbose)
 			if (n == 0)
 				break;
 			nw += n;
+			bx = buf + nw;
 		}
 	} while (nr > 0);
 
-	if ((nw < 1 || buf[--nw] != '\0') && send(fd, "", 1, 0) == -1)
-		ERR("socket write");
+	if ((bx == buf || *--bx != '\0') && send(fd, "", 1, 0) == -1)
+		ERR("socket write 0");
 
 	if (!verbose)
 		exit(0);
