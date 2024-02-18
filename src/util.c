@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2024 Matthias Pressfreund
  * Copyright (c) 2014 Reyk Floeter <reyk@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -627,11 +627,7 @@ msg_send(struct statfd *sfd, const char *fmt, ...)
 	if (S_ISSOCK(sfd->sb.st_mode)) {
 		if (vasprintf(&msg, fmt, args) == -1)
 			FATAL("vasprintf");
-		while (send(sfd->fd, msg, strlen(msg), MSG_NOSIGNAL) == -1) {
-			if (errno != EAGAIN)
-				break; /* ignore errors */
-			NANONAP;
-		}
+		RSEND(sfd->fd, msg, strlen(msg));
 		free(msg);
 	} else if (vdprintf(sfd->fd, fmt, args) == -1)
 		FATAL("vdprintf");

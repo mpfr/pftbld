@@ -58,16 +58,15 @@ sockpipe(const char *path, int verbose)
 			ERR("stdin read");
 		nw = 0;
 		while (nw < nr) {
-			if ((n = send(fd, &buf[nw], nr - nw, 0)) == -1)
+			if ((n = send(fd, &buf[nw], nr - nw, 0)) == -1 ||
+			    n == 0)
 				ERR("socket write");
-			if (n == 0)
-				break;
 			nw += n;
 			bx = buf + nw;
 		}
 	} while (nr > 0);
 
-	if ((bx == buf || *--bx != '\0') && send(fd, "", 1, 0) == -1)
+	if ((bx == buf || *--bx != '\0') && send(fd, "", 1, 0) != 1)
 		ERR("socket write 0");
 
 	if (!verbose)
@@ -79,10 +78,8 @@ sockpipe(const char *path, int verbose)
 		nw = 0;
 		while (nw < nr) {
 			if ((n = write(STDOUT_FILENO, &buf[nw],
-			    nr - nw)) == -1)
+			    nr - nw)) == -1 || n == 0)
 				ERR("stdout write");
-			if (n == 0)
-				break;
 			nw += n;
 		}
 	} while (nr > 0);

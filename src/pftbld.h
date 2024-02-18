@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2024 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -146,6 +146,17 @@
 
 #define ISEND(d, m, ...)	send_valist(d, m, __VA_ARGS__)
 #define IRECV(d, m, ...)	recv_valist(d, m, __VA_ARGS__)
+
+#define RSEND(d, b, n)						\
+	do {							\
+		while (send(d, b, n, MSG_NOSIGNAL) == -1) {	\
+			if (errno == EPIPE)			\
+				break;				\
+			if (errno != EAGAIN)			\
+				FATAL("send");			\
+			NANONAP;				\
+		}						\
+	} while (0)
 
 #define GETENV(s, e)							\
 	do {								\

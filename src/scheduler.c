@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2022 Matthias Pressfreund
+ * Copyright (c) 2020 - 2024 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -771,7 +771,7 @@ abort:
 	EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0, NULL);
 	if (HAS_TIMEOUT(ibuf))
 		EV_MOD(kqfd, kev, kevid, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
-	send(ibuf->datafd, nak, sizeof(nak), MSG_NOSIGNAL);
+	RSEND(ibuf->datafd, nak, sizeof(nak));
 	close(ibuf->datafd);
 
 remove:

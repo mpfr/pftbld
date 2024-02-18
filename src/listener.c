@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2024 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -342,7 +342,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	memset(&addr, 0, sizeof(addr));
 	if (parse_addr(&addr, ibuf->data) == -1) {
 		log_warnx("ignored invalid address (%s)", ibuf->data);
-		send(datafd, nak, sizeof(nak), MSG_NOSIGNAL);
+		RSEND(datafd, nak, sizeof(nak));
 		close(datafd);
 		return;
 	}
@@ -624,7 +624,7 @@ next:
 	}
 
 end:
-	send(datafd, ack, sizeof(ack), MSG_NOSIGNAL);
+	RSEND(datafd, ack, sizeof(ack));
 	close(datafd);
 }
 
