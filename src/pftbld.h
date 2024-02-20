@@ -149,13 +149,17 @@
 
 #define RSEND(d, b, n)						\
 	do {							\
-		while (send(d, b, n, MSG_NOSIGNAL) == -1) {	\
-			if (errno == EPIPE)			\
-				break;				\
-			if (errno != EAGAIN)			\
-				FATAL("send");			\
-			NANONAP;				\
-		}						\
+		size_t	 _nw;					\
+		ssize_t	 _n;					\
+		for (_nw = 0; _nw < (n); _nw += _n)		\
+			if ((_n = send(d, (b) + _nw, (n) - _nw,	\
+			    MSG_NOSIGNAL)) == -1 || _n == 0) {	\
+				if (errno == EPIPE)		\
+					break;			\
+				if (errno != EAGAIN)		\
+					FATAL("send");		\
+				NANONAP;			\
+			}					\
 	} while (0)
 
 #define GETENV(s, e)							\
@@ -166,8 +170,8 @@
 
 #define SETENV(e, s)					\
 	do {						\
-		if (setenv(e, _s, 1) == -1)		\
-			FATAL("setenv(%s, %s)", e, _s);	\
+		if (setenv(e, s, 1) == -1)		\
+			FATAL("setenv(%s, %s)", e, s);	\
 	} while (0)
 
 #define LLTOS(s, n)	ASPRINTF(&s, "%lld", n)

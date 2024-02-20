@@ -58,7 +58,7 @@ sockpipe(const char *path, int verbose)
 			ERR("stdin read");
 		nw = 0;
 		while (nw < nr) {
-			if ((n = send(fd, &buf[nw], nr - nw, 0)) == -1 ||
+			if ((n = send(fd, buf + nw, nr - nw, 0)) == -1 ||
 			    n == 0)
 				ERR("socket write");
 			nw += n;
@@ -77,7 +77,7 @@ sockpipe(const char *path, int verbose)
 			ERR("socket read");
 		nw = 0;
 		while (nw < nr) {
-			if ((n = write(STDOUT_FILENO, &buf[nw],
+			if ((n = write(STDOUT_FILENO, buf + nw,
 			    nr - nw)) == -1 || n == 0)
 				ERR("stdout write");
 			nw += n;

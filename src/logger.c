@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2024 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -90,10 +90,10 @@ handle_pipe(struct kevent *kev)
 	MALLOC(buf, n);
 	nr = nw = 0;
 	do {
-		if ((nx = read(pipefd, &buf[nr], n - nr)) == -1)
+		if ((nx = read(pipefd, buf + nr, n - nr)) == -1)
 			FATAL("read");
 		nr += nx;
-		if ((nx = write(logfd, &buf[nw], nr - nw)) == -1)
+		if ((nx = write(logfd, buf + nw, nr - nw)) == -1)
 			FATAL("write");
 		nw += nx;
 	} while (nr < n || nw < nr);
