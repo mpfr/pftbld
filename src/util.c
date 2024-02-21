@@ -618,6 +618,23 @@ create_statfd(int fd)
 }
 
 void
+rsend(int fd, const char *msg, size_t len)
+{
+	size_t	 nw;
+	ssize_t	 n;
+
+	for (nw = 0; nw < len; nw += n)
+		if ((n = send(fd, msg + nw, len - nw, MSG_NOSIGNAL)) == -1 ||
+		    n == 0) {
+			if (errno == EPIPE)
+				break;
+			if (errno != EAGAIN)
+				FATAL("send");
+			NANONAP;
+		}
+}
+
+void
 msg_send(struct statfd *sfd, const char *fmt, ...)
 {
 	va_list	 args;
@@ -627,7 +644,7 @@ msg_send(struct statfd *sfd, const char *fmt, ...)
 	if (S_ISSOCK(sfd->sb.st_mode)) {
 		if (vasprintf(&msg, fmt, args) == -1)
 			FATAL("vasprintf");
-		RSEND(sfd->fd, msg, strlen(msg));
+		rsend(sfd->fd, msg, strlen(msg));
 		free(msg);
 	} else if (vdprintf(sfd->fd, fmt, args) == -1)
 		FATAL("vdprintf");

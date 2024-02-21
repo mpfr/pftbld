@@ -147,21 +147,6 @@
 #define ISEND(d, m, ...)	send_valist(d, m, __VA_ARGS__)
 #define IRECV(d, m, ...)	recv_valist(d, m, __VA_ARGS__)
 
-#define RSEND(d, b, n)						\
-	do {							\
-		size_t	 _nw;					\
-		ssize_t	 _n;					\
-		for (_nw = 0; _nw < (n); _nw += _n)		\
-			if ((_n = send(d, (b) + _nw, (n) - _nw,	\
-			    MSG_NOSIGNAL)) == -1 || _n == 0) {	\
-				if (errno == EPIPE)		\
-					break;			\
-				if (errno != EAGAIN)		\
-					FATAL("send");		\
-				NANONAP;			\
-			}					\
-	} while (0)
-
 #define GETENV(s, e)							\
 	do {								\
 		if ((s = getenv(e)) == NULL)				\
@@ -574,5 +559,6 @@ struct crange	*parse_crange(const char *);
 int		 prefill_socketopts(struct socket *);
 enum pathres	 check_path(const char *, char *, size_t);
 struct statfd	*create_statfd(int);
+void		 rsend(int, const char *, size_t);
 void		 msg_send(struct statfd *, const char *, ...)
 		    __attribute__((__format__ (printf, 2, 3)));

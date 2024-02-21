@@ -771,7 +771,7 @@ abort:
 	EV_MOD(kqfd, kev, kevid, EVFILT_READ, EV_DELETE, 0, 0, NULL);
 	if (HAS_TIMEOUT(ibuf))
 		EV_MOD(kqfd, kev, kevid, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
-	RSEND(ibuf->datafd, nak, sizeof(nak));
+	rsend(ibuf->datafd, nak, sizeof(nak));
 	close(ibuf->datafd);
 
 remove:

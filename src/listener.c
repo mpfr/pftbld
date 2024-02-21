@@ -342,7 +342,7 @@ proc_data(struct inbuf *ibuf, int kqfd)
 	memset(&addr, 0, sizeof(addr));
 	if (parse_addr(&addr, ibuf->data) == -1) {
 		log_warnx("ignored invalid address (%s)", ibuf->data);
-		RSEND(datafd, nak, sizeof(nak));
+		rsend(datafd, nak, sizeof(nak));
 		close(datafd);
 		return;
 	}
@@ -624,7 +624,7 @@ next:
 	}
 
 end:
-	RSEND(datafd, ack, sizeof(ack));
+	rsend(datafd, ack, sizeof(ack));
 	close(datafd);
 }
 
