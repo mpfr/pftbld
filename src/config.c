@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2025 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,7 +34,6 @@ static void	 update_sockets(struct socketq *, struct socketq *,
 static char	*esc(const char *);
 
 extern struct config	*conf;
-extern struct clientq	 cltq;
 
 static int
 sockets_eq(struct socket *s1, struct socket *s2)
