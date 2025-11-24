@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2024 Matthias Pressfreund
+ * Copyright (c) 2020 - 2025 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -56,14 +56,10 @@ sockpipe(const char *path, int verbose)
 	do {
 		if ((nr = read(STDIN_FILENO, buf, sizeof(buf))) == -1)
 			ERR("stdin read");
-		nw = 0;
-		while (nw < nr) {
+		for (nw = 0; nw < nr; nw += n, bx = buf + nw)
 			if ((n = send(fd, buf + nw, nr - nw, 0)) == -1 ||
 			    n == 0)
 				ERR("socket write");
-			nw += n;
-			bx = buf + nw;
-		}
 	} while (nr > 0);
 
 	if ((bx == buf || *--bx != '\0') && send(fd, "", 1, 0) != 1)
@@ -75,13 +71,10 @@ sockpipe(const char *path, int verbose)
 	do {
 		if ((nr = recv(fd, buf, sizeof(buf), 0)) == -1)
 			ERR("socket read");
-		nw = 0;
-		while (nw < nr) {
+		for (nw = 0; nw < nr; nw += n)
 			if ((n = write(STDOUT_FILENO, buf + nw,
 			    nr - nw)) == -1 || n == 0)
 				ERR("stdout write");
-			nw += n;
-		}
 	} while (nr > 0);
 
 	exit(0);
