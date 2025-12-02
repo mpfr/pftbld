@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2024 Matthias Pressfreund
+ * Copyright (c) 2020 - 2025 Matthias Pressfreund
  * Copyright (c) 2014 Reyk Floeter <reyk@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -624,8 +624,7 @@ rsend(int fd, const char *msg, size_t len)
 	ssize_t	 n;
 
 	for (nw = 0; nw < len; nw += n)
-		if ((n = send(fd, msg + nw, len - nw, MSG_NOSIGNAL)) == -1 ||
-		    n == 0) {
+		if ((n = send(fd, msg + nw, len - nw, MSG_NOSIGNAL)) == -1) {
 			if (errno == EPIPE)
 				break;
 			if (errno != EAGAIN)

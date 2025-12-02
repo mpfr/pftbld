@@ -57,8 +57,7 @@ sockpipe(const char *path, int verbose)
 		if ((nr = read(STDIN_FILENO, buf, sizeof(buf))) == -1)
 			ERR("stdin read");
 		for (nw = 0; nw < nr; nw += n, bx = buf + nw)
-			if ((n = send(fd, buf + nw, nr - nw, 0)) == -1 ||
-			    n == 0)
+			if ((n = send(fd, buf + nw, nr - nw, 0)) == -1)
 				ERR("socket write");
 	} while (nr > 0);
 
@@ -72,8 +71,7 @@ sockpipe(const char *path, int verbose)
 		if ((nr = recv(fd, buf, sizeof(buf), 0)) == -1)
 			ERR("socket read");
 		for (nw = 0; nw < nr; nw += n)
-			if ((n = write(STDOUT_FILENO, buf + nw,
-			    nr - nw)) == -1 || n == 0)
+			if ((n = write(STDOUT_FILENO, buf + nw, nr - nw)) == -1)
 				ERR("stdout write");
 	} while (nr > 0);
 
