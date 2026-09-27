@@ -1,7 +1,13 @@
 <!DOCTYPE html>
 <html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="stylesheet" href="https://man.openbsd.org/mandoc.css" type="text/css" media="all"/>
+  <title>PFTBLD.CONF(5)</title>
+</head>
 <!-- This is an automatically generated file.  Do not edit.
-   Copyright (c) 2020, 2021 Matthias Pressfreund
+   Copyright (c) 2020 - 2026 Matthias Pressfreund
   
    Permission to use, copy, modify, and distribute this software for any
    purpose with or without fee is hereby granted, provided that the above
@@ -15,34 +21,27 @@
    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    -->
-<head>
-  <meta charset="utf-8"/>
-  <link rel="stylesheet" href="https://man.openbsd.org/mandoc.css" type="text/css" media="all"/>
-  <title>PFTBLD.CONF(5)</title>
-</head>
 <body>
-<table class="head">
-  <tr>
-    <td class="head-ltitle">PFTBLD.CONF(5)</td>
-    <td class="head-vol">File Formats Manual</td>
-    <td class="head-rtitle">PFTBLD.CONF(5)</td>
-  </tr>
-</table>
-<div class="manual-text">
+<div class="head" role="doc-pageheader" aria-label="Manual header
+  line"><span class="head-ltitle">PFTBLD.CONF(5)</span>
+  <span class="head-vol">File Formats Manual</span>
+  <span class="head-rtitle">PFTBLD.CONF(5)</span></div>
+<main class="manual-text">
 <section class="Sh">
-<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+<h2 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h2>
 <p class="Pp"><code class="Nm">pftbld.conf</code> &#x2014;
-    <span class="Nd">configuration file for the
-    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table content
-    management daemon</span></p>
+    <span class="Nd" role="doc-subtitle">configuration file for the
+    <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf, section
+    4">pf(4)</a> table content management daemon</span></p>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<h2 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h2>
 <p class="Pp"><code class="Nm">pftbld.conf</code> is the configuration file for
-    <a class="Xr" href="pftbld.8.html">pftbld(8)</a>.</p>
+    <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+    8">pftbld(8)</a>.</p>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="TYPES"><a class="permalink" href="#TYPES">TYPES</a></h1>
+<h2 class="Sh" id="TYPES"><a class="permalink" href="#TYPES">TYPES</a></h2>
 <p class="Pp">In this context, the following rules regarding parameter value
     types apply:</p>
 <p class="Pp"></p>
@@ -95,11 +94,11 @@ s (seconds)</pre>
 </ul>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="GLOBAL_CONFIGURATION"><a class="permalink" href="#GLOBAL_CONFIGURATION">GLOBAL
-  CONFIGURATION</a></h1>
+<h2 class="Sh" id="GLOBAL_CONFIGURATION"><a class="permalink" href="#GLOBAL_CONFIGURATION">GLOBAL
+  CONFIGURATION</a></h2>
 <p class="Pp">Here are the settings that may be applied globally:</p>
 <dl class="Bl-tag">
-  <dt>[<code class="Ic">no</code>] <code class="Ic">backlog</code>
+  <dt id="backlog">[<code class="Ic">no</code>] <code class="Ic">backlog</code>
     <var class="Ar">number</var></dt>
   <dd>The maximum allowed number of simultaneous connections on a
       <code class="Ic">socket</code>. In case the <code class="Ic">no</code>
@@ -108,9 +107,9 @@ s (seconds)</pre>
       of 5 connections will be used. The actual upper limit of this parameter is
       the value of the <span class="Pa">kern.somaxconn</span> kernel state which
       can be determined by means of the
-      <a class="Xr" href="http://man.openbsd.org/sysctl.8">sysctl(8)</a>
-      utility.</dd>
-  <dt>[<code class="Ic">no</code>] <code class="Ic">datamax</code>
+      <a class="Xr" href="http://man.openbsd.org/sysctl.8" aria-label="sysctl,
+      section 8">sysctl(8)</a> utility.</dd>
+  <dt id="datamax">[<code class="Ic">no</code>] <code class="Ic">datamax</code>
     <var class="Ar">bytes</var></dt>
   <dd>This limits the number of <var class="Ar">bytes</var> allowed to be
       transmitted per connection, the terminating
@@ -120,13 +119,14 @@ s (seconds)</pre>
       keyword is specified instead of the number of <var class="Ar">bytes</var>,
       no limit is applied to the amount of data accepted by a connection.
       Defaults to 2048 bytes per connection.</dd>
-  <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
+  <dt id="drop">[<code class="Ic">no</code>] <code class="Ic">drop</code>
     <var class="Ar">time</var></dt>
   <dd>The amount of time (from the moment it is received) after which a managed
       IP address will be discarded/dropped from
-      <a class="Xr" href="pftbld.8.html">pftbld(8)</a> memory. In case the
-      <code class="Ic">no</code> keyword is used instead of a
-      <var class="Ar">time</var> value, IP addresses will be kept forever.</dd>
+      <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+      8">pftbld(8)</a> memory. In case the <code class="Ic">no</code> keyword is
+      used instead of a <var class="Ar">time</var> value, IP addresses will be
+      kept forever.</dd>
   <dt id="exclude"><a class="permalink" href="#exclude"><code class="Ic">exclude</code></a>
     <var class="Ar">option</var> | {...}</dt>
   <dd>Specifies exclusion criteria for incoming data. Multiple criterias may be
@@ -152,12 +152,12 @@ s (seconds)</pre>
         <var class="Ar">path</var></dt>
       <dd>Read <code class="Ic">net</code> entries line by line from the file at
           <var class="Ar">path</var>. The file must be fomatted as outlined in
-          <a class="Xr" href="http://man.openbsd.org/hosts.5">hosts(5)</a>.
-          Lines not starting with a valid
+          <a class="Xr" href="http://man.openbsd.org/hosts.5" aria-label="hosts,
+          section 5">hosts(5)</a>. Lines not starting with a valid
           <span class="Pa">address/network</span> are logged and ignored.</dd>
     </dl>
   </dd>
-  <dt>[<code class="Ic">no</code>] <code class="Ic">idlemin</code>
+  <dt id="idlemin">[<code class="Ic">no</code>] <code class="Ic">idlemin</code>
     <var class="Ar">milliseconds</var></dt>
   <dd>Specifies the minimum time that must elapse between successive occurrences
       of an IP address on a <span class="Pa">data socket</span> in order to be
@@ -197,19 +197,20 @@ s (seconds)</pre>
         <var class="Ar">path</var></dt>
       <dd>Read <code class="Ic">net</code> entries line by line from the file at
           <var class="Ar">path</var>. The file must be fomatted as outlined in
-          <a class="Xr" href="http://man.openbsd.org/hosts.5">hosts(5)</a>.
-          Lines not starting with a valid
+          <a class="Xr" href="http://man.openbsd.org/hosts.5" aria-label="hosts,
+          section 5">hosts(5)</a>. Lines not starting with a valid
           <span class="Pa">address/network</span> are logged and ignored.</dd>
     </dl>
   </dd>
-  <dt>[<code class="Ic">no</code>] <code class="Ic">log</code>
+  <dt id="log">[<code class="Ic">no</code>] <code class="Ic">log</code>
     <var class="Ar">path</var></dt>
-  <dd>Make <a class="Xr" href="pftbld.8.html">pftbld(8)</a> write its log to the
-      file at <span class="Pa">path</span> instead of the default log file
+  <dd>Make <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+      8">pftbld(8)</a> write its log to the file at <span class="Pa">path</span>
+      instead of the default log file
       <span class="Pa">/var/log/pftbld.log</span>. Logging may be completely
       disabled by using the leading <code class="Ic">no</code> keyword instead
       of specifying a <var class="Ar">path</var>.</dd>
-  <dt>[<code class="Ic">no</code>] <code class="Ic">timeout</code>
+  <dt id="timeout">[<code class="Ic">no</code>] <code class="Ic">timeout</code>
     <var class="Ar">milliseconds</var></dt>
   <dd>Sets the maximum time for a client to transmit its data after making a
       connection. If a client does not succeed sending data within the specified
@@ -221,7 +222,7 @@ s (seconds)</pre>
 </dl>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="TARGETS"><a class="permalink" href="#TARGETS">TARGETS</a></h1>
+<h2 class="Sh" id="TARGETS"><a class="permalink" href="#TARGETS">TARGETS</a></h2>
 <p class="Pp">Typically, targets are used to distinguish input data by service
     type and apply appropriate handling. An IP address transmitted by a client
     is always (automatically) assigned to a <code class="Ic">target</code>.
@@ -232,8 +233,9 @@ s (seconds)</pre>
     targets as well as multiple addresses may be associated with the same
     target.</p>
 <p class="Pp">In order to start
-    <a class="Xr" href="pftbld.8.html">pftbld(8)</a>, at least one
-    <code class="Ic">target</code> needs to be defined.</p>
+    <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+    8">pftbld(8)</a>, at least one <code class="Ic">target</code> needs to be
+    defined.</p>
 <dl class="Bl-tag">
   <dt id="target"><a class="permalink" href="#target"><code class="Ic">target</code></a>
     <var class="Ar">name</var> {...}</dt>
@@ -244,15 +246,16 @@ s (seconds)</pre>
       <dt id="cascade"><a class="permalink" href="#cascade"><code class="Ic">cascade</code></a>
         {...}</dt>
       <dd>Specifies frame and first <code class="Ic">step</code> of a
-          <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>
-          <code class="Ic">table</code> cascade associated client entries will
-          traverse during their <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
-          life cycle. There must be exactly one instance defined per
-          <code class="Ic">target</code>, followed by a block of options
-          enclosed in curly braces:
+          <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf,
+          section 4">pf(4)</a> <code class="Ic">table</code> cascade associated
+          client entries will traverse during their
+          <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+          8">pftbld(8)</a> life cycle. There must be exactly one instance
+          defined per <code class="Ic">target</code>, followed by a block of
+          options enclosed in curly braces:
         <dl class="Bl-tag">
-          <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
-            <var class="Ar">time</var></dt>
+          <dt id="drop~2">[<code class="Ic">no</code>]
+            <code class="Ic">drop</code> <var class="Ar">time</var></dt>
           <dd>Overrides any <code class="Ic">drop</code> option specified
               globally or with the enclosing
             <code class="Ic">target</code>.</dd>
@@ -262,8 +265,8 @@ s (seconds)</pre>
               corresponding <code class="Ic">table</code>. If omitted, addresses
               do not expire and remain in their tables until deleted manually,
               e.g. by using the
-              <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a>
-              <code class="Ic">drop</code> command.</dd>
+              <a class="Xr" href="pftblctl.8.html" aria-label="pftblctl, section
+              8">pftblctl(8)</a> <code class="Ic">drop</code> command.</dd>
           <dt id="hits"><a class="permalink" href="#hits"><code class="Ic">hits</code></a>
             <var class="Ar">number</var></dt>
           <dd>Maximum number of appearances for a specific IP address in the
@@ -272,8 +275,9 @@ s (seconds)</pre>
               move on to the next <code class="Ic">step</code>. In order to
               properly close a <code class="Ic">cascade</code>, this option
               needs to be omitted on the last <code class="Ic">step</code> as
-              this makes <a class="Xr" href="pftbld.8.html">pftbld(8)</a> stop
-              evaluating the appearance count of an IP address.</dd>
+              this makes <a class="Xr" href="pftbld.8.html" aria-label="pftbld,
+              section 8">pftbld(8)</a> stop evaluating the appearance count of
+              an IP address.</dd>
           <dt id="kill"><a class="permalink" href="#kill"><code class="Ic">kill</code></a>
             |
             <a class="permalink" href="#keep"><code class="Ic" id="keep">keep</code></a>
@@ -309,19 +313,20 @@ s (seconds)</pre>
           <dt id="table"><a class="permalink" href="#table"><code class="Ic">table</code></a>
             <var class="Ar">name</var></dt>
           <dd>The <var class="Ar">name</var> of the corresponding
-              <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table.
-              This option is mandatory at <code class="Ic">cascade</code>
-              definition and optional for every enclosed
-              <code class="Ic">step</code>.
+              <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf,
+              section 4">pf(4)</a> table. This option is mandatory at
+              <code class="Ic">cascade</code> definition and optional for every
+              enclosed <code class="Ic">step</code>.
             <p class="Pp">It should also be noted that while sharing tables is
                 discouraged, unmanaged entries added by other means coexist
                 perfectly and neither interfere with nor get affected by those
                 created and managed by
-                <a class="Xr" href="pftbld.8.html">pftbld(8)</a>.</p>
+                <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+                8">pftbld(8)</a>.</p>
           </dd>
         </dl>
       </dd>
-      <dt>[<code class="Ic">no</code>] <code class="Ic">drop</code>
+      <dt id="drop~3">[<code class="Ic">no</code>] <code class="Ic">drop</code>
         <var class="Ar">time</var></dt>
       <dd>Overrides the global <code class="Ic">drop</code> option.</dd>
       <dt id="exclude~2"><a class="permalink" href="#exclude~2"><code class="Ic">exclude</code></a>
@@ -329,8 +334,8 @@ s (seconds)</pre>
       <dd>Allows for <code class="Ic">target</code> specific exclusion criteria
           additional (and evaluated prior) to global
           <code class="Ic">exclude</code> settings.</dd>
-      <dt>[<code class="Ic">no</code>] <code class="Ic">idlemin</code>
-        <var class="Ar">milliseconds</var></dt>
+      <dt id="idlemin~2">[<code class="Ic">no</code>]
+        <code class="Ic">idlemin</code> <var class="Ar">milliseconds</var></dt>
       <dd>Overrides the global <code class="Ic">idlemin</code> option.</dd>
       <dt id="include~2"><a class="permalink" href="#include~2"><code class="Ic">include</code></a>
         <var class="Ar">option</var> | {...}</dt>
@@ -362,38 +367,41 @@ s (seconds)</pre>
       </dd>
       <dt id="skip"><a class="permalink" href="#skip"><code class="Ic">skip</code></a>
         <var class="Ar">number</var></dt>
-      <dd>Makes <a class="Xr" href="pftbld.8.html">pftbld(8)</a> add the IP
-          address of a new client entry to the corresponding
-          <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table only
-          after the specified <var class="Ar">number</var> of appearances.</dd>
+      <dd>Makes <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+          8">pftbld(8)</a> add the IP address of a new client entry to the
+          corresponding
+          <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf,
+          section 4">pf(4)</a> table only after the specified
+          <var class="Ar">number</var> of appearances.</dd>
       <dt id="socket"><a class="permalink" href="#socket"><code class="Ic">socket</code></a>
         <var class="Ar">path</var> [{...}]</dt>
       <dd>Specifies a UNIX-domain socket at <var class="Ar">path</var> to be
           used for sending target specific <span class="Pa">data strings</span>
-          to <a class="Xr" href="pftbld.8.html">pftbld(8)</a>. At least one data
-          socket must be specified per <code class="Ic">target</code>, followed
-          by an optional block of parameters enclosed in curly braces:
+          to <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+          8">pftbld(8)</a>. At least one data socket must be specified per
+          <code class="Ic">target</code>, followed by an optional block of
+          parameters enclosed in curly braces:
         <dl class="Bl-tag">
           <dt id="action"><a class="permalink" href="#action"><code class="Ic">action
             add</code></a> |
             <a class="permalink" href="#delete"><code class="Ic" id="delete">delete</code></a>
-            |
-            <a class="permalink" href="#drop"><code class="Ic" id="drop">drop</code></a></dt>
+            | <code class="Ic">drop</code></dt>
           <dd>Specifies how to process IP addresses received through the parent
               <code class="Ic">socket</code>. The default action is
               <code class="Ic">add</code>, creating a new client entry and
               inserting the address into the corresponding
-              <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table.
-              The <code class="Ic">delete</code> action removes the address from
-              the corresponding table as if it just had expired. If
-              <code class="Ic">drop</code> is specified, the address will not
-              just be deleted, but the associated client entry will also be
-              completely removed from the daemon's memory.</dd>
-          <dt>[<code class="Ic">no</code>] <code class="Ic">backlog</code>
-            <var class="Ar">number</var></dt>
+              <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf,
+              section 4">pf(4)</a> table. The <code class="Ic">delete</code>
+              action removes the address from the corresponding table as if it
+              just had expired. If <code class="Ic">drop</code> is specified,
+              the address will not just be deleted, but the associated client
+              entry will also be completely removed from the daemon's
+            memory.</dd>
+          <dt id="backlog~2">[<code class="Ic">no</code>]
+            <code class="Ic">backlog</code> <var class="Ar">number</var></dt>
           <dd>Overrides the global <code class="Ic">backlog</code> value.</dd>
-          <dt>[<code class="Ic">no</code>] <code class="Ic">datamax</code>
-            <var class="Ar">bytes</var></dt>
+          <dt id="datamax~2">[<code class="Ic">no</code>]
+            <code class="Ic">datamax</code> <var class="Ar">bytes</var></dt>
           <dd>Overrides the global <code class="Ic">datamax</code> value.</dd>
           <dt id="group"><a class="permalink" href="#group"><code class="Ic">group</code></a>
             <var class="Ar">id</var> | <var class="Ar">name</var></dt>
@@ -423,7 +431,8 @@ s (seconds)</pre>
               numeric user <var class="Ar">id</var> or as a
               <var class="Ar">name</var> to derive the <var class="Ar">id</var>
               from. Defaults to the owner of the parent directory.</dd>
-          <dt>[<code class="Ic">no</code>] <code class="Ic">timeout</code>
+          <dt id="timeout~2">[<code class="Ic">no</code>]
+            <code class="Ic">timeout</code>
             <var class="Ar">milliseconds</var></dt>
           <dd>Overrides the global <code class="Ic">timeout</code> value.</dd>
         </dl>
@@ -433,7 +442,7 @@ s (seconds)</pre>
 </dl>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h1>
+<h2 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h2>
 <dl class="Bl-tag Bl-compact">
   <dt><span class="Pa">/etc/hosts</span></dt>
   <dd>Local host name lookup file.</dd>
@@ -444,13 +453,15 @@ s (seconds)</pre>
 </dl>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+<h2 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h2>
 <p class="Pp">The following <code class="Nm">pftbld.conf</code> example
     specifies a <span class="Pa">www</span> target with a <span class="Pa">data
     socket</span> inside the default
-    <a class="Xr" href="http://man.openbsd.org/chroot.8">chroot(8)</a> directory
-    of the <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a>
-    server, allowing for instant reporting of offending clients.</p>
+    <a class="Xr" href="http://man.openbsd.org/chroot.8" aria-label="chroot,
+    section 8">chroot(8)</a> directory of the
+    <a class="Xr" href="http://man.openbsd.org/httpd.8" aria-label="httpd,
+    section 8">httpd(8)</a> server, allowing for instant reporting of offending
+    clients.</p>
 <div class="Bd Pp Bd-indent Li">
 <pre>exclude {
 	localhosts
@@ -497,15 +508,16 @@ target &quot;www&quot; {
     <span class="Pa">attackers</span> table for 5 days, is not going to be
     dropped from memory anymore and source nodes will be killed along with state
     entries.</p>
-<p class="Pp">The <a class="Xr" href="pftbld.8.html">pftbld(8)</a> binary in
-    pipe mode may be used for testing:</p>
+<p class="Pp">The <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+    8">pftbld(8)</a> binary in pipe mode may be used for testing:</p>
 <div class="Bd Pp Bd-indent Li">
 <pre># echo -n &quot;11.22.33.44&quot; | pftbld -p /var/www/run/pftbld-www.sock</pre>
 </div>
 <p class="Pp">Alternatively, the same result can be achieved by utilizing
-    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a> along with
-    <code class="Fl">-q</code> suppressing the server acknowledge that would be
-    printed to <span class="Pa">stdout</span> otherwise:</p>
+    <a class="Xr" href="pftblctl.8.html" aria-label="pftblctl, section
+    8">pftblctl(8)</a> along with <code class="Fl">-q</code> suppressing the
+    server acknowledge that would be printed to <span class="Pa">stdout</span>
+    otherwise:</p>
 <div class="Bd Pp Bd-indent Li">
 <pre># pftblctl -q -s /var/www/run/pftbld-www.sock 11.22.33.44</pre>
 </div>
@@ -514,22 +526,22 @@ target &quot;www&quot; {
     the address <span class="Pa">11.22.33.44</span> has hit the
     <span class="Pa">www</span> target and the second that the address has been
     added to the <span class="Pa">attackers</span>
-    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table and will be
-    kept there for the next hour.</p>
+    <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf, section
+    4">pf(4)</a> table and will be kept there for the next hour.</p>
 <p class="Pp">Removing the address from
-    <a class="Xr" href="pftbld.8.html">pftbld(8)</a> memory (and the
-    <span class="Pa">attackers</span> table) can be achieved by sending a
-    <span class="Pa">drop</span> command to the <span class="Pa">control
-    socket</span>:</p>
+    <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+    8">pftbld(8)</a> memory (and the <span class="Pa">attackers</span> table)
+    can be achieved by sending a <span class="Pa">drop</span> command to the
+    <span class="Pa">control socket</span>:</p>
 <div class="Bd Pp Bd-indent Li">
 <pre># pftblctl drop 11.22.33.44
 1 client entry dropped.</pre>
 </div>
 <p class="Pp">In order to keep offending clients away from
-    <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a>,
-    appropriate entries in
-    <a class="Xr" href="http://man.openbsd.org/pf.conf.5">pf.conf(5)</a> are
-    required. Here's an example:</p>
+    <a class="Xr" href="http://man.openbsd.org/httpd.8" aria-label="httpd,
+    section 8">httpd(8)</a>, appropriate entries in
+    <a class="Xr" href="http://man.openbsd.org/pf.conf.5" aria-label="pf.conf,
+    section 5">pf.conf(5)</a> are required. Here's an example:</p>
 <div class="Bd Pp Bd-indent Li">
 <pre>table &lt;attackers&gt; persist
 block in quick log proto tcp from &lt;attackers&gt; to port { www https }</pre>
@@ -550,10 +562,11 @@ block in quick log proto tcp from &lt;attackers&gt; to port { www https }</pre>
 }</pre>
 </div>
 <p class="Pp">In case a web application should be capable to, for instance, drop
-    client entries from <a class="Xr" href="pftbld.8.html">pftbld(8)</a>
-    autonomously, at first an additional <code class="Ic">socket</code> entry,
-    this time with the <code class="Ic">action drop</code> option is required in
-    the configuration:</p>
+    client entries from <a class="Xr" href="pftbld.8.html" aria-label="pftbld,
+    section 8">pftbld(8)</a> autonomously, at first an additional
+    <code class="Ic">socket</code> entry, this time with the
+    <code class="Ic">action drop</code> option is required in the
+  configuration:</p>
 <div class="Bd Pp Bd-indent Li">
 <pre>target &quot;www&quot; {
 	...
@@ -581,24 +594,25 @@ block in quick log proto tcp from &lt;attackers&gt; to port { www https }</pre>
 </div>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
-  ALSO</a></h1>
-<p class="Pp"><a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>,
-    <a class="Xr" href="http://man.openbsd.org/pf.conf.5">pf.conf(5)</a>,
-    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a>,
-    <a class="Xr" href="pftbld.8.html">pftbld(8)</a></p>
+<h2 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h2>
+<p class="Pp"><a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf,
+    section 4">pf(4)</a>,
+    <a class="Xr" href="http://man.openbsd.org/pf.conf.5" aria-label="pf.conf,
+    section 5">pf.conf(5)</a>,
+    <a class="Xr" href="pftblctl.8.html" aria-label="pftblctl, section
+    8">pftblctl(8)</a>, <a class="Xr" href="pftbld.8.html" aria-label="pftbld,
+    section 8">pftbld(8)</a></p>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="AUTHORS"><a class="permalink" href="#AUTHORS">AUTHORS</a></h1>
-<p class="Pp">The <a class="Xr" href="pftbld.8.html">pftbld(8)</a> program was
-    written by <span class="An">Matthias Pressfreund</span>.</p>
+<h2 class="Sh" id="AUTHORS"><a class="permalink" href="#AUTHORS">AUTHORS</a></h2>
+<p class="Pp">The <a class="Xr" href="pftbld.8.html" aria-label="pftbld, section
+    8">pftbld(8)</a> program was written by <span class="An">Matthias
+    Pressfreund</span>.</p>
 </section>
-</div>
-<table class="foot">
-  <tr>
-    <td class="foot-date">May 14, 2021</td>
-    <td class="foot-os">OpenBSD</td>
-  </tr>
-</table>
+</main>
+<div class="foot" role="doc-pagefooter" aria-label="Manual footer
+  line"><span class="foot-left">OpenBSD</span> <span class="foot-date">September
+  27, 2026</span> <span class="foot-right">PFTBLD.CONF(5)</span></div>
 </body>
 </html>

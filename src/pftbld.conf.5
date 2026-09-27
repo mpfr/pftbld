@@ -1,5 +1,5 @@
 .\"
-.\" Copyright (c) 2020, 2021 Matthias Pressfreund
+.\" Copyright (c) 2020 - 2026 Matthias Pressfreund
 .\"
 .\" Permission to use, copy, modify, and distribute this software for any
 .\" purpose with or without fee is hereby granted, provided that the above
@@ -13,7 +13,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: May 14 2021 $
+.Dd $Mdocdate: Sep 27 2026 $
 .Dt PFTBLD.CONF 5
 .Os
 .Sh NAME
@@ -90,6 +90,7 @@ Below a few examples to illustrate the above:
 .Sh GLOBAL CONFIGURATION
 Here are the settings that may be applied globally:
 .Bl -tag -width Ds
+.Tg backlog
 .It Oo Ic no Oc Ic backlog Ar number
 The maximum allowed number of simultaneous connections on a
 .Ic socket .
@@ -104,6 +105,7 @@ The actual upper limit of this parameter is the value of the
 kernel state which can be determined by means of the
 .Xr sysctl 8
 utility.
+.Tg datamax
 .It Oo Ic no Oc Ic datamax Ar bytes
 This limits the number of
 .Ar bytes
@@ -118,6 +120,7 @@ keyword is specified instead of the number of
 .Ar bytes ,
 no limit is applied to the amount of data accepted by a connection.
 Defaults to 2048 bytes per connection.
+.Tg drop
 .It Oo Ic no Oc Ic drop Ar time
 The amount of time (from the moment it is received) after which a managed IP
 address will be discarded/dropped from
@@ -163,6 +166,7 @@ Lines not starting with a valid
 .Pa address/network
 are logged and ignored.
 .El
+.Tg idlemin
 .It Oo Ic no Oc Ic idlemin Ar milliseconds
 Specifies the minimum time that must elapse between successive occurrences of
 an IP address on a
@@ -222,6 +226,7 @@ Lines not starting with a valid
 .Pa address/network
 are logged and ignored.
 .El
+.Tg log
 .It Oo Ic no Oc Ic log Ar path
 Make
 .Xr pftbld 8
@@ -233,6 +238,7 @@ Logging may be completely disabled by using the leading
 .Ic no
 keyword instead of specifying a
 .Ar path .
+.Tg timeout
 .It Oo Ic no Oc Ic timeout Ar milliseconds
 Sets the maximum time for a client to transmit its data after making a
 connection.
@@ -283,6 +289,7 @@ There must be exactly one instance defined per
 .Ic target ,
 followed by a block of options enclosed in curly braces:
 .Bl -tag -width Ds
+.Tg drop
 .It Oo Ic no Oc Ic drop Ar time
 Overrides any
 .Ic drop
@@ -363,6 +370,7 @@ entries added by other means coexist perfectly and neither interfere with nor
 get affected by those created and managed by
 .Xr pftbld 8 .
 .El
+.Tg drop
 .It Oo Ic no Oc Ic drop Ar time
 Overrides the global
 .Ic drop
@@ -373,6 +381,7 @@ Allows for
 specific exclusion criteria additional (and evaluated prior) to global
 .Ic exclude
 settings.
+.Tg idlemin
 .It Oo Ic no Oc Ic idlemin Ar milliseconds
 Overrides the global
 .Ic idlemin
@@ -445,10 +454,12 @@ If
 .Ic drop
 is specified, the address will not just be deleted, but the associated client
 entry will also be completely removed from the daemon's memory.
+.Tg backlog
 .It Oo Ic no Oc Ic backlog Ar number
 Overrides the global
 .Ic backlog
 value.
+.Tg datamax
 .It Oo Ic no Oc Ic datamax Ar bytes
 Overrides the global
 .Ic datamax
@@ -499,6 +510,7 @@ to derive the
 .Ar id
 from.
 Defaults to the owner of the parent directory.
+.Tg timeout
 .It Oo Ic no Oc Ic timeout Ar milliseconds
 Overrides the global
 .Ic timeout

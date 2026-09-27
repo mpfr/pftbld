@@ -1,7 +1,13 @@
 <!DOCTYPE html>
 <html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="stylesheet" href="https://man.openbsd.org/mandoc.css" type="text/css" media="all"/>
+  <title>PFTBLD(8)</title>
+</head>
 <!-- This is an automatically generated file.  Do not edit.
-   Copyright (c) 2020, 2021 Matthias Pressfreund
+   Copyright (c) 2020 - 2023 Matthias Pressfreund
   
    Permission to use, copy, modify, and distribute this software for any
    purpose with or without fee is hereby granted, provided that the above
@@ -15,28 +21,20 @@
    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    -->
-<head>
-  <meta charset="utf-8"/>
-  <link rel="stylesheet" href="https://man.openbsd.org/mandoc.css" type="text/css" media="all"/>
-  <title>PFTBLD(8)</title>
-</head>
 <body>
-<table class="head">
-  <tr>
-    <td class="head-ltitle">PFTBLD(8)</td>
-    <td class="head-vol">System Manager's Manual</td>
-    <td class="head-rtitle">PFTBLD(8)</td>
-  </tr>
-</table>
-<div class="manual-text">
+<div class="head" role="doc-pageheader" aria-label="Manual header
+  line"><span class="head-ltitle">PFTBLD(8)</span> <span class="head-vol">System
+  Manager's Manual</span> <span class="head-rtitle">PFTBLD(8)</span></div>
+<main class="manual-text">
 <section class="Sh">
-<h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
-<p class="Pp"><code class="Nm">pftbld</code> &#x2014; <span class="Nd">automate
-    <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table content
-    management</span></p>
+<h2 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h2>
+<p class="Pp"><code class="Nm">pftbld</code> &#x2014;
+    <span class="Nd" role="doc-subtitle">automate
+    <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf, section
+    4">pf(4)</a> table content management</span></p>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+<h2 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h2>
 <table class="Nm">
   <tr>
     <td><code class="Nm">pftbld</code></td>
@@ -56,7 +54,7 @@
 </table>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h1>
+<h2 class="Sh" id="DESCRIPTION"><a class="permalink" href="#DESCRIPTION">DESCRIPTION</a></h2>
 <p class="Pp">The <code class="Nm">pftbld</code> daemon listens on UNIX-domain
     sockets for incoming IP addresses, usually sent by programs such as network
     services and applications.</p>
@@ -65,30 +63,34 @@
 <p class="Pp"></p>
 <ol class="Bl-enum Bd-indent Bl-compact">
   <li>The address is immediately added to a
-      <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> table according
-      to the daemon's configuration for and the frequency of its appearance on
-      the respective socket.</li>
+      <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf, section
+      4">pf(4)</a> table according to the daemon's configuration and the
+      frequency of its appearance on the respective socket.</li>
   <li>After an expiry time also specified in the configuration, the address is
       deleted from the table.</li>
 </ol>
 <p class="Pp"><code class="Nm">pftbld</code> obtains its configuration from
-    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.</p>
+    <a class="Xr" href="pftbld.conf.5.html" aria-label="pftbld.conf, section
+    5">pftbld.conf(5)</a>.</p>
 <p class="Pp">The daemon was originally designed to build and maintain dynamic,
     service/application specific firewall blocklists, but may just as well serve
     any other kind of filtering or translation purposes.</p>
 <p class="Pp">As <code class="Nm">pftbld</code> can persist managed addresses
-    and meta-data, it is capable of restoring its runtime status and
-    corresponding <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>
-    tables through system reboots and migrations.</p>
+    and meta-data, it is able to restore its runtime state and corresponding
+    <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf, section
+    4">pf(4)</a> tables after system reboots and migrations.</p>
 <p class="Pp">Client programs may directly or indirectly (i.e. through some
     other tool) connect and write to the daemon's UNIX-domain sockets. A FastCGI
-    supported <a class="Xr" href="http://man.openbsd.org/httpd.8">httpd(8)</a>
-    server reporting offenders through such a socket is a typical example (see
-    also <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>). Indirect
-    connections, however, may as well be established through
-    <code class="Nm">pftbld</code> itself when used in pipe mode (details
-    described below) or by means of the
-    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a> tool.</p>
+    supported
+    <a class="Xr" href="http://man.openbsd.org/httpd.8" aria-label="httpd,
+    section 8">httpd(8)</a> server reporting offenders through such a socket is
+    a typical example (see also
+    <a class="Xr" href="pftbld.conf.5.html" aria-label="pftbld.conf, section
+    5">pftbld.conf(5)</a>). Indirect connections, however, may as well be
+    established through <code class="Nm">pftbld</code> itself when used in pipe
+    mode (details described below) or by means of the
+    <a class="Xr" href="pftblctl.8.html" aria-label="pftblctl, section
+    8">pftblctl(8)</a> tool.</p>
 <p class="Pp"><code class="Nm">pftbld</code> rereads the configuration file on
     <code class="Dv">SIGHUP</code> and reopens its log file when it receives
     <code class="Dv">SIGUSR1</code>.</p>
@@ -121,9 +123,10 @@
       <span class="Pa">/var/run/pftbld.sock</span>.</dd>
   <dt id="u"><a class="permalink" href="#u"><code class="Fl">-u</code></a></dt>
   <dd>By default, managed addresses will remain in
-      <a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a> tables after
-      <code class="Nm">pftbld</code> shutdown. With this option given, addresses
-      will be unloaded from corresponding tables on shutdown.</dd>
+      <a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf, section
+      4">pf(4)</a> tables after <code class="Nm">pftbld</code> shutdown. With
+      this option given, addresses will be unloaded from corresponding tables on
+      shutdown.</dd>
   <dt id="v"><a class="permalink" href="#v"><code class="Fl">-v</code></a></dt>
   <dd>Verbose mode. If used with the server, multiple <code class="Fl">-v</code>
       options increase the verbosity. If used with pipe mode to write either
@@ -140,14 +143,15 @@
 </dl>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="MESSAGES"><a class="permalink" href="#MESSAGES">MESSAGES</a></h1>
+<h2 class="Sh" id="MESSAGES"><a class="permalink" href="#MESSAGES">MESSAGES</a></h2>
 <p class="Pp">Client programs may send messages to any
     <code class="Ic">socket</code> specified in the configuration. Each message
     must be formatted as <span class="Pa">one single plain text string</span>,
     and may consist of multiple <span class="Pa">newline-delimited</span> parts.
     By default, the maximum length of a message is 2048 bytes, but this may be
     changed via the <code class="Ic">datamax</code> parameter in
-    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>.</p>
+    <a class="Xr" href="pftbld.conf.5.html" aria-label="pftbld.conf, section
+    5">pftbld.conf(5)</a>.</p>
 <p class="Pp">A message for a <span class="Pa">data socket</span> must start
     with an <span class="Pa">IP address</span> followed by any number of
     <span class="Pa">optional pieces of text</span>, the sole purpose of which
@@ -167,8 +171,7 @@
     cause two log entries:</p>
 <div class="Bd Pp Bd-indent Li">
 <pre>[...] Add :: [www] &lt;- [11.22.33.44][GET /test.php 404]
-[...] &gt;&gt;&gt; Added [11.22.33.44]:[www]:(2x:3h16m25s) \
-to { attackers } for 1h.</pre>
+[...] &gt;&gt;&gt; Added [11.22.33.44]:[www]:(2x:3h16m25s) to { attackers } for 1h.</pre>
 </div>
 <p class="Pp">The first entry documents the incoming message including all
     optional parts. The following entry lets us know that this is the second
@@ -182,11 +185,12 @@ to { attackers } for 1h.</pre>
 </div>
 <p class="Pp">Although sending messages to a <span class="Pa">control
     socket</span> basically works the same way, using the
-    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a> tool is recommended for
-    simplicity. A list of accepted commands is available on its manpage.</p>
+    <a class="Xr" href="pftblctl.8.html" aria-label="pftblctl, section
+    8">pftblctl(8)</a> tool is recommended for simplicity. A list of accepted
+    commands is available on its manpage.</p>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h1>
+<h2 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h2>
 <dl class="Bl-tag Bl-compact">
   <dt><span class="Pa">/etc/pftbld/pftbld.conf</span></dt>
   <dd>Default configuration file.</dd>
@@ -197,29 +201,29 @@ to { attackers } for 1h.</pre>
 </dl>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
-  ALSO</a></h1>
-<p class="Pp"><a class="Xr" href="http://man.openbsd.org/pf.4">pf(4)</a>,
-    <a class="Xr" href="pftbld.conf.5.html">pftbld.conf(5)</a>,
-    <a class="Xr" href="pftblctl.8.html">pftblctl(8)</a></p>
+<h2 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE
+  ALSO</a></h2>
+<p class="Pp"><a class="Xr" href="http://man.openbsd.org/pf.4" aria-label="pf,
+    section 4">pf(4)</a>,
+    <a class="Xr" href="pftbld.conf.5.html" aria-label="pftbld.conf, section
+    5">pftbld.conf(5)</a>,
+    <a class="Xr" href="pftblctl.8.html" aria-label="pftblctl, section
+    8">pftblctl(8)</a></p>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="HISTORY"><a class="permalink" href="#HISTORY">HISTORY</a></h1>
+<h2 class="Sh" id="HISTORY"><a class="permalink" href="#HISTORY">HISTORY</a></h2>
 <p class="Pp">The <code class="Nm">pftbld</code> program first appeared on
     <a class="Lk" href="https://github.com/mpfr/pftbld/">GitHub</a> in August,
     2020.</p>
 </section>
 <section class="Sh">
-<h1 class="Sh" id="AUTHORS"><a class="permalink" href="#AUTHORS">AUTHORS</a></h1>
+<h2 class="Sh" id="AUTHORS"><a class="permalink" href="#AUTHORS">AUTHORS</a></h2>
 <p class="Pp">The <code class="Nm">pftbld</code> program was written by
     <span class="An">Matthias Pressfreund</span>.</p>
 </section>
-</div>
-<table class="foot">
-  <tr>
-    <td class="foot-date">February 13, 2021</td>
-    <td class="foot-os">OpenBSD</td>
-  </tr>
-</table>
+</main>
+<div class="foot" role="doc-pagefooter" aria-label="Manual footer
+  line"><span class="foot-left">OpenBSD</span> <span class="foot-date">December
+  1, 2023</span> <span class="foot-right">PFTBLD(8)</span></div>
 </body>
 </html>
