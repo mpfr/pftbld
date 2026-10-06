@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2024 Matthias Pressfreund
+ * Copyright (c) 2020 - 2026 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -253,7 +253,7 @@ void
 fork_listener(struct socket *sockcfg, char *tgtname)
 {
 	extern const struct procfunc	 process[];
-	extern char			*__progname;
+	extern char			*__progname, execpath[];
 
 	int	 cfd[2];
 	pid_t	 pid;
@@ -290,8 +290,8 @@ fork_listener(struct socket *sockcfg, char *tgtname)
 	LLTOS(argv[10], sockcfg->timeout);
 	argv[11] = NULL;
 
-	execvp(__progname, argv);
-	FATAL("execvp");
+	execv(execpath, argv);
+	FATAL("execv");
 }
 
 static struct crange *

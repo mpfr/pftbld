@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2024 Matthias Pressfreund
+ * Copyright (c) 2020 - 2026 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1079,7 +1079,7 @@ fork_scheduler(void)
 {
 	extern int			 logfd, privfd;
 	extern const struct procfunc	 process[];
-	extern char			*__progname;
+	extern char			*__progname, execpath[];
 
 	int	 ctrlfd[2], inbfd[2];
 	char	*argv[3];
@@ -1109,8 +1109,8 @@ fork_scheduler(void)
 	argv[1] = __progname;
 	argv[2] = NULL;
 
-	execvp(__progname, argv);
-	FATAL("execvp");
+	execv(execpath, argv);
+	FATAL("execv");
 }
 
 int

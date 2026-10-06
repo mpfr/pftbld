@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2021 Matthias Pressfreund
+ * Copyright (c) 2020 - 2026 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -41,7 +41,7 @@ static void	 send_conf(int);
 extern struct config	*conf;
 
 char	*basepath = NULL;
-char	 conffile[PATH_MAX] = CONF_FILE;
+char	 execpath[PATH_MAX], conffile[PATH_MAX] = CONF_FILE;
 int	 privfd;
 
 const struct procfunc	 process[] = {
@@ -188,6 +188,9 @@ pftbld(int argc, char *argv[])
 			usage();
 		}
 	}
+
+	if (getexecpath(execpath, sizeof(execpath)) != 0)
+		fatal("getexecpath");
 
 	if (conffileopt != NULL)
 		CANONICAL_PATH_SET(conffile, conffileopt, "configuration file",

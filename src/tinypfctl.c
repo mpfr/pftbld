@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 - 2024 Matthias Pressfreund
+ * Copyright (c) 2020 - 2026 Matthias Pressfreund
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -385,7 +385,7 @@ int
 fork_tinypfctl(struct pfcmd *cmd)
 {
 	extern const struct procfunc	 process[];
-	extern char			*__progname;
+	extern char			*__progname, execpath[];
 
 	int	 ctrlfd[2], pid;
 	char	*argv[7];
@@ -412,6 +412,6 @@ fork_tinypfctl(struct pfcmd *cmd)
 	LLTOS(argv[5], (long long)cmd->addrcnt);
 	argv[6] = NULL;
 
-	execvp(__progname, argv);
-	FATAL("execvp");
+	execv(execpath, argv);
+	FATAL("execv");
 }
