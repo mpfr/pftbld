@@ -20,8 +20,8 @@ The most common cases probably are:
 `pftbld` needs to be built from sources and installed manually. Luckily, this is easy and straightforward. Just follow the steps below.
 
 First of all, make sure you're running `OpenBSD-current`. Otherwise, one of the following branches might be more appropriate:
+* [8.0-stable](https://github.com/mpfr/pftbld/tree/8.0-stable)
 * [7.9-stable](https://github.com/mpfr/pftbld/tree/7.9-stable)
-* [7.8-stable](https://github.com/mpfr/pftbld/tree/7.8-stable)
 
 Then, make sure your user (e.g. `mpfr`) has sufficient `doas` permissions.
 
