@@ -21,7 +21,7 @@ The most common cases probably are:
 
 First of all, make sure you're running `OpenBSD 7.9-stable`. Otherwise, one of the following branches might be more appropriate:
 * [current](https://github.com/mpfr/pftbld)
-* [7.8-stable](https://github.com/mpfr/pftbld/tree/7.8-stable)
+* [8.0-stable](https://github.com/mpfr/pftbld/tree/8.0-stable)
 
 Then, make sure your user (e.g. `mpfr`) has sufficient `doas` permissions.
 
